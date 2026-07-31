@@ -1,4 +1,99 @@
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.type === "MJ_XHS_START_COMMENT_SYNC") {
+    const requestId = String(message.requestId || "");
+    const profileUrl = String(message.profileUrl || "");
+    if (!requestId || !/^https:\/\/www\.xiaohongshu\.com\/user\/profile\/[0-9a-z]+/i.test(profileUrl)) return false;
+    chrome.storage.local.set({
+      mjXhsCommentSync: {
+        requestId,
+        profileUrl,
+        createdAt: new Date().toISOString(),
+        noteUrls: [],
+        results: {},
+      },
+    }, () => chrome.tabs.create({ url: profileUrl, active: true }));
+    return false;
+  }
+  if (message?.type === "MJ_XHS_PROFILE_NOTES") {
+    chrome.storage.local.get("mjXhsCommentSync", (stored) => {
+      const state = stored.mjXhsCommentSync;
+      if (!state || state.requestId !== message.requestId) return;
+      const noteUrls = Array.isArray(message.noteUrls) ? [...new Set(message.noteUrls)].slice(0, 3) : [];
+      if (!noteUrls.length) {
+        chrome.storage.local.set({
+          mjXhsCommentSyncResult: {
+            requestId: state.requestId,
+            comments: [],
+            error: "没有从主页读取到公开笔记，请确认账号已登录并重试",
+          },
+        });
+        return;
+      }
+      chrome.storage.local.set({
+        mjXhsCommentSync: { ...state, noteUrls, results: {} },
+      }, () => noteUrls.forEach((url) => chrome.tabs.create({ url, active: false })));
+    });
+    return false;
+  }
+  if (message?.type === "MJ_XHS_NOTE_COMMENTS") {
+    chrome.storage.local.get("mjXhsCommentSync", (stored) => {
+      const state = stored.mjXhsCommentSync;
+      if (!state || state.requestId !== message.requestId || !state.noteUrls?.includes(message.sourceUrl)) return;
+      const results = { ...(state.results || {}), [message.sourceUrl]: Array.isArray(message.comments) ? message.comments : [] };
+      const next = { ...state, results };
+      chrome.storage.local.set({ mjXhsCommentSync: next });
+      if (Object.keys(results).length >= state.noteUrls.length) {
+        chrome.storage.local.set({
+          mjXhsCommentSyncResult: {
+            requestId: state.requestId,
+            comments: Object.values(results).flat().slice(0, 50),
+            error: "",
+          },
+        });
+      }
+    });
+    return false;
+  }
+  if (message?.type === "MJ_XHS_START_COMMENT_REPLY") {
+    const requestId = String(message.requestId || "");
+    const actions = Array.isArray(message.actions) ? message.actions.slice(0, 5) : [];
+    if (!requestId || !actions.length) return false;
+    const state = {
+      requestId,
+      actions,
+      authorization: message.authorization,
+      results: {},
+      createdAt: new Date().toISOString(),
+    };
+    chrome.storage.local.set({ mjXhsCommentReply: state }, () => {
+      [...new Set(actions.map((action) => action.sourceUrl))].forEach((url) => {
+        if (/^https:\/\/www\.xiaohongshu\.com\/(?:explore|discovery\/item)\//.test(url)) {
+          chrome.tabs.create({ url, active: false });
+        }
+      });
+    });
+    return false;
+  }
+  if (message?.type === "MJ_XHS_COMMENT_REPLY_PROGRESS") {
+    chrome.storage.local.get("mjXhsCommentReply", (stored) => {
+      const state = stored.mjXhsCommentReply;
+      if (!state || state.requestId !== message.requestId) return;
+      const results = { ...(state.results || {}) };
+      for (const result of Array.isArray(message.results) ? message.results : []) results[result.id] = result;
+      const next = { ...state, results };
+      chrome.storage.local.set({ mjXhsCommentReply: next });
+      if (Object.keys(results).length >= state.actions.length) {
+        chrome.storage.local.set({
+          mjXhsCommentReplyResult: {
+            requestId: state.requestId,
+            results: Object.values(results),
+            error: "",
+          },
+        });
+      }
+    });
+    return false;
+  }
   if (message?.type === "MJ_XHS_START_RESEARCH") {
     const requestId = String(message.requestId || "");
     if (!requestId) return false;

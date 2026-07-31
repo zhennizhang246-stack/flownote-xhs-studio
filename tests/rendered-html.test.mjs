@@ -11,8 +11,8 @@ test("ships the studio secretary product surface", async () => {
   assert.match(page, /每日 3 篇小红书高热参考解析/);
   assert.match(page, /确认并预填小红书发布页/);
   assert.match(page, /确认本篇并自动发布/);
-  assert.match(page, /MJ 发布桥 1.2 已连接/);
-  assert.match(page, /秘书会打开小红书/);
+  assert.match(page, /MJ 发布桥 1.3 已连接/);
+  assert.match(page, /秘书会重新打开小红书/);
   assert.match(page, /from=menu&target=image/);
   assert.match(page, /renderCoverDataUrl/);
   assert.match(page, /5 \* 60_000/);
@@ -22,8 +22,10 @@ test("ships the studio secretary product surface", async () => {
   assert.match(page, /办公项目/);
   assert.match(page, /酒店项目/);
   assert.match(page, /展厅陈列项目/);
-  assert.match(page, /小红书客服助手/);
-  assert.match(page, /高风险站外导流模板 · 已禁用自动发送/);
+  assert.match(page, /笔记评论自动回复秘书/);
+  assert.match(page, /同步最近笔记评论/);
+  assert.match(page, /确认并自动回复安全评论/);
+  assert.match(page, /高风险评论 · 自动转人工/);
   assert.match(page, /3 个标题方案 · 点击选择/);
   assert.match(page, /确认并同步保存/);
   assert.match(page, /©2026/);
@@ -33,6 +35,13 @@ test("ships the studio secretary product surface", async () => {
   assert.match(page, /人工立即发布/);
   assert.match(page, /官方 API 自动发布/);
   assert.match(page, /等待官方授权/);
+  assert.match(page, /封面样式编辑/);
+  assert.match(page, /建筑网格/);
+  assert.match(page, /标题颜色/);
+  assert.match(page, /已纳入后续生成策略/);
+  assert.match(page, /直接打开当前可浏览的原笔记网页/);
+  assert.match(page, /重新采集今日 3 篇/);
+  assert.match(page, /visibleResearchReferences/);
   assert.match(page, /保存项目并生成封面与文案/);
   assert.match(page, /浙江 · 温州/);
 });
@@ -42,6 +51,7 @@ test("ships a local bridge with manual prefill and single-use auto-publish autho
   const siteBridge = await readFile(new URL("../browser-extension/site-bridge.js", import.meta.url), "utf8");
   const prefill = await readFile(new URL("../browser-extension/xhs-prefill.js", import.meta.url), "utf8");
   const research = await readFile(new URL("../browser-extension/xhs-research.js", import.meta.url), "utf8");
+  const comments = await readFile(new URL("../browser-extension/xhs-comments.js", import.meta.url), "utf8");
   assert.equal(manifest.manifest_version, 3);
   assert.ok(manifest.content_scripts.some((entry) => entry.matches.includes("https://creator.xiaohongshu.com/publish/*")));
   assert.match(siteBridge, /MJ_XHS_DRAFT_STORED/);
@@ -58,6 +68,12 @@ test("ships a local bridge with manual prefill and single-use auto-publish autho
   assert.match(research, /collectCandidates/);
   assert.match(research, /安全验证/);
   assert.match(research, /MJ_XHS_RESEARCH_RESULTS/);
+  assert.match(siteBridge, /MJ_XHS_COMMENT_SYNC_REQUEST/);
+  assert.match(siteBridge, /MJ_XHS_COMMENT_REPLY_REQUEST/);
+  assert.match(comments, /collectProfileNotes/);
+  assert.match(comments, /collectNoteComments/);
+  assert.match(comments, /authorizationValid/);
+  assert.match(comments, /20_000/);
 });
 
 test("uses Node CI instead of applying Deno lint rules to the Node app", async () => {
@@ -98,12 +114,15 @@ test("binds durable project storage", async () => {
   assert.match(schema, /customer_messages/);
   assert.match(schema, /category/);
   assert.match(schema, /publish_mode/);
+  assert.match(schema, /owner_email/);
+  assert.match(schema, /account_automation_settings/);
 });
 
-test("ships a durable, human-reviewed customer service handoff", async () => {
+test("ships a durable, guarded note comment reply manager", async () => {
   const route = await readFile(new URL("../app/api/customer-service/route.ts", import.meta.url), "utf8");
-  assert.match(route, /SAFE_REPLY/);
+  assert.match(route, /MANUAL_REVIEW_PATTERN/);
   assert.match(route, /suggestedReply/);
+  assert.match(route, /autoReplyEligible/);
   assert.doesNotMatch(route, /LIKE-MJ0666666/);
 });
 
@@ -120,6 +139,9 @@ test("ships configurable scheduling and daily research APIs", async () => {
   assert.match(researchService, /isXiaohongshuNoteUrl/);
   assert.match(researchService, /collectBrowserResearch/);
   assert.match(researchService, /abstractReusablePattern/);
+  assert.match(researchService, /xsec_token/);
+  assert.match(researchService, /noteIdentity/);
+  assert.match(researchService, /db\.delete\(researchReferences\)/);
   assert.match(generate, /近期研究规律/);
   assert.match(generate, /不得复制标题、原句、段落或封面版式/);
 });
@@ -130,4 +152,55 @@ test("requires a human-approved draft before scheduling", async () => {
   assert.match(projectApi, /approvedAt/);
   assert.match(projectApi, /publishedAt/);
   assert.match(scheduleApi, /请先保存并人工确认封面与文案/);
+});
+
+test("persists designed covers and gates official publishing behind approved credentials", async () => {
+  const page = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  const projectApi = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
+  const coverApi = await readFile(new URL("../app/api/projects/[id]/cover/route.ts", import.meta.url), "utf8");
+  const publishApi = await readFile(new URL("../app/api/publish/official/route.ts", import.meta.url), "utf8");
+  const publisher = await readFile(new URL("../lib/official-publish.ts", import.meta.url), "utf8");
+  const worker = await readFile(new URL("../worker/index.ts", import.meta.url), "utf8");
+  assert.match(page, /normalizedCoverStyle/);
+  assert.match(page, /drawCoverPattern/);
+  assert.match(page, /submitOfficialProject/);
+  assert.match(projectApi, /coverStyle/);
+  assert.match(coverApi, /approved-cover\.jpg/);
+  assert.match(publishApi, /publishProjectOfficial/);
+  assert.match(publisher, /xiaohongshu\.com/);
+  assert.match(publisher, /\["approved", "scheduled"\]/);
+  assert.match(publisher, /publishDueProjects/);
+  assert.match(worker, /publishDueProjects/);
+});
+
+test("publishes a sign-in-gated multi-account workspace without sharing Xiaohongshu sessions", async () => {
+  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  const account = await readFile(new URL("../lib/account.ts", import.meta.url), "utf8");
+  const projects = await readFile(new URL("../app/api/projects/route.ts", import.meta.url), "utf8");
+  const settings = await readFile(new URL("../app/api/settings/route.ts", import.meta.url), "utf8");
+  assert.match(page, /requireChatGPTUser/);
+  assert.match(page, /force-dynamic/);
+  assert.match(studio, /其他账户首次使用需重新登录小红书/);
+  assert.match(studio, /mj-xhs-profile-url/);
+  assert.doesNotMatch(studio, /60f6318b0000000001015907/);
+  assert.match(account, /PRIMARY_OWNER_EMAIL/);
+  assert.match(projects, /requireAccountEmail/);
+  assert.match(projects, /projects\.ownerEmail/);
+  assert.match(settings, /accountAutomationSettings/);
+});
+
+test("publishes a WeChat share page synchronized with the main site content", async () => {
+  const sharePage = await readFile(new URL("../app/wechat/page.tsx", import.meta.url), "utf8");
+  const sharedContent = await readFile(new URL("../lib/site-content.ts", import.meta.url), "utf8");
+  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const layout = await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
+  assert.match(sharePage, /微信转发专页/);
+  assert.match(sharePage, /与主站同步/);
+  assert.match(sharePage, /openGraph/);
+  assert.match(sharePage, /href="\/"/);
+  assert.match(sharePage, /siteContent\.features/);
+  assert.match(sharedContent, /shareDescription/);
+  assert.match(page, /siteContent/);
+  assert.match(layout, /siteContent/);
 });

@@ -2,6 +2,7 @@
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 export const projects = sqliteTable("projects", {
   id: integer("id").primaryKey({ autoIncrement: true }), name: text("name").notNull(),
+  ownerEmail: text("owner_email").notNull().default(""),
   location: text("location").notNull().default(""), area: text("area").notNull().default(""),
   projectType: text("project_type").notNull().default(""), category: text("category").notNull().default("住宅项目"),
   audience: text("audience").notNull().default(""),
@@ -30,8 +31,21 @@ export const automationSettings = sqliteTable("automation_settings", {
   updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
+export const accountAutomationSettings = sqliteTable("account_automation_settings", {
+  ownerEmail: text("owner_email").primaryKey(),
+  timezone: text("timezone").notNull().default("Asia/Shanghai"),
+  publishTime: text("publish_time").notNull().default("12:00"),
+  publishCadenceDays: integer("publish_cadence_days").notNull().default(3),
+  researchTime: text("research_time").notNull().default("09:00"),
+  dailyResearchEnabled: integer("daily_research_enabled", { mode: "boolean" }).notNull().default(true),
+  requireApproval: integer("require_approval", { mode: "boolean" }).notNull().default(true),
+  publishMode: text("publish_mode").notNull().default("manual"),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
 export const researchReferences = sqliteTable("research_references", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  ownerEmail: text("owner_email").notNull().default(""),
   researchDate: text("research_date").notNull(),
   sourceUrl: text("source_url").notNull().unique(),
   title: text("title").notNull(),
@@ -50,6 +64,7 @@ export const researchReferences = sqliteTable("research_references", {
 
 export const customerMessages = sqliteTable("customer_messages", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  ownerEmail: text("owner_email").notNull().default(""),
   senderName: text("sender_name").notNull().default("小红书访客"),
   message: text("message").notNull(),
   sourceUrl: text("source_url").notNull().default(""),

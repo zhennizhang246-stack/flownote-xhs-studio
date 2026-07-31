@@ -1,5 +1,5 @@
 import { drizzle } from "drizzle-orm/d1";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import * as schema from "../db/schema";
 import { researchReferences } from "../db/schema";
 
@@ -68,6 +68,17 @@ function isXiaohongshuNoteUrl(value: string) {
 function canonicalXiaohongshuNoteUrl(value: string) {
   if (!isXiaohongshuNoteUrl(value)) return "";
   const url = new URL(value);
+  const canonical = new URL(`${url.origin}${url.pathname}`);
+  for (const key of ["xsec_token", "xsec_source", "source"]) {
+    const parameter = url.searchParams.get(key);
+    if (parameter) canonical.searchParams.set(key, parameter.slice(0, 1000));
+  }
+  return canonical.href.slice(0, 2000);
+}
+
+function noteIdentity(value: string) {
+  if (!isXiaohongshuNoteUrl(value)) return "";
+  const url = new URL(value);
   return `${url.origin}${url.pathname}`;
 }
 
@@ -92,16 +103,17 @@ function abstractReusablePattern(title: string) {
   return "封面只突出一个空间情绪，标题提出单一价值，正文按视觉印象、设计方法、生活收益逐层推进。";
 }
 
-export async function collectBrowserResearch(env: ResearchRuntimeEnv, candidates: BrowserResearchCandidate[], force = false) {
+export async function collectBrowserResearch(env: ResearchRuntimeEnv, ownerEmail: string, candidates: BrowserResearchCandidate[], force = false) {
   const date = chinaDate();
-  const existing = await listResearch(env, date);
+  const existing = await listResearch(env, ownerEmail, date);
   if (existing.length >= 3 && !force) return existing;
   const unique = new Map<string, BrowserResearchCandidate>();
   for (const candidate of candidates.slice(0, 20)) {
     const sourceUrl = canonicalXiaohongshuNoteUrl(String(candidate.sourceUrl || "").trim());
+    const identity = noteIdentity(sourceUrl);
     const title = String(candidate.title || "").replace(/\s+/g, " ").trim().slice(0, 120);
-    if (!isXiaohongshuNoteUrl(sourceUrl) || title.length < 3 || unique.has(sourceUrl)) continue;
-    unique.set(sourceUrl, {
+    if (!identity || title.length < 3 || unique.has(identity)) continue;
+    unique.set(identity, {
       sourceUrl,
       title,
       author: String(candidate.author || "").replace(/\s+/g, " ").trim().slice(0, 80),
@@ -117,6 +129,12 @@ export async function collectBrowserResearch(env: ResearchRuntimeEnv, candidates
   if (selected.length !== 3) throw new Error("未从小红书公开搜索页读取到 3 篇可核验笔记，请确认已登录后重试");
 
   const db = drizzle(env.DB, { schema });
+  if (force) {
+    await db.delete(researchReferences).where(and(
+      eq(researchReferences.ownerEmail, ownerEmail),
+      eq(researchReferences.researchDate, date),
+    ));
+  }
   for (const candidate of selected) {
     const likes = parseVisibleMetric(candidate.likesText || "");
     const item: ResearchItem = {
@@ -137,13 +155,13 @@ export async function collectBrowserResearch(env: ResearchRuntimeEnv, candidates
       audienceInsight: "面向正在寻找设计灵感、比较设计公司专业度，或准备启动住宅与商业空间项目的人群。",
       reusablePattern: abstractReusablePattern(candidate.title),
     };
-    const values = { researchDate: date, ...item };
+    const values = { ownerEmail, researchDate: date, ...item };
     await db.insert(researchReferences).values(values).onConflictDoUpdate({
       target: researchReferences.sourceUrl,
       set: values,
     });
   }
-  return listResearch(env, date);
+  return listResearch(env, ownerEmail, date);
 }
 
 const researchSchema = {
@@ -182,17 +200,17 @@ const researchSchema = {
   },
 };
 
-export async function listResearch(env: ResearchRuntimeEnv, date?: string) {
+export async function listResearch(env: ResearchRuntimeEnv, ownerEmail: string, date?: string) {
   const db = drizzle(env.DB, { schema });
   return date
-    ? db.select().from(researchReferences).where(eq(researchReferences.researchDate, date)).orderBy(desc(researchReferences.likes)).limit(3)
-    : db.select().from(researchReferences).orderBy(desc(researchReferences.researchDate), desc(researchReferences.likes)).limit(30);
+    ? db.select().from(researchReferences).where(and(eq(researchReferences.ownerEmail, ownerEmail), eq(researchReferences.researchDate, date))).orderBy(desc(researchReferences.likes)).limit(3)
+    : db.select().from(researchReferences).where(eq(researchReferences.ownerEmail, ownerEmail)).orderBy(desc(researchReferences.researchDate), desc(researchReferences.likes)).limit(30);
 }
 
-export async function collectDailyResearch(env: ResearchRuntimeEnv, force = false) {
+export async function collectDailyResearch(env: ResearchRuntimeEnv, ownerEmail: string, force = false) {
   if (!env.OPENAI_API_KEY?.startsWith("sk-")) throw new Error("OpenAI API 密钥尚未连接");
   const date = chinaDate();
-  const existing = await listResearch(env, date);
+  const existing = await listResearch(env, ownerEmail, date);
   if (existing.length >= 3 && !force) return existing;
 
   const prompt = `今天是 ${date}。你是室内设计工作室的内容研究员。
@@ -238,11 +256,11 @@ reusablePattern 必须是可用于未来原创项目的抽象方法。`;
 
   const db = drizzle(env.DB, { schema });
   for (const item of items) {
-    const values = { researchDate: date, ...item };
+    const values = { ownerEmail, researchDate: date, ...item };
     await db.insert(researchReferences).values(values).onConflictDoUpdate({
       target: researchReferences.sourceUrl,
       set: values,
     });
   }
-  return listResearch(env, date);
+  return listResearch(env, ownerEmail, date);
 }

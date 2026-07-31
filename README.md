@@ -24,6 +24,8 @@ npm run build
 
 版本 1.2 增加浏览器研究流程：用户点击“开始今日研究”后，扩展打开小红书公开搜索页，读取可见的室内设计笔记候选，平台筛选 3 篇并保存抽象的文案、封面与受众规律。生成新项目时会读取最近研究规律，但禁止复制原句、标题或封面版式。
 
+版本 1.3 将客服模块升级为“笔记评论秘书”：同步本人最近公开笔记中可见的评论，生成规则化合规回复，并在单次确认后最多自动回复 5 条安全评论。联系方式、投诉、退款、侵权、举报和验证提示均转人工。
+
 This starter does not use `wrangler.jsonc`.
 
 ## Included Shape
@@ -99,6 +101,34 @@ actions tied to the current ChatGPT user. Leave public content anonymous.
 - `npm run build`: verify the vinext build output
 - `npm test`: build the starter and verify its rendered loading skeleton
 - `npm run db:generate`: generate Drizzle migrations after schema changes
+
+## Cover editor and formal publishing
+
+- The creator workspace stores editable cover typography, colors, overlay,
+  alignment, placement, and decorative patterns together with each project.
+- Saving or approving a project renders the exact 1080×1440 cover into project
+  storage, so the asset library, browser bridge, and publishing adapter use the
+  same approved cover.
+- Traffic-reference cards open their Xiaohongshu source notes. The three latest
+  abstract research patterns are supplied to future copy and cover generation;
+  original wording and layouts are not copied.
+- Formal automatic publishing stays disabled until a Xiaohongshu-approved HTTPS
+  endpoint and token are stored in the hosted environment. Due approved items
+  are submitted by the scheduled worker, with an atomic publishing lock to
+  prevent duplicate submissions. The browser-assisted manual flow remains
+  available at all times.
+
+## Public multi-account access
+
+- The public URL starts with dispatch-owned ChatGPT sign-in. Each signed-in
+  account receives an isolated D1 workspace for projects, settings, research,
+  and comment records.
+- Existing unowned records can only be claimed by the account matching the
+  secret `PRIMARY_OWNER_EMAIL`; other users cannot see or modify them.
+- Xiaohongshu login stays browser-local. Each user logs in to Xiaohongshu in
+  their own browser, installs the publishing bridge, and saves their own profile
+  URL locally for comment management. Xiaohongshu cookies and credentials are
+  never stored by the site.
 
 ## Learn More
 
