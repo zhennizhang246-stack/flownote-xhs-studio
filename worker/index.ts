@@ -2,12 +2,17 @@
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
 import { collectDailyResearch } from "../lib/research";
+import { publishDueProjects } from "../lib/official-publish";
 
 interface Env {
   ASSETS: Fetcher;
   DB: D1Database;
   OPENAI_API_KEY?: string;
   OPENAI_MODEL?: string;
+  PROJECT_MEDIA?: R2Bucket;
+  XHS_OFFICIAL_PUBLISH_ENDPOINT?: string;
+  XHS_OFFICIAL_PUBLISH_TOKEN?: string;
+  XHS_OFFICIAL_ACCOUNT_ID?: string;
   IMAGES: {
     input(stream: ReadableStream): {
       transform(options: Record<string, unknown>): {
@@ -46,7 +51,10 @@ const worker = {
     return handler.fetch(request, env, ctx);
   },
   async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
-    ctx.waitUntil(collectDailyResearch(env));
+    ctx.waitUntil(Promise.allSettled([
+      collectDailyResearch(env),
+      publishDueProjects(env),
+    ]));
   },
 };
 

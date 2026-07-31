@@ -21,10 +21,16 @@ type RuntimeEnv = {
 
 function officialApiConnected() {
   const runtime = env as unknown as RuntimeEnv;
-  return Boolean(
-    runtime.XHS_OFFICIAL_PUBLISH_ENDPOINT?.startsWith("https://")
-    && runtime.XHS_OFFICIAL_PUBLISH_TOKEN,
-  );
+  try {
+    const endpoint = new URL(runtime.XHS_OFFICIAL_PUBLISH_ENDPOINT || "");
+    return Boolean(
+      endpoint.protocol === "https:"
+      && (endpoint.hostname === "xiaohongshu.com" || endpoint.hostname.endsWith(".xiaohongshu.com"))
+      && runtime.XHS_OFFICIAL_PUBLISH_TOKEN,
+    );
+  } catch {
+    return false;
+  }
 }
 
 export async function GET() {

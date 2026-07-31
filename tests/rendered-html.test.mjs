@@ -35,6 +35,11 @@ test("ships the studio secretary product surface", async () => {
   assert.match(page, /人工立即发布/);
   assert.match(page, /官方 API 自动发布/);
   assert.match(page, /等待官方授权/);
+  assert.match(page, /封面样式编辑/);
+  assert.match(page, /建筑网格/);
+  assert.match(page, /标题颜色/);
+  assert.match(page, /已纳入后续生成策略/);
+  assert.match(page, /点击整张卡片查看小红书原笔记/);
   assert.match(page, /保存项目并生成封面与文案/);
   assert.match(page, /浙江 · 温州/);
 });
@@ -140,4 +145,23 @@ test("requires a human-approved draft before scheduling", async () => {
   assert.match(projectApi, /approvedAt/);
   assert.match(projectApi, /publishedAt/);
   assert.match(scheduleApi, /请先保存并人工确认封面与文案/);
+});
+
+test("persists designed covers and gates official publishing behind approved credentials", async () => {
+  const page = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  const projectApi = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
+  const coverApi = await readFile(new URL("../app/api/projects/[id]/cover/route.ts", import.meta.url), "utf8");
+  const publishApi = await readFile(new URL("../app/api/publish/official/route.ts", import.meta.url), "utf8");
+  const publisher = await readFile(new URL("../lib/official-publish.ts", import.meta.url), "utf8");
+  const worker = await readFile(new URL("../worker/index.ts", import.meta.url), "utf8");
+  assert.match(page, /normalizedCoverStyle/);
+  assert.match(page, /drawCoverPattern/);
+  assert.match(page, /submitOfficialProject/);
+  assert.match(projectApi, /coverStyle/);
+  assert.match(coverApi, /approved-cover\.jpg/);
+  assert.match(publishApi, /publishProjectOfficial/);
+  assert.match(publisher, /xiaohongshu\.com/);
+  assert.match(publisher, /\["approved", "scheduled"\]/);
+  assert.match(publisher, /publishDueProjects/);
+  assert.match(worker, /publishDueProjects/);
 });
