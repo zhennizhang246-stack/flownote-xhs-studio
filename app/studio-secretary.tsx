@@ -1185,6 +1185,7 @@ export function StudioSecretary({ accountName }: { accountName: string }) {
       <div className="brand"><span className="brand-mark">栖</span><div><strong>栖作</strong><small>STUDIO SECRETARY</small></div></div>
       <nav>{navItems.map((item) => <button className={activeTab === item.id ? "nav-item active" : "nav-item"} key={item.id} onClick={() => setActiveTab(item.id)}><span>{item.number}</span>{item.label}</button>)}</nav>
       <div className="cadence-card copyright-card"><small>©2026</small><strong>由 MJ 制作</strong><p>网站平台</p></div>
+      <a className="wechat-share-link" href="/wechat" target="_blank" rel="noreferrer">微信转发页 ↗</a>
       <p className="sidebar-note">图片、事实、排期与参考均按项目归档。正式发布前保留人工确认。</p>
     </aside>
     <section className="workspace">
