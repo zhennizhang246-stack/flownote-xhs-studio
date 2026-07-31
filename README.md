@@ -22,6 +22,8 @@ npm run build
 
 部署包同时提供 `/downloads/mj-xhs-draft-bridge.zip`。解压后，在 Chrome 或 Edge 的扩展管理页开启开发者模式并选择“加载已解压的扩展程序”。安装完成后刷新网站，发布预览区会显示“MJ 发布桥已连接”。
 
+版本 1.2 增加浏览器研究流程：用户点击“开始今日研究”后，扩展打开小红书公开搜索页，读取可见的室内设计笔记候选，平台筛选 3 篇并保存抽象的文案、封面与受众规律。生成新项目时会读取最近研究规律，但禁止复制原句、标题或封面版式。
+
 This starter does not use `wrangler.jsonc`.
 
 ## Included Shape

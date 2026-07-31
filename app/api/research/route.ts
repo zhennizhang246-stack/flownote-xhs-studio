@@ -1,5 +1,11 @@
 import { env } from "cloudflare:workers";
-import { collectDailyResearch, listResearch, type ResearchRuntimeEnv } from "../../../lib/research";
+import {
+  collectBrowserResearch,
+  collectDailyResearch,
+  listResearch,
+  type BrowserResearchCandidate,
+  type ResearchRuntimeEnv,
+} from "../../../lib/research";
 
 export async function GET() {
   try {
@@ -11,8 +17,15 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const payload = await request.json().catch(() => ({})) as { force?: boolean };
-    return Response.json({ references: await collectDailyResearch(env as unknown as ResearchRuntimeEnv, payload.force === true) });
+    const payload = await request.json().catch(() => ({})) as {
+      force?: boolean;
+      browserCandidates?: BrowserResearchCandidate[];
+    };
+    const runtime = env as unknown as ResearchRuntimeEnv;
+    const references = Array.isArray(payload.browserCandidates) && payload.browserCandidates.length
+      ? await collectBrowserResearch(runtime, payload.browserCandidates, payload.force === true)
+      : await collectDailyResearch(runtime, payload.force === true);
+    return Response.json({ references });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "每日研究失败" }, { status: 500 });
   }

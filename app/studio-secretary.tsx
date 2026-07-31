@@ -70,6 +70,15 @@ type CustomerMessage = {
   createdAt: string;
   repliedAt?: string | null;
 };
+type BrowserResearchCandidate = {
+  sourceUrl: string;
+  title: string;
+  author?: string;
+  likesText?: string;
+  coverUrl?: string;
+  coverAlt?: string;
+  cardText?: string;
+};
 type XhsBridgeDraft = {
   version: 2;
   projectId: number;
@@ -167,6 +176,42 @@ const statusLabels: Record<string, string> = {
 const XHS_PUBLISH_URL = "https://creator.xiaohongshu.com/publish/publish?source=official&from=menu&target=image";
 const XHS_BRIDGE_SOURCE = "mj-xhs-studio";
 const XHS_BRIDGE_EXTENSION_URL = "/downloads/mj-xhs-draft-bridge.zip";
+
+function collectResearchFromBridge(force: boolean) {
+  return new Promise<BrowserResearchCandidate[]>((resolve, reject) => {
+    const requestId = crypto.randomUUID();
+    const timeout = window.setTimeout(() => {
+      window.removeEventListener("message", receiveResult);
+      reject(new Error("等待小红书公开搜索结果超时，请确认搜索页已打开且账号已登录"));
+    }, 35_000);
+    function receiveResult(event: MessageEvent) {
+      if (event.source !== window || event.origin !== window.location.origin) return;
+      const message = event.data as {
+        source?: string;
+        type?: string;
+        version?: number;
+        requestId?: string;
+        candidates?: BrowserResearchCandidate[];
+        error?: string;
+      };
+      if (message.source !== "mj-xhs-bridge"
+        || message.type !== "MJ_XHS_RESEARCH_RESULT"
+        || message.version !== 3
+        || message.requestId !== requestId) return;
+      window.clearTimeout(timeout);
+      window.removeEventListener("message", receiveResult);
+      if (message.error) reject(new Error(message.error));
+      else resolve(Array.isArray(message.candidates) ? message.candidates : []);
+    }
+    window.addEventListener("message", receiveResult);
+    window.postMessage({
+      source: XHS_BRIDGE_SOURCE,
+      type: "MJ_XHS_RESEARCH_REQUEST",
+      requestId,
+      force,
+    }, window.location.origin);
+  });
+}
 
 const loadImage = (source: string) => new Promise<HTMLImageElement>((resolve, reject) => {
   const image = new Image();
@@ -327,7 +372,7 @@ export function StudioSecretary() {
       if (event.source !== window || event.origin !== window.location.origin) return;
       const message = event.data as { source?: string; type?: string; version?: number };
       if (message?.source !== "mj-xhs-bridge") return;
-      if (message.version === 2 && (message.type === "MJ_XHS_BRIDGE_READY" || message.type === "MJ_XHS_DRAFT_STORED")) {
+      if (message.version === 3 && (message.type === "MJ_XHS_BRIDGE_READY" || message.type === "MJ_XHS_DRAFT_STORED")) {
         setBridgeReady(true);
       }
     }
@@ -607,18 +652,21 @@ export function StudioSecretary() {
   async function runResearch(force: boolean) {
     if (researching) return;
     setResearching(true);
-    setResearchNotice("正在检索公开高热室内设计内容并解析…");
+    setResearchNotice("秘书正在打开小红书公开搜索页，筛选室内设计高热笔记…");
     try {
+      if (!bridgeReady) throw new Error("请安装或更新 MJ 发布桥 1.2，刷新平台后再开始今日研究");
+      const browserCandidates = await collectResearchFromBridge(force);
+      setResearchNotice(`已从小红书读取 ${browserCandidates.length} 篇公开笔记，正在筛选并建立原创分析…`);
       const response = await fetch("/api/research", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ force }),
+        body: JSON.stringify({ force, browserCandidates }),
       });
       const payload = await response.json() as { references?: ResearchReference[]; error?: string };
       if (!response.ok) throw new Error(payload.error || "每日研究失败");
       const latest = payload.references || [];
       setReferences((current) => [...latest, ...current.filter((item) => item.researchDate !== localDate())]);
-      setResearchNotice(`今日 3 条参考已完成：只提炼结构与视觉规律，不复制原文`);
+      setResearchNotice("今日 3 篇参考已完成：来源为小红书公开笔记，只提炼结构与视觉规律，不复制原文");
     } catch (error) {
       setResearchNotice(error instanceof Error ? error.message : "每日研究失败");
     } finally {
@@ -689,7 +737,7 @@ export function StudioSecretary() {
       <div className="section-heading compact"><div><span>LIVE PREVIEW</span><h2>发布预览</h2></div><span className="mode-label">{draft.mode || "AI 分析"}</span></div>
       <div className="phone-frame"><div className="cover-preview"><img src={coverImage} alt="项目封面预览"/><div className="cover-shade"/><span className="cover-eyebrow">ORIGINAL DESIGN · RESIDENCE</span><div className="cover-copy"><h3>{draft.coverTitle}</h3><p>{draft.coverSubtitle}</p></div><span className="page-count">01 / {previews.length}</span></div></div>
       <div className={`bridge-status ${bridgeReady ? "connected" : ""}`}>
-        <span>{bridgeReady ? "MJ 发布桥 1.1 已连接" : "未连接最新版 MJ 发布桥"}</span>
+        <span>{bridgeReady ? "MJ 发布桥 1.2 已连接" : "未连接最新版 MJ 发布桥"}</span>
         <p>{bridgeReady ? "成品封面、项目图片、标题、正文与标签会保持统一；可选择人工发布或单篇确认后自动发布。" : "安装一次浏览器扩展，即可把已确认内容自动带入小红书官方图文发布页。"}</p>
         {!bridgeReady && <a href={XHS_BRIDGE_EXTENSION_URL} download>下载或更新 MJ 发布桥扩展</a>}
       </div>
@@ -760,7 +808,7 @@ export function StudioSecretary() {
   </div>;
 
   const researchView = <section className="dashboard-card">
-    <div className="section-heading"><div><span>DAILY CONTENT INTELLIGENCE</span><h2>每日 3 篇小红书高热参考解析</h2><p>来源严格限定为小红书笔记详情页，只研究选题、封面和叙事规律，为未来项目生成原创内容。</p></div><button className="small-action" disabled={researching} onClick={() => void runResearch(true)}>{researching ? "正在研究…" : "刷新今日 3 篇"}</button></div>
+    <div className="section-heading"><div><span>DAILY CONTENT INTELLIGENCE</span><h2>每日 3 篇小红书高热参考解析</h2><p>秘书会进入小红书公开搜索页，筛选室内设计公司与实景案例笔记，只研究选题、封面和叙事规律。</p></div><button className="small-action" disabled={researching} onClick={() => void runResearch(true)}>{researching ? "正在小红书研究…" : "刷新今日 3 篇"}</button></div>
     <div className="research-summary"><div><strong>{settings.researchTime}</strong><span>每日自动收集</span></div><div><strong>3 篇</strong><span>室内设计高热参考</span></div><div><strong>原创</strong><span>只提炼规律，不复制原文</span></div></div>
     <p className="research-notice">{researchNotice || `最近研究日：${references[0]?.researchDate || "等待首次收集"}`}</p>
     <div className="research-grid">
@@ -770,7 +818,7 @@ export function StudioSecretary() {
         <div className="research-analysis"><h3>文案结构</h3><p>{reference.copyAnalysis}</p><h3>封面规律</h3><p>{reference.coverAnalysis}</p><h3>可复用方法</h3><p>{reference.reusablePattern}</p></div>
         <div className="source-row"><span>{reference.metricsNote}</span><a href={reference.sourceUrl} target="_blank" rel="noreferrer">查看原始来源 ↗</a></div>
       </article>)}
-      {!references.length && <div className="empty-state research-empty"><strong>今日研究尚未生成</strong><p>点击“刷新今日 3 篇”，秘书会检索公开高热室内设计内容并建立分析档案。</p><button onClick={() => void runResearch(false)}>开始今日研究</button></div>}
+      {!references.length && <div className="empty-state research-empty"><strong>今日研究尚未生成</strong><p>点击“开始今日研究”，秘书会打开小红书、读取公开可见的高热室内设计笔记并建立分析档案。</p><button onClick={() => void runResearch(false)}>开始今日研究</button></div>}
     </div>
   </section>;
 
