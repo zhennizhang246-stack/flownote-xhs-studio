@@ -24,16 +24,6 @@ type ResearchItem = {
   reusablePattern: string;
 };
 
-export type BrowserResearchCandidate = {
-  sourceUrl: string;
-  title: string;
-  author?: string;
-  likesText?: string;
-  coverUrl?: string;
-  coverAlt?: string;
-  cardText?: string;
-};
-
 function outputText(payload: Record<string, unknown>) {
   const output = Array.isArray(payload.output) ? payload.output : [];
   return output.flatMap((item) => {
@@ -63,87 +53,6 @@ function isXiaohongshuNoteUrl(value: string) {
   } catch {
     return false;
   }
-}
-
-function canonicalXiaohongshuNoteUrl(value: string) {
-  if (!isXiaohongshuNoteUrl(value)) return "";
-  const url = new URL(value);
-  return `${url.origin}${url.pathname}`;
-}
-
-function parseVisibleMetric(value: string) {
-  const normalized = String(value || "").trim().toLowerCase();
-  const match = normalized.match(/(\d+(?:\.\d+)?)\s*([万wk]?)/i);
-  if (!match) return 0;
-  const multiplier = match[2] === "万" || match[2].toLowerCase() === "w"
-    ? 10_000
-    : match[2].toLowerCase() === "k" ? 1_000 : 1;
-  return Math.max(0, Math.round(Number(match[1]) * multiplier));
-}
-
-function abstractCopyPattern(title: string) {
-  if (/\d|㎡|m²|平米/.test(title)) return "标题将面积、数量或项目事实前置，再补充空间价值，形成快速可读的“事实＋收益”结构。";
-  if (/[？?]|怎么|如何|为什么/.test(title)) return "标题以真实设计问题建立阅读动机，正文适合按问题、设计判断、落地结果三段展开。";
-  return "标题先传达空间情绪或核心体验，正文再用材质、光线、动线和功能细节建立可信度。";
-}
-
-function abstractReusablePattern(title: string) {
-  if (/\d|㎡|m²|平米/.test(title)) return "封面保留一个明确项目事实，标题避免堆叠形容词；正文用三个可验证设计细节支撑结论。";
-  return "封面只突出一个空间情绪，标题提出单一价值，正文按视觉印象、设计方法、生活收益逐层推进。";
-}
-
-export async function collectBrowserResearch(env: ResearchRuntimeEnv, candidates: BrowserResearchCandidate[], force = false) {
-  const date = chinaDate();
-  const existing = await listResearch(env, date);
-  if (existing.length >= 3 && !force) return existing;
-  const unique = new Map<string, BrowserResearchCandidate>();
-  for (const candidate of candidates.slice(0, 20)) {
-    const sourceUrl = canonicalXiaohongshuNoteUrl(String(candidate.sourceUrl || "").trim());
-    const title = String(candidate.title || "").replace(/\s+/g, " ").trim().slice(0, 120);
-    if (!isXiaohongshuNoteUrl(sourceUrl) || title.length < 3 || unique.has(sourceUrl)) continue;
-    unique.set(sourceUrl, {
-      sourceUrl,
-      title,
-      author: String(candidate.author || "").replace(/\s+/g, " ").trim().slice(0, 80),
-      likesText: String(candidate.likesText || "").trim().slice(0, 30),
-      coverUrl: String(candidate.coverUrl || "").slice(0, 2000),
-      coverAlt: String(candidate.coverAlt || "").replace(/\s+/g, " ").trim().slice(0, 180),
-      cardText: String(candidate.cardText || "").replace(/\s+/g, " ").trim().slice(0, 800),
-    });
-  }
-  const selected = [...unique.values()]
-    .sort((a, b) => parseVisibleMetric(b.likesText || "") - parseVisibleMetric(a.likesText || ""))
-    .slice(0, 3);
-  if (selected.length !== 3) throw new Error("未从小红书公开搜索页读取到 3 篇可核验笔记，请确认已登录后重试");
-
-  const db = drizzle(env.DB, { schema });
-  for (const candidate of selected) {
-    const likes = parseVisibleMetric(candidate.likesText || "");
-    const item: ResearchItem = {
-      sourceUrl: candidate.sourceUrl,
-      title: candidate.title,
-      author: candidate.author || "小红书公开作者",
-      likes,
-      saves: 0,
-      comments: 0,
-      metricsNote: likes
-        ? `小红书搜索页采集时可见点赞约 ${candidate.likesText}；收藏与评论未在卡片中公开显示`
-        : "已核验为小红书公开笔记；搜索卡片未稳定显示可解析的互动数",
-      metricConfidence: "estimated",
-      copyAnalysis: abstractCopyPattern(candidate.title),
-      coverAnalysis: candidate.coverAlt
-        ? "封面以室内实景为主体，并通过画面主体、留白和文字层级建立首屏识别；生成时应结合项目原图重新构图。"
-        : "公开卡片以项目空间实景建立视觉信任；生成时保持单一视觉中心、克制文字和清晰项目事实。",
-      audienceInsight: "面向正在寻找设计灵感、比较设计公司专业度，或准备启动住宅与商业空间项目的人群。",
-      reusablePattern: abstractReusablePattern(candidate.title),
-    };
-    const values = { researchDate: date, ...item };
-    await db.insert(researchReferences).values(values).onConflictDoUpdate({
-      target: researchReferences.sourceUrl,
-      set: values,
-    });
-  }
-  return listResearch(env, date);
 }
 
 const researchSchema = {

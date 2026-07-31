@@ -22,20 +22,6 @@
       "when": 1785468399821,
       "tag": "0002_glorious_rafael_vega",
       "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "6",
-      "when": 1785469875335,
-      "tag": "0003_round_deathbird",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "6",
-      "when": 1785471953732,
-      "tag": "0004_sad_iron_man",
-      "breakpoints": true
     }
   ]
 }
