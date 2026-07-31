@@ -6,6 +6,8 @@ export const projects = sqliteTable("projects", {
   projectType: text("project_type").notNull().default(""), audience: text("audience").notNull().default(""),
   brief: text("brief").notNull().default(""), status: text("status").notNull().default("uploaded"),
   draftJson: text("draft_json").notNull().default("{}"), scheduledAt: text("scheduled_at"),
+  approvedAt: text("approved_at"), publishedAt: text("published_at"),
+  publishUrl: text("publish_url").notNull().default(""),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 export const projectImages = sqliteTable("project_images", {

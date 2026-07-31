@@ -25,6 +25,9 @@ type ProjectRecord = ProjectMeta & {
   id: number;
   status: string;
   scheduledAt?: string | null;
+  approvedAt?: string | null;
+  publishedAt?: string | null;
+  publishUrl?: string;
   createdAt: string;
   draft?: Partial<Draft>;
   images?: Array<{ id: number; url: string; fileName: string }>;
@@ -115,9 +118,11 @@ const nextSlot = (settings: AutomationSettings) => {
 const statusLabels: Record<string, string> = {
   uploaded: "已入库",
   drafted: "文案已生成",
+  approved: "已人工确认",
   scheduled: "已排期",
   published: "已发布",
 };
+const XHS_PUBLISH_URL = "https://creator.xiaohongshu.com/publish/publish?source=official&from=tab_switch";
 
 function localFallback(meta: ProjectMeta): Draft {
   const location = meta.location || "项目所在地待确认";
@@ -304,6 +309,88 @@ export function StudioSecretary() {
     await refreshProjects();
   }
 
+  function loadProject(project: ProjectRecord) {
+    setCurrentProjectId(project.id);
+    setMeta({
+      name: project.name,
+      location: project.location,
+      area: project.area,
+      projectType: project.projectType,
+      audience: project.audience,
+      brief: project.brief,
+    });
+    setDraft({ ...seededDraft, ...project.draft, tags: project.draft?.tags || [], highlights: project.draft?.highlights || [], riskNotes: project.draft?.riskNotes || [] });
+    setPreviews(project.images?.map((image) => image.url) || []);
+    setFiles([]);
+    setPhase("done");
+    setNotice(`已打开「${project.name}」，可继续编辑封面与文案`);
+    setActiveTab("creator");
+  }
+
+  async function saveProject(status: "drafted" | "approved" | "published", publishUrl = "") {
+    if (!currentProjectId) {
+      setNotice("示例项目不会写入资产库，请先上传实景图并生成正式项目");
+      return false;
+    }
+    const response = await fetch(`/api/projects/${currentProjectId}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ draft: { ...draft, mode: "人工编辑" }, status, publishUrl }),
+    });
+    const payload = await response.json() as { error?: string };
+    if (!response.ok) {
+      setNotice(payload.error || "保存失败");
+      return false;
+    }
+    setNotice(status === "approved" ? "封面与文案已人工确认，可随时发布或加入三天队列" : status === "published" ? "已记录为发布完成" : "编辑内容已保存到项目资产库");
+    await refreshProjects();
+    return true;
+  }
+
+  async function publishNow() {
+    if (!currentProjectId) {
+      setNotice("请先上传图片并生成正式项目，再进入发布流程");
+      return;
+    }
+    const publishWindow = window.open(XHS_PUBLISH_URL, "_blank", "noopener,noreferrer");
+    const approved = await saveProject("approved");
+    if (!approved) {
+      publishWindow?.close();
+      return;
+    }
+    const copy = `${draft.title}\n\n${draft.body}\n\n${draft.tags.map((tag) => `#${tag.replace(/^#/, "")}`).join(" ")}`;
+    try {
+      await navigator.clipboard.writeText(copy);
+      setNotice("已确认并复制完整文案；官方小红书发布页已打开，请上传所选项目图片后发布");
+    } catch {
+      setNotice("已确认内容并打开官方小红书发布页；请从编辑区复制文案后发布");
+    }
+  }
+
+  async function approveAndSchedule() {
+    if (!currentProjectId) {
+      setNotice("请先上传图片并生成正式项目");
+      return;
+    }
+    if (await saveProject("approved")) await scheduleProject(currentProjectId);
+  }
+
+  async function markPublished(project: ProjectRecord) {
+    const publishUrl = window.prompt("可选：粘贴已发布的小红书笔记链接，便于后续复盘", "") || "";
+    const response = await fetch(`/api/projects/${project.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ draft: project.draft, status: "published", publishUrl }),
+    });
+    if (!response.ok) {
+      const payload = await response.json() as { error?: string };
+      setNotice(payload.error || "发布记录保存失败");
+      return;
+    }
+    setNotice(`「${project.name}」已记录为发布完成`);
+    await refreshProjects();
+  }
+
   async function runResearch(force: boolean) {
     if (researching) return;
     setResearching(true);
@@ -348,13 +435,19 @@ export function StudioSecretary() {
       <div className="section-heading compact"><div><span>LIVE PREVIEW</span><h2>发布预览</h2></div><span className="mode-label">{draft.mode || "AI 分析"}</span></div>
       <div className="phone-frame"><div className="cover-preview"><img src={coverImage} alt="项目封面预览"/><div className="cover-shade"/><span className="cover-eyebrow">ORIGINAL DESIGN · RESIDENCE</span><div className="cover-copy"><h3>{draft.coverTitle}</h3><p>{draft.coverSubtitle}</p></div><span className="page-count">01 / {previews.length}</span></div></div>
       <div className="publish-actions">
-        <button className="secondary-action" onClick={() => currentProjectId ? void scheduleProject(currentProjectId) : setActiveTab("calendar")}>{currentProjectId ? `加入 ${settings.publishTime} 排期` : "打开发布日历"}</button>
-        <button className="icon-action" onClick={() => setActiveTab("assets")} aria-label="打开资产库">→</button>
+        <button className="secondary-action" onClick={() => void publishNow()}>确认并打开小红书发布页</button>
+        <button className="icon-action" onClick={() => void saveProject("drafted")} aria-label="保存到项目资产库">存</button>
       </div>
     </section>
-    <section className="editorial-card">
-      <div className="editorial-title"><span>GENERATED COPY</span><h2>{draft.title}</h2><div className="fact-row">{facts.map((fact) => <span key={fact}>{fact}</span>)}</div></div>
-      <div className="copy-column">{draft.body.split("\n").map((line, index) => line ? <p key={`${line}-${index}`}>{line}</p> : <br key={`break-${index}`}/>)}<div className="tags">{draft.tags.map((tag) => <span key={tag}>#{tag.replace(/^#/, "")}</span>)}</div></div>
+    <section className="editorial-card editor-mode">
+      <div className="editorial-title"><span>EDITABLE COPY</span><label><small>笔记标题</small><textarea value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}/></label><div className="fact-row">{facts.map((fact) => <span key={fact}>{fact}</span>)}</div></div>
+      <div className="copy-column">
+        <label><small>封面主标题</small><input value={draft.coverTitle} onChange={(event) => setDraft((current) => ({ ...current, coverTitle: event.target.value }))}/></label>
+        <label><small>封面副标题</small><input value={draft.coverSubtitle} onChange={(event) => setDraft((current) => ({ ...current, coverSubtitle: event.target.value }))}/></label>
+        <label><small>正文</small><textarea className="body-editor" value={draft.body} onChange={(event) => setDraft((current) => ({ ...current, body: event.target.value }))}/></label>
+        <label><small>话题标签（用逗号或空格分隔）</small><input value={draft.tags.join("，")} onChange={(event) => setDraft((current) => ({ ...current, tags: event.target.value.split(/[，,\s#]+/).filter(Boolean).slice(0, 12) }))}/></label>
+        <div className="editor-actions"><button onClick={() => void saveProject("drafted")}>保存到资产库</button><button className="approve-action" onClick={() => void saveProject("approved")}>确认封面与文案</button><button onClick={() => void approveAndSchedule()}>确认并加入三天队列</button></div>
+      </div>
       <div className="analysis-column"><div><span className="mini-heading">图片分析要点</span><ul>{draft.highlights.map((item) => <li key={item}>{item}</li>)}</ul></div><div className="risk-box"><span>发布前确认</span>{draft.riskNotes.map((note) => <p key={note}>{note}</p>)}</div></div>
     </section>
   </div>;
@@ -365,7 +458,7 @@ export function StudioSecretary() {
       <article className="asset-card featured"><img src={seededImages[1]} alt="温州150平方米住宅"/><div><span className="state-pill">示例项目</span><h3>栖光木境</h3><p>浙江 · 温州　150m²　住宅空间</p><small>7 张实景图 · 已生成封面与文案</small></div></article>
       {projects.map((project) => <article className="asset-card" key={project.id}>
         {project.images?.[0] ? <img src={project.images[0].url} alt={project.name}/> : <div className="asset-placeholder">栖</div>}
-        <div><span className={`state-pill ${project.status}`}>{statusLabels[project.status] || project.status}</span><h3>{project.name}</h3><p>{project.location || "地点待补充"}　{project.area || "面积待补充"}</p><small>{project.images?.length || 0} 张实景图 · {project.scheduledAt ? new Date(project.scheduledAt).toLocaleString("zh-CN") : "尚未排期"}</small></div>
+        <div><span className={`state-pill ${project.status}`}>{statusLabels[project.status] || project.status}</span><h3>{project.name}</h3><p>{project.location || "地点待补充"}　{project.area || "面积待补充"}</p><small>{project.images?.length || 0} 张实景图 · {project.scheduledAt ? new Date(project.scheduledAt).toLocaleString("zh-CN") : "尚未排期"}</small><div className="asset-actions"><button onClick={() => loadProject(project)}>打开编辑</button>{["approved", "scheduled"].includes(project.status) && <button onClick={() => void markPublished(project)}>标记已发布</button>}</div></div>
       </article>)}
       {!projects.length && <div className="empty-state"><strong>资产库等待第一个正式项目</strong><p>在创作工作台上传图片并生成后，项目会自动归档到这里。</p></div>}
     </div>
@@ -382,15 +475,15 @@ export function StudioSecretary() {
         <label className="toggle-row wide"><span>发布前保留人工确认</span><input type="checkbox" checked={settings.requireApproval} onChange={(event) => setSettings((current) => ({ ...current, requireApproval: event.target.checked }))}/></label>
       </div>
       <button className="primary-action settings-save" onClick={() => void saveSettings()}><span>保存自动配置</span><span>→</span></button>
-      <p className="notice">{settingsNotice || "系统会自动准备发布内容；小红书正式发布仍需账户授权与发布前确认。"}</p>
+      <p className="notice">{settingsNotice || "系统每三天准备一条已确认内容并提醒发布；正式发布通过小红书官方创作服务平台完成。"}</p>
     </section>
     <section className="dashboard-card queue-card">
-      <div className="section-heading"><div><span>PUBLISH QUEUE</span><h2>项目发布日历</h2><p>从资产库为每个项目指定独立日期和时间。</p></div><span className="counter">{scheduledProjects.length} 个已排期</span></div>
+      <div className="section-heading"><div><span>PUBLISH QUEUE</span><h2>项目发布日历</h2><p>仅人工确认后的内容可排期；到期后进入官方发布交接流程。</p></div><span className="counter">{scheduledProjects.length} 个已排期</span></div>
       <div className="queue-list">
         {projects.map((project) => <div className="queue-item" key={project.id}>
           <div className="queue-project">{project.images?.[0] ? <img src={project.images[0].url} alt=""/> : <span>{project.name.slice(0, 1)}</span>}<div><strong>{project.name}</strong><small>{project.location} · {project.area}</small></div></div>
           <input type="datetime-local" value={scheduleDrafts[project.id] || nextSlot(settings)} onChange={(event) => setScheduleDrafts((current) => ({ ...current, [project.id]: event.target.value }))}/>
-          <button onClick={() => void scheduleProject(project.id)}>{project.scheduledAt ? "更新排期" : "加入日历"}</button>
+          <button onClick={() => void scheduleProject(project.id)}>{project.scheduledAt ? "更新排期" : project.status === "approved" ? "加入日历" : "先确认"}</button>
         </div>)}
         {!projects.length && <div className="empty-state"><strong>还没有可排期项目</strong><p>先在创作工作台上传项目实景图，项目会自动进入这里。</p></div>}
       </div>
@@ -398,7 +491,7 @@ export function StudioSecretary() {
   </div>;
 
   const researchView = <section className="dashboard-card">
-    <div className="section-heading"><div><span>DAILY CONTENT INTELLIGENCE</span><h2>每日 3 篇高热参考解析</h2><p>研究公开来源的选题、封面和叙事规律，为未来项目生成原创内容。</p></div><button className="small-action" disabled={researching} onClick={() => void runResearch(true)}>{researching ? "正在研究…" : "刷新今日 3 篇"}</button></div>
+    <div className="section-heading"><div><span>DAILY CONTENT INTELLIGENCE</span><h2>每日 3 篇小红书高热参考解析</h2><p>来源严格限定为小红书笔记详情页，只研究选题、封面和叙事规律，为未来项目生成原创内容。</p></div><button className="small-action" disabled={researching} onClick={() => void runResearch(true)}>{researching ? "正在研究…" : "刷新今日 3 篇"}</button></div>
     <div className="research-summary"><div><strong>{settings.researchTime}</strong><span>每日自动收集</span></div><div><strong>3 篇</strong><span>室内设计高热参考</span></div><div><strong>原创</strong><span>只提炼规律，不复制原文</span></div></div>
     <p className="research-notice">{researchNotice || `最近研究日：${references[0]?.researchDate || "等待首次收集"}`}</p>
     <div className="research-grid">
