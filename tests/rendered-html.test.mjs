@@ -48,7 +48,7 @@ test("ships a local bridge that prefills but never publishes a Xiaohongshu note"
 });
 
 test("uses Node CI instead of applying Deno lint rules to the Node app", async () => {
-  const workflow = await readFile(new URL("../.github/workflows/deno.yml", import.meta.url), "utf8");
+  const workflow = await readFile(new URL("../.github/workflows/node.yml", import.meta.url), "utf8");
   assert.match(workflow, /name: Node CI/);
   assert.match(workflow, /node-version: "24"/);
   assert.match(workflow, /npm ci/);
