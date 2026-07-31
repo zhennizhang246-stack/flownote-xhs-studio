@@ -2,7 +2,7 @@ const STUDIO_SOURCE = "mj-xhs-studio";
 const BRIDGE_SOURCE = "mj-xhs-bridge";
 
 function notifyPage(type) {
-  window.postMessage({ source: BRIDGE_SOURCE, type, version: 2 }, window.location.origin);
+  window.postMessage({ source: BRIDGE_SOURCE, type, version: 3 }, window.location.origin);
 }
 
 function normalizeDraft(value) {
@@ -45,12 +45,33 @@ window.addEventListener("message", (event) => {
     notifyPage("MJ_XHS_BRIDGE_READY");
     return;
   }
+  if (message.type === "MJ_XHS_RESEARCH_REQUEST") {
+    chrome.runtime.sendMessage({
+      type: "MJ_XHS_START_RESEARCH",
+      requestId: String(message.requestId || ""),
+      force: message.force === true,
+    });
+    return;
+  }
   if (message.type !== "MJ_XHS_DRAFT") return;
   const draft = normalizeDraft(message.payload);
   if (!draft) return;
   chrome.storage.local.set({ mjXhsDraft: draft }, () => {
     if (!chrome.runtime.lastError) notifyPage("MJ_XHS_DRAFT_STORED");
   });
+});
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  const result = changes.mjXhsResearchResult?.newValue;
+  if (area !== "local" || !result) return;
+  window.postMessage({
+    source: BRIDGE_SOURCE,
+    type: "MJ_XHS_RESEARCH_RESULT",
+    version: 3,
+    requestId: result.requestId,
+    candidates: result.candidates || [],
+    error: result.error || "",
+  }, window.location.origin);
 });
 
 notifyPage("MJ_XHS_BRIDGE_READY");

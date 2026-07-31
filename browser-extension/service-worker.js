@@ -1,4 +1,32 @@
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.type === "MJ_XHS_START_RESEARCH") {
+    const requestId = String(message.requestId || "");
+    if (!requestId) return false;
+    chrome.storage.local.set({
+      mjXhsResearchRequest: {
+        requestId,
+        createdAt: new Date().toISOString(),
+      },
+    }, () => {
+      const query = encodeURIComponent("室内设计公司 实景案例 空间设计");
+      chrome.tabs.create({
+        url: `https://www.xiaohongshu.com/search_result?keyword=${query}&source=web_search_result_notes`,
+        active: true,
+      });
+    });
+    return false;
+  }
+  if (message?.type === "MJ_XHS_RESEARCH_RESULTS") {
+    chrome.storage.local.set({
+      mjXhsResearchResult: {
+        requestId: String(message.requestId || ""),
+        candidates: Array.isArray(message.candidates) ? message.candidates.slice(0, 12) : [],
+        error: String(message.error || ""),
+        collectedAt: new Date().toISOString(),
+      },
+    });
+    return false;
+  }
   if (message?.type !== "MJ_XHS_FETCH_IMAGE") return false;
   const url = String(message.url || "");
   if (!/^https:\/\/xhs-studio-secretary\.mj051225\.chatgpt\.site\/api\/media\/\d+$/.test(url)

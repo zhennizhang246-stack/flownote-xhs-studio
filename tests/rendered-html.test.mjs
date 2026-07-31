@@ -11,7 +11,8 @@ test("ships the studio secretary product surface", async () => {
   assert.match(page, /每日 3 篇小红书高热参考解析/);
   assert.match(page, /确认并预填小红书发布页/);
   assert.match(page, /确认本篇并自动发布/);
-  assert.match(page, /MJ 发布桥 1.1 已连接/);
+  assert.match(page, /MJ 发布桥 1.2 已连接/);
+  assert.match(page, /秘书会打开小红书/);
   assert.match(page, /from=menu&target=image/);
   assert.match(page, /renderCoverDataUrl/);
   assert.match(page, /5 \* 60_000/);
@@ -40,6 +41,7 @@ test("ships a local bridge with manual prefill and single-use auto-publish autho
   const manifest = JSON.parse(await readFile(new URL("../browser-extension/manifest.json", import.meta.url), "utf8"));
   const siteBridge = await readFile(new URL("../browser-extension/site-bridge.js", import.meta.url), "utf8");
   const prefill = await readFile(new URL("../browser-extension/xhs-prefill.js", import.meta.url), "utf8");
+  const research = await readFile(new URL("../browser-extension/xhs-research.js", import.meta.url), "utf8");
   assert.equal(manifest.manifest_version, 3);
   assert.ok(manifest.content_scripts.some((entry) => entry.matches.includes("https://creator.xiaohongshu.com/publish/*")));
   assert.match(siteBridge, /MJ_XHS_DRAFT_STORED/);
@@ -52,6 +54,10 @@ test("ships a local bridge with manual prefill and single-use auto-publish autho
   assert.match(prefill, /hasVerificationBlocker/);
   assert.match(prefill, /candidates\.length === 1/);
   assert.match(prefill, /button\.click\(\)/);
+  assert.match(siteBridge, /MJ_XHS_RESEARCH_REQUEST/);
+  assert.match(research, /collectCandidates/);
+  assert.match(research, /安全验证/);
+  assert.match(research, /MJ_XHS_RESEARCH_RESULTS/);
 });
 
 test("uses Node CI instead of applying Deno lint rules to the Node app", async () => {
@@ -105,12 +111,17 @@ test("ships configurable scheduling and daily research APIs", async () => {
   const settings = await readFile(new URL("../app/api/settings/route.ts", import.meta.url), "utf8");
   const research = await readFile(new URL("../app/api/research/route.ts", import.meta.url), "utf8");
   const researchService = await readFile(new URL("../lib/research.ts", import.meta.url), "utf8");
+  const generate = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
   assert.match(settings, /publishCadenceDays/);
   assert.match(settings, /researchTime/);
   assert.match(research, /collectDailyResearch/);
   assert.match(researchService, /type: "web_search"/);
   assert.match(researchService, /不得大段摘录或改写原文/);
   assert.match(researchService, /isXiaohongshuNoteUrl/);
+  assert.match(researchService, /collectBrowserResearch/);
+  assert.match(researchService, /abstractReusablePattern/);
+  assert.match(generate, /近期研究规律/);
+  assert.match(generate, /不得复制标题、原句、段落或封面版式/);
 });
 
 test("requires a human-approved draft before scheduling", async () => {
