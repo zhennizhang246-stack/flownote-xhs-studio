@@ -7,6 +7,18 @@ type Draft = {
   titleOptions?: string[];
   coverTitle: string;
   coverSubtitle: string;
+  coverStyle?: {
+    fontFamily?: string;
+    titleColor?: string;
+    subtitleColor?: string;
+    overlayColor?: string;
+    overlayOpacity?: number;
+    pattern?: string;
+    patternColor?: string;
+    titleSize?: number;
+    align?: string;
+    position?: string;
+  };
   body: string;
   tags: string[];
   highlights: string[];
@@ -24,11 +36,28 @@ function cleanDraft(value: unknown): Draft {
   const cleanList = (list: unknown, maxItems: number, maxLength: number) => (
     Array.isArray(list) ? list.map((item) => cleanText(item, maxLength)).filter(Boolean).slice(0, maxItems) : []
   );
+  const style = input.coverStyle && typeof input.coverStyle === "object" ? input.coverStyle : {};
+  const color = (value: unknown, fallback: string) => /^#[0-9a-f]{6}$/i.test(String(value || "")) ? String(value) : fallback;
+  const oneOf = <T extends string>(value: unknown, options: readonly T[], fallback: T) => (
+    options.includes(String(value) as T) ? String(value) as T : fallback
+  );
   const draft = {
     title: cleanText(input.title, 80),
     titleOptions: cleanList(input.titleOptions, 3, 80),
     coverTitle: cleanText(input.coverTitle, 30),
     coverSubtitle: cleanText(input.coverSubtitle, 60),
+    coverStyle: {
+      fontFamily: oneOf(style.fontFamily, ["serif", "sans", "kai"] as const, "serif"),
+      titleColor: color(style.titleColor, "#ffffff"),
+      subtitleColor: color(style.subtitleColor, "#eee9df"),
+      overlayColor: color(style.overlayColor, "#121713"),
+      overlayOpacity: Math.min(90, Math.max(0, Number(style.overlayOpacity ?? 58))),
+      pattern: oneOf(style.pattern, ["none", "frame", "grid", "dots", "corners"] as const, "frame"),
+      patternColor: color(style.patternColor, "#ffffff"),
+      titleSize: Math.min(120, Math.max(52, Number(style.titleSize ?? 88))),
+      align: oneOf(style.align, ["left", "center"] as const, "left"),
+      position: oneOf(style.position, ["top", "middle", "bottom"] as const, "bottom"),
+    },
     body: cleanText(input.body, 3000),
     tags: cleanList(input.tags, 12, 24),
     highlights: cleanList(input.highlights, 12, 120),

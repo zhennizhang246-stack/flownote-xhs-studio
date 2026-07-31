@@ -102,6 +102,22 @@ actions tied to the current ChatGPT user. Leave public content anonymous.
 - `npm test`: build the starter and verify its rendered loading skeleton
 - `npm run db:generate`: generate Drizzle migrations after schema changes
 
+## Cover editor and formal publishing
+
+- The creator workspace stores editable cover typography, colors, overlay,
+  alignment, placement, and decorative patterns together with each project.
+- Saving or approving a project renders the exact 1080×1440 cover into project
+  storage, so the asset library, browser bridge, and publishing adapter use the
+  same approved cover.
+- Traffic-reference cards open their Xiaohongshu source notes. The three latest
+  abstract research patterns are supplied to future copy and cover generation;
+  original wording and layouts are not copied.
+- Formal automatic publishing stays disabled until a Xiaohongshu-approved HTTPS
+  endpoint and token are stored in the hosted environment. Due approved items
+  are submitted by the scheduled worker, with an atomic publishing lock to
+  prevent duplicate submissions. The browser-assisted manual flow remains
+  available at all times.
+
 ## Learn More
 
 - [vinext Documentation](https://github.com/cloudflare/vinext)
