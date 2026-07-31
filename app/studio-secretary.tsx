@@ -69,6 +69,7 @@ type CustomerMessage = {
   status: "pending" | "replied";
   createdAt: string;
   repliedAt?: string | null;
+  autoReplyEligible?: boolean;
 };
 type BrowserResearchCandidate = {
   sourceUrl: string;
@@ -139,7 +140,7 @@ const navItems: Array<{ id: Tab; number: string; label: string }> = [
   { id: "assets", number: "02", label: "项目资产库" },
   { id: "calendar", number: "03", label: "发布日历" },
   { id: "research", number: "04", label: "流量参考" },
-  { id: "service", number: "05", label: "小红书客服" },
+  { id: "service", number: "05", label: "笔记评论秘书" },
 ];
 const projectCategories = ["全部项目", "商业项目", "住宅项目", "办公项目", "酒店项目", "展厅陈列项目", "其他项目"];
 const MAX_PROJECT_IMAGES = 10;
@@ -176,6 +177,7 @@ const statusLabels: Record<string, string> = {
 const XHS_PUBLISH_URL = "https://creator.xiaohongshu.com/publish/publish?source=official&from=menu&target=image";
 const XHS_BRIDGE_SOURCE = "mj-xhs-studio";
 const XHS_BRIDGE_EXTENSION_URL = "/downloads/mj-xhs-draft-bridge.zip";
+const XHS_PROFILE_URL = "https://www.xiaohongshu.com/user/profile/60f6318b0000000001015907";
 
 function collectResearchFromBridge(force: boolean) {
   return new Promise<BrowserResearchCandidate[]>((resolve, reject) => {
@@ -196,7 +198,7 @@ function collectResearchFromBridge(force: boolean) {
       };
       if (message.source !== "mj-xhs-bridge"
         || message.type !== "MJ_XHS_RESEARCH_RESULT"
-        || message.version !== 3
+        || message.version !== 4
         || message.requestId !== requestId) return;
       window.clearTimeout(timeout);
       window.removeEventListener("message", receiveResult);
@@ -209,6 +211,90 @@ function collectResearchFromBridge(force: boolean) {
       type: "MJ_XHS_RESEARCH_REQUEST",
       requestId,
       force,
+    }, window.location.origin);
+  });
+}
+
+function syncCommentsFromBridge() {
+  return new Promise<Array<{ senderName: string; message: string; sourceUrl: string }>>((resolve, reject) => {
+    const requestId = crypto.randomUUID();
+    const timeout = window.setTimeout(() => {
+      window.removeEventListener("message", receiveResult);
+      reject(new Error("等待笔记评论同步超时，请确认小红书主页和笔记页可以正常打开"));
+    }, 55_000);
+    function receiveResult(event: MessageEvent) {
+      if (event.source !== window || event.origin !== window.location.origin) return;
+      const message = event.data as {
+        source?: string;
+        type?: string;
+        version?: number;
+        requestId?: string;
+        comments?: Array<{ senderName: string; message: string; sourceUrl: string }>;
+        error?: string;
+      };
+      if (message.source !== "mj-xhs-bridge"
+        || message.type !== "MJ_XHS_COMMENT_SYNC_RESULT"
+        || message.version !== 4
+        || message.requestId !== requestId) return;
+      window.clearTimeout(timeout);
+      window.removeEventListener("message", receiveResult);
+      if (message.error) reject(new Error(message.error));
+      else resolve(Array.isArray(message.comments) ? message.comments : []);
+    }
+    window.addEventListener("message", receiveResult);
+    window.postMessage({
+      source: XHS_BRIDGE_SOURCE,
+      type: "MJ_XHS_COMMENT_SYNC_REQUEST",
+      requestId,
+      profileUrl: XHS_PROFILE_URL,
+    }, window.location.origin);
+  });
+}
+
+function replyCommentsThroughBridge(actions: Array<{
+  id: number;
+  senderName: string;
+  message: string;
+  sourceUrl: string;
+  reply: string;
+}>) {
+  return new Promise<Array<{ id: number; success: boolean; error?: string }>>((resolve, reject) => {
+    const requestId = crypto.randomUUID();
+    const confirmedAt = new Date();
+    const timeout = window.setTimeout(() => {
+      window.removeEventListener("message", receiveResult);
+      reject(new Error("自动回复等待超时，未完成的评论已保留为待处理"));
+    }, 150_000);
+    function receiveResult(event: MessageEvent) {
+      if (event.source !== window || event.origin !== window.location.origin) return;
+      const message = event.data as {
+        source?: string;
+        type?: string;
+        version?: number;
+        requestId?: string;
+        results?: Array<{ id: number; success: boolean; error?: string }>;
+        error?: string;
+      };
+      if (message.source !== "mj-xhs-bridge"
+        || message.type !== "MJ_XHS_COMMENT_REPLY_RESULT"
+        || message.version !== 4
+        || message.requestId !== requestId) return;
+      window.clearTimeout(timeout);
+      window.removeEventListener("message", receiveResult);
+      if (message.error) reject(new Error(message.error));
+      else resolve(Array.isArray(message.results) ? message.results : []);
+    }
+    window.addEventListener("message", receiveResult);
+    window.postMessage({
+      source: XHS_BRIDGE_SOURCE,
+      type: "MJ_XHS_COMMENT_REPLY_REQUEST",
+      requestId,
+      actions,
+      authorization: {
+        confirmedAt: confirmedAt.toISOString(),
+        expiresAt: new Date(confirmedAt.getTime() + 5 * 60_000).toISOString(),
+        nonce: crypto.randomUUID(),
+      },
     }, window.location.origin);
   });
 }
@@ -372,7 +458,7 @@ export function StudioSecretary() {
       if (event.source !== window || event.origin !== window.location.origin) return;
       const message = event.data as { source?: string; type?: string; version?: number };
       if (message?.source !== "mj-xhs-bridge") return;
-      if (message.version === 3 && (message.type === "MJ_XHS_BRIDGE_READY" || message.type === "MJ_XHS_DRAFT_STORED")) {
+      if (message.version === 4 && (message.type === "MJ_XHS_BRIDGE_READY" || message.type === "MJ_XHS_DRAFT_STORED")) {
         setBridgeReady(true);
       }
     }
@@ -654,7 +740,7 @@ export function StudioSecretary() {
     setResearching(true);
     setResearchNotice("秘书正在打开小红书公开搜索页，筛选室内设计高热笔记…");
     try {
-      if (!bridgeReady) throw new Error("请安装或更新 MJ 发布桥 1.2，刷新平台后再开始今日研究");
+      if (!bridgeReady) throw new Error("请安装或更新 MJ 发布桥 1.3，刷新平台后再开始今日研究");
       const browserCandidates = await collectResearchFromBridge(force);
       setResearchNotice(`已从小红书读取 ${browserCandidates.length} 篇公开笔记，正在筛选并建立原创分析…`);
       const response = await fetch("/api/research", {
@@ -674,8 +760,81 @@ export function StudioSecretary() {
     }
   }
 
+  async function refreshCustomerMessages() {
+    const response = await fetch("/api/customer-service");
+    if (!response.ok) return;
+    const payload = await response.json() as { messages?: CustomerMessage[] };
+    setMessages(payload.messages || []);
+  }
+
+  async function syncNoteComments() {
+    if (!bridgeReady) {
+      setServiceNotice("请安装或更新 MJ 发布桥 1.3，刷新平台后再同步笔记评论");
+      return;
+    }
+    setServiceNotice("秘书正在打开你的主页与最近笔记，读取公开可见的待回复评论…");
+    try {
+      const comments = await syncCommentsFromBridge();
+      const response = await fetch("/api/customer-service", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ comments }),
+      });
+      const payload = await response.json() as { messages?: CustomerMessage[]; error?: string };
+      if (!response.ok) throw new Error(payload.error || "评论归档失败");
+      await refreshCustomerMessages();
+      setServiceNotice(`已同步 ${comments.length} 条公开评论；安全评论可自动回复，高风险评论已转人工`);
+    } catch (error) {
+      setServiceNotice(error instanceof Error ? error.message : "笔记评论同步失败");
+    }
+  }
+
+  async function autoReplyPendingComments() {
+    if (!bridgeReady) {
+      setServiceNotice("请先连接 MJ 发布桥 1.3");
+      return;
+    }
+    const actions = messages
+      .filter((item) => item.status === "pending" && item.autoReplyEligible && item.sourceUrl)
+      .slice(0, 5)
+      .map((item) => ({
+        id: item.id,
+        senderName: item.senderName,
+        message: item.message,
+        sourceUrl: item.sourceUrl,
+        reply: item.suggestedReply,
+      }));
+    if (!actions.length) {
+      setServiceNotice("当前没有符合自动回复规则的安全评论；高风险评论需人工处理");
+      return;
+    }
+    if (!window.confirm(`确认自动回复 ${actions.length} 条笔记评论？\n\n秘书会逐条限速发送；联系方式、投诉和争议评论不会进入自动队列。`)) {
+      setServiceNotice("已取消本次自动回复，没有发送任何评论");
+      return;
+    }
+    setServiceNotice(`正在逐条回复 ${actions.length} 条安全评论，请保持小红书页面可用…`);
+    try {
+      const results = await replyCommentsThroughBridge(actions);
+      const succeeded = results.filter((result) => result.success);
+      for (const result of succeeded) {
+        await fetch("/api/customer-service", {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ id: result.id, status: "replied" }),
+        });
+      }
+      await refreshCustomerMessages();
+      const failed = results.filter((result) => !result.success);
+      setServiceNotice(failed.length
+        ? `已自动回复 ${succeeded.length} 条，${failed.length} 条因页面状态或安全规则转人工`
+        : `已完成 ${succeeded.length} 条评论自动回复`);
+    } catch (error) {
+      setServiceNotice(error instanceof Error ? error.message : "自动回复未完成");
+    }
+  }
+
   async function saveCustomerMessage() {
-    setServiceNotice("正在保存留言并生成合规回复…");
+    setServiceNotice("正在保存评论并生成合规回复…");
     const response = await fetch("/api/customer-service", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -683,12 +842,12 @@ export function StudioSecretary() {
     });
     const payload = await response.json() as { message?: CustomerMessage; error?: string };
     if (!response.ok || !payload.message) {
-      setServiceNotice(payload.error || "留言保存失败");
+      setServiceNotice(payload.error || "评论保存失败");
       return;
     }
     setMessages((current) => [payload.message!, ...current]);
     setMessageForm({ senderName: "", message: "", sourceUrl: "" });
-    setServiceNotice("留言已归档，已生成站内合规回复建议");
+    setServiceNotice("评论已归档，已生成合规回复建议");
   }
 
   async function copyServiceReply(item: CustomerMessage) {
@@ -737,7 +896,7 @@ export function StudioSecretary() {
       <div className="section-heading compact"><div><span>LIVE PREVIEW</span><h2>发布预览</h2></div><span className="mode-label">{draft.mode || "AI 分析"}</span></div>
       <div className="phone-frame"><div className="cover-preview"><img src={coverImage} alt="项目封面预览"/><div className="cover-shade"/><span className="cover-eyebrow">ORIGINAL DESIGN · RESIDENCE</span><div className="cover-copy"><h3>{draft.coverTitle}</h3><p>{draft.coverSubtitle}</p></div><span className="page-count">01 / {previews.length}</span></div></div>
       <div className={`bridge-status ${bridgeReady ? "connected" : ""}`}>
-        <span>{bridgeReady ? "MJ 发布桥 1.2 已连接" : "未连接最新版 MJ 发布桥"}</span>
+        <span>{bridgeReady ? "MJ 发布桥 1.3 已连接" : "未连接最新版 MJ 发布桥"}</span>
         <p>{bridgeReady ? "成品封面、项目图片、标题、正文与标签会保持统一；可选择人工发布或单篇确认后自动发布。" : "安装一次浏览器扩展，即可把已确认内容自动带入小红书官方图文发布页。"}</p>
         {!bridgeReady && <a href={XHS_BRIDGE_EXTENSION_URL} download>下载或更新 MJ 发布桥扩展</a>}
       </div>
@@ -824,27 +983,32 @@ export function StudioSecretary() {
 
   const serviceView = <div className="service-layout">
     <section className="dashboard-card service-intake">
-      <div className="section-heading"><div><span>CUSTOMER SERVICE</span><h2>小红书客服助手</h2><p>集中整理客户留言，生成站内合规回复，人工确认后发送。</p></div><a className="small-action service-link" href="https://creator.xiaohongshu.com/" target="_blank" rel="noreferrer">打开小红书后台 ↗</a></div>
-      <div className="integration-warning"><strong>当前为人工交接模式</strong><p>尚未连接小红书官方消息 API，平台不会伪造或自动抓取私信。请从官方后台查看留言并粘贴到这里。</p></div>
-      <div className="service-form">
-        <label><span>客户昵称</span><input value={messageForm.senderName} onChange={(event) => setMessageForm((current) => ({ ...current, senderName: event.target.value }))} placeholder="例如：温州小林"/></label>
-        <label><span>小红书留言或私信</span><textarea value={messageForm.message} onChange={(event) => setMessageForm((current) => ({ ...current, message: event.target.value }))} placeholder="粘贴客户原始留言"/></label>
-        <label><span>来源链接（可选）</span><input value={messageForm.sourceUrl} onChange={(event) => setMessageForm((current) => ({ ...current, sourceUrl: event.target.value }))} placeholder="小红书笔记或用户页面链接"/></label>
-        <button className="primary-action" onClick={() => void saveCustomerMessage()}><span>归档留言并生成回复</span><span>→</span></button>
+      <div className="section-heading"><div><span>NOTE COMMENT SECRETARY</span><h2>笔记评论自动回复秘书</h2><p>同步本人公开笔记中的可见评论，识别咨询意图，生成合规回复并管理处理状态。</p></div><a className="small-action service-link" href={XHS_PROFILE_URL} target="_blank" rel="noreferrer">打开我的小红书主页 ↗</a></div>
+      <div className="integration-warning"><strong>发布桥评论管理模式</strong><p>只读取本人公开笔记中当前可见的评论，不读取私信。登录验证、投诉争议、联系方式和风控提示均转人工。</p></div>
+      <div className="comment-automation-actions">
+        <button className="primary-action" onClick={() => void syncNoteComments()}><span>同步最近笔记评论</span><span>↻</span></button>
+        <button className="auto-comment-action" disabled={!messages.some((item) => item.status === "pending" && item.autoReplyEligible)} onClick={() => void autoReplyPendingComments()}>确认并自动回复安全评论</button>
       </div>
-      <div className="blocked-template"><span>高风险站外导流模板 · 已禁用自动发送</span><code>✨vx：LIKE-MJ0666666</code><p>小红书官方规则将直接展示微信号等联系方式列为联系方式导流，可能影响账号流量或权限。</p></div>
+      <div className="service-form">
+        <div className="manual-comment-title"><strong>人工补录评论</strong><span>用于页面暂时无法自动读取时</span></div>
+        <label><span>评论用户</span><input value={messageForm.senderName} onChange={(event) => setMessageForm((current) => ({ ...current, senderName: event.target.value }))} placeholder="例如：温州小林"/></label>
+        <label><span>评论内容</span><textarea value={messageForm.message} onChange={(event) => setMessageForm((current) => ({ ...current, message: event.target.value }))} placeholder="粘贴公开笔记评论"/></label>
+        <label><span>笔记链接</span><input value={messageForm.sourceUrl} onChange={(event) => setMessageForm((current) => ({ ...current, sourceUrl: event.target.value }))} placeholder="小红书笔记详情页链接"/></label>
+        <button className="secondary-action manual-save" onClick={() => void saveCustomerMessage()}>补录并生成建议回复</button>
+      </div>
+      <div className="blocked-template"><span>高风险评论 · 自动转人工</span><code>联系方式 / 投诉 / 退款 / 争议 / 验证码</code><p>自动回复不会发送微信号、电话号码或其他站外导流信息，也不会处理争议性评论。</p></div>
       <p className="notice">{serviceNotice}</p>
     </section>
     <section className="dashboard-card service-inbox">
-      <div className="section-heading"><div><span>MESSAGE INBOX</span><h2>客户留言箱</h2><p>先理解客户需求，再发送有帮助的站内回复。</p></div><span className="counter">{messages.filter((item) => item.status === "pending").length} 条待回复</span></div>
+      <div className="section-heading"><div><span>COMMENT QUEUE</span><h2>笔记评论处理队列</h2><p>秘书区分安全评论与需人工介入的评论，并保留每条处理记录。</p></div><span className="counter">{messages.filter((item) => item.status === "pending").length} 条待回复</span></div>
       <div className="message-list">
         {messages.map((item) => <article className={`message-card ${item.status}`} key={item.id}>
-          <div className="message-meta"><div><strong>{item.senderName}</strong><small>{new Date(item.createdAt).toLocaleString("zh-CN")}</small></div><span>{item.status === "replied" ? "已回复" : "待回复"}</span></div>
+          <div className="message-meta"><div><strong>{item.senderName}</strong><small>{new Date(item.createdAt).toLocaleString("zh-CN")}</small></div><span>{item.status === "replied" ? "已回复" : item.autoReplyEligible ? "可自动回复" : "转人工"}</span></div>
           <blockquote>{item.message}</blockquote>
           <div className="reply-suggestion"><small>建议回复</small><p>{item.suggestedReply}</p></div>
           <div className="message-actions"><button onClick={() => void copyServiceReply(item)}>复制合规回复</button><button onClick={() => void markMessageReplied(item)} disabled={item.status === "replied"}>{item.status === "replied" ? "已完成" : "标记已回复"}</button>{item.sourceUrl && <a href={item.sourceUrl} target="_blank" rel="noreferrer">查看来源 ↗</a>}</div>
         </article>)}
-        {!messages.length && <div className="empty-state"><strong>还没有客服留言</strong><p>从小红书官方后台复制客户留言到左侧，平台会自动建立待回复记录。</p></div>}
+        {!messages.length && <div className="empty-state"><strong>还没有同步到笔记评论</strong><p>点击“同步最近笔记评论”，秘书会打开你的主页和最近笔记建立待回复队列。</p></div>}
       </div>
     </section>
   </div>;
