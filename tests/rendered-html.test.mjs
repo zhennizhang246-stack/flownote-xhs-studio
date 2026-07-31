@@ -11,7 +11,7 @@ test("ships the studio secretary product surface", async () => {
   assert.match(page, /每日 3 篇小红书高热参考解析/);
   assert.match(page, /确认并预填小红书发布页/);
   assert.match(page, /确认本篇并自动发布/);
-  assert.match(page, /MJ 发布桥 1.2 已连接/);
+  assert.match(page, /MJ 发布桥 1.3 已连接/);
   assert.match(page, /秘书会打开小红书/);
   assert.match(page, /from=menu&target=image/);
   assert.match(page, /renderCoverDataUrl/);
@@ -22,8 +22,10 @@ test("ships the studio secretary product surface", async () => {
   assert.match(page, /办公项目/);
   assert.match(page, /酒店项目/);
   assert.match(page, /展厅陈列项目/);
-  assert.match(page, /小红书客服助手/);
-  assert.match(page, /高风险站外导流模板 · 已禁用自动发送/);
+  assert.match(page, /笔记评论自动回复秘书/);
+  assert.match(page, /同步最近笔记评论/);
+  assert.match(page, /确认并自动回复安全评论/);
+  assert.match(page, /高风险评论 · 自动转人工/);
   assert.match(page, /3 个标题方案 · 点击选择/);
   assert.match(page, /确认并同步保存/);
   assert.match(page, /©2026/);
@@ -42,6 +44,7 @@ test("ships a local bridge with manual prefill and single-use auto-publish autho
   const siteBridge = await readFile(new URL("../browser-extension/site-bridge.js", import.meta.url), "utf8");
   const prefill = await readFile(new URL("../browser-extension/xhs-prefill.js", import.meta.url), "utf8");
   const research = await readFile(new URL("../browser-extension/xhs-research.js", import.meta.url), "utf8");
+  const comments = await readFile(new URL("../browser-extension/xhs-comments.js", import.meta.url), "utf8");
   assert.equal(manifest.manifest_version, 3);
   assert.ok(manifest.content_scripts.some((entry) => entry.matches.includes("https://creator.xiaohongshu.com/publish/*")));
   assert.match(siteBridge, /MJ_XHS_DRAFT_STORED/);
@@ -58,6 +61,12 @@ test("ships a local bridge with manual prefill and single-use auto-publish autho
   assert.match(research, /collectCandidates/);
   assert.match(research, /安全验证/);
   assert.match(research, /MJ_XHS_RESEARCH_RESULTS/);
+  assert.match(siteBridge, /MJ_XHS_COMMENT_SYNC_REQUEST/);
+  assert.match(siteBridge, /MJ_XHS_COMMENT_REPLY_REQUEST/);
+  assert.match(comments, /collectProfileNotes/);
+  assert.match(comments, /collectNoteComments/);
+  assert.match(comments, /authorizationValid/);
+  assert.match(comments, /20_000/);
 });
 
 test("uses Node CI instead of applying Deno lint rules to the Node app", async () => {
@@ -100,10 +109,11 @@ test("binds durable project storage", async () => {
   assert.match(schema, /publish_mode/);
 });
 
-test("ships a durable, human-reviewed customer service handoff", async () => {
+test("ships a durable, guarded note comment reply manager", async () => {
   const route = await readFile(new URL("../app/api/customer-service/route.ts", import.meta.url), "utf8");
-  assert.match(route, /SAFE_REPLY/);
+  assert.match(route, /MANUAL_REVIEW_PATTERN/);
   assert.match(route, /suggestedReply/);
+  assert.match(route, /autoReplyEligible/);
   assert.doesNotMatch(route, /LIKE-MJ0666666/);
 });
 

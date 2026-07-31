@@ -2,7 +2,7 @@ const STUDIO_SOURCE = "mj-xhs-studio";
 const BRIDGE_SOURCE = "mj-xhs-bridge";
 
 function notifyPage(type) {
-  window.postMessage({ source: BRIDGE_SOURCE, type, version: 3 }, window.location.origin);
+  window.postMessage({ source: BRIDGE_SOURCE, type, version: 4 }, window.location.origin);
 }
 
 function normalizeDraft(value) {
@@ -53,6 +53,23 @@ window.addEventListener("message", (event) => {
     });
     return;
   }
+  if (message.type === "MJ_XHS_COMMENT_SYNC_REQUEST") {
+    chrome.runtime.sendMessage({
+      type: "MJ_XHS_START_COMMENT_SYNC",
+      requestId: String(message.requestId || ""),
+      profileUrl: String(message.profileUrl || ""),
+    });
+    return;
+  }
+  if (message.type === "MJ_XHS_COMMENT_REPLY_REQUEST") {
+    chrome.runtime.sendMessage({
+      type: "MJ_XHS_START_COMMENT_REPLY",
+      requestId: String(message.requestId || ""),
+      actions: Array.isArray(message.actions) ? message.actions.slice(0, 5) : [],
+      authorization: message.authorization,
+    });
+    return;
+  }
   if (message.type !== "MJ_XHS_DRAFT") return;
   const draft = normalizeDraft(message.payload);
   if (!draft) return;
@@ -67,11 +84,33 @@ chrome.storage.onChanged.addListener((changes, area) => {
   window.postMessage({
     source: BRIDGE_SOURCE,
     type: "MJ_XHS_RESEARCH_RESULT",
-    version: 3,
+    version: 4,
     requestId: result.requestId,
     candidates: result.candidates || [],
     error: result.error || "",
   }, window.location.origin);
+});
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local") return;
+  const sync = changes.mjXhsCommentSyncResult?.newValue;
+  if (sync) {
+    window.postMessage({
+      source: BRIDGE_SOURCE,
+      type: "MJ_XHS_COMMENT_SYNC_RESULT",
+      version: 4,
+      ...sync,
+    }, window.location.origin);
+  }
+  const replies = changes.mjXhsCommentReplyResult?.newValue;
+  if (replies) {
+    window.postMessage({
+      source: BRIDGE_SOURCE,
+      type: "MJ_XHS_COMMENT_REPLY_RESULT",
+      version: 4,
+      ...replies,
+    }, window.location.origin);
+  }
 });
 
 notifyPage("MJ_XHS_BRIDGE_READY");
