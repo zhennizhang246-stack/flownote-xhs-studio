@@ -1,0 +1,9 @@
+<view class="page">
+  <text class="kicker">PROJECT ASSET LIBRARY</text><view class="page-title">项目资产库</view>
+  <view class="subtle">所有项目只属于当前微信账户，下拉可刷新。</view>
+  <view class="empty" wx:if="{{!loading && !projects.length}}"><text class="empty-title">还没有项目</text><text class="empty-desc">前往“创作”上传实景图并建立第一个项目。</text></view>
+  <view class="project-card" wx:for="{{projects}}" wx:key="_id">
+    <image wx:if="{{item.images[0]}}" src="{{item.images[0].fileId}}" mode="aspectFill" />
+    <view class="project-body"><view class="project-top"><text class="pill">{{item.category}}</text><text class="state">{{item.status}}</text></view><view class="project-name">{{item.name}}</view><view class="subtle">{{item.location}} · {{item.area}}</view><view class="project-title">{{item.draft.title}}</view><view class="project-actions"><button class="mini light" data-id="{{item._id}}" bindtap="copy">复制文案</button><button class="mini" data-id="{{item._id}}" bindtap="approve">人工确认</button></view></view>
+  </view>
+</view>

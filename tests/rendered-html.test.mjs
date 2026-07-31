@@ -244,3 +244,21 @@ test("ships a touch-friendly mobile application layout", async () => {
   assert.match(styles, /min-height:46px/);
   assert.match(styles, /font-size:16px/);
 });
+
+test("ships an OpenID-isolated native WeChat mini program", async () => {
+  const appConfig = JSON.parse(await readFile(new URL("../wechat-miniprogram/miniprogram/app.json", import.meta.url), "utf8"));
+  const projectConfig = JSON.parse(await readFile(new URL("../wechat-miniprogram/project.config.json", import.meta.url), "utf8"));
+  const cloudFunction = await readFile(new URL("../wechat-miniprogram/cloudfunctions/studio/index.js", import.meta.url), "utf8");
+  const home = await readFile(new URL("../wechat-miniprogram/miniprogram/pages/home/index.js", import.meta.url), "utf8");
+  const account = await readFile(new URL("../wechat-miniprogram/miniprogram/pages/account/index.wxml", import.meta.url), "utf8");
+  assert.equal(appConfig.pages.length, 5);
+  assert.equal(appConfig.tabBar.list.length, 5);
+  assert.equal(projectConfig.miniprogramRoot, "miniprogram/");
+  assert.equal(projectConfig.cloudfunctionRoot, "cloudfunctions/");
+  assert.match(cloudFunction, /cloud\.getWXContext\(\)\.OPENID/);
+  assert.match(cloudFunction, /ownerOpenId/);
+  assert.match(cloudFunction, /项目不存在或无权访问/);
+  assert.match(home, /count: remaining/);
+  assert.match(cloudFunction, /slice\(0, 10\)/);
+  assert.match(account, /open-type="getPhoneNumber"/);
+});

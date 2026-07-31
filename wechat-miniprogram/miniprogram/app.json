@@ -1,0 +1,32 @@
+{
+  "pages": [
+    "pages/home/index",
+    "pages/assets/index",
+    "pages/calendar/index",
+    "pages/research/index",
+    "pages/account/index"
+  ],
+  "window": {
+    "navigationBarTitleText": "栖作创作秘书",
+    "navigationBarBackgroundColor": "#1b241f",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#f0eee7",
+    "backgroundTextStyle": "dark"
+  },
+  "tabBar": {
+    "color": "#788078",
+    "selectedColor": "#536c5e",
+    "backgroundColor": "#faf9f5",
+    "borderStyle": "white",
+    "list": [
+      { "pagePath": "pages/home/index", "text": "创作" },
+      { "pagePath": "pages/assets/index", "text": "资产" },
+      { "pagePath": "pages/calendar/index", "text": "排期" },
+      { "pagePath": "pages/research/index", "text": "参考" },
+      { "pagePath": "pages/account/index", "text": "我的" }
+    ]
+  },
+  "sitemapLocation": "sitemap.json",
+  "style": "v2",
+  "lazyCodeLoading": "requiredComponents"
+}
