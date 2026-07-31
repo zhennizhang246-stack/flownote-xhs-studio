@@ -39,7 +39,7 @@ test("ships the studio secretary product surface", async () => {
   assert.match(page, /建筑网格/);
   assert.match(page, /标题颜色/);
   assert.match(page, /已纳入后续生成策略/);
-  assert.match(page, /点击整张卡片查看小红书原笔记/);
+  assert.match(page, /可直接跳转到原笔记网页/);
   assert.match(page, /保存项目并生成封面与文案/);
   assert.match(page, /浙江 · 温州/);
 });
