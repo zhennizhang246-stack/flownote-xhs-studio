@@ -496,6 +496,14 @@ export function StudioSecretary() {
   const visibleProjects = assetCategory === "全部项目"
     ? projects
     : projects.filter((project) => project.category === assetCategory);
+  const visibleResearchReferences = references.filter((reference) => {
+    try {
+      const url = new URL(reference.sourceUrl);
+      return url.searchParams.has("xsec_token");
+    } catch {
+      return false;
+    }
+  }).slice(0, 3);
 
   useEffect(() => {
     async function loadWorkspace() {
@@ -1122,15 +1130,15 @@ export function StudioSecretary() {
   const researchView = <section className="dashboard-card">
     <div className="section-heading"><div><span>DAILY CONTENT INTELLIGENCE</span><h2>每日 3 篇小红书高热参考解析</h2><p>每张参考卡片都可直接跳转到小红书原笔记网页；秘书提炼后的结构、封面层级与受众洞察会自动用于后续项目生成升级。</p></div><button className="small-action" disabled={researching} onClick={() => void runResearch(true)}>{researching ? "正在小红书研究…" : "刷新今日 3 篇"}</button></div>
     <div className="research-summary"><div><strong>{settings.researchTime}</strong><span>每日自动收集</span></div><div><strong>3 篇</strong><span>室内设计高热参考</span></div><div><strong>原创</strong><span>只提炼规律，不复制原文</span></div></div>
-    <p className="research-notice">{researchNotice || `最近研究日：${references[0]?.researchDate || "等待首次收集"}`}</p>
+    <p className="research-notice">{researchNotice || `最近可浏览研究日：${visibleResearchReferences[0]?.researchDate || "请刷新今日 3 篇"}`}</p>
     <div className="research-grid">
-      {references.map((reference, index) => <a className="research-card" href={reference.sourceUrl} target="_blank" rel="noreferrer" key={reference.id}>
+      {visibleResearchReferences.map((reference, index) => <a className="research-card" href={reference.sourceUrl} target="_blank" rel="noreferrer" key={reference.id}>
         <div className={`research-cover tone-${index % 3}`}><span>REFERENCE {String((index % 3) + 1).padStart(2, "0")}</span><strong>{reference.title}</strong><small>{reference.author || "公开来源"}</small></div>
         <div className="metric-row"><span>赞 {reference.likes || "待核实"}</span><span>藏 {reference.saves || "待核实"}</span><span>评 {reference.comments || "待核实"}</span><em>{reference.metricConfidence === "verified" ? "已核实" : "估算信号"}</em></div>
         <div className="research-analysis"><span className="generation-ready">✓ 已纳入后续生成策略</span><h3>文案结构</h3><p>{reference.copyAnalysis}</p><h3>封面规律</h3><p>{reference.coverAnalysis}</p><h3>可复用方法</h3><p>{reference.reusablePattern}</p></div>
-        <div className="source-row"><span>{reference.metricsNote}</span><strong>可直接跳转到原笔记网页 ↗</strong></div>
+        <div className="source-row"><span>{reference.metricsNote}</span><strong>直接打开当前可浏览的原笔记网页 ↗</strong></div>
       </a>)}
-      {!references.length && <div className="empty-state research-empty"><strong>今日研究尚未生成</strong><p>点击“开始今日研究”，秘书会打开小红书、读取公开可见的高热室内设计笔记并建立分析档案。</p><button onClick={() => void runResearch(false)}>开始今日研究</button></div>}
+      {!visibleResearchReferences.length && <div className="empty-state research-empty"><strong>需要重新采集可浏览笔记</strong><p>旧链接缺少小红书当前访问参数或已经失效。点击刷新后，秘书会重新打开小红书并替换为当前可直接浏览的原笔记链接。</p><button onClick={() => void runResearch(true)}>重新采集今日 3 篇</button></div>}
     </div>
   </section>;
 

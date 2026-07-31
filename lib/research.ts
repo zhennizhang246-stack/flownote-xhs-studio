@@ -68,6 +68,17 @@ function isXiaohongshuNoteUrl(value: string) {
 function canonicalXiaohongshuNoteUrl(value: string) {
   if (!isXiaohongshuNoteUrl(value)) return "";
   const url = new URL(value);
+  const canonical = new URL(`${url.origin}${url.pathname}`);
+  for (const key of ["xsec_token", "xsec_source", "source"]) {
+    const parameter = url.searchParams.get(key);
+    if (parameter) canonical.searchParams.set(key, parameter.slice(0, 1000));
+  }
+  return canonical.href.slice(0, 2000);
+}
+
+function noteIdentity(value: string) {
+  if (!isXiaohongshuNoteUrl(value)) return "";
+  const url = new URL(value);
   return `${url.origin}${url.pathname}`;
 }
 
@@ -99,9 +110,10 @@ export async function collectBrowserResearch(env: ResearchRuntimeEnv, candidates
   const unique = new Map<string, BrowserResearchCandidate>();
   for (const candidate of candidates.slice(0, 20)) {
     const sourceUrl = canonicalXiaohongshuNoteUrl(String(candidate.sourceUrl || "").trim());
+    const identity = noteIdentity(sourceUrl);
     const title = String(candidate.title || "").replace(/\s+/g, " ").trim().slice(0, 120);
-    if (!isXiaohongshuNoteUrl(sourceUrl) || title.length < 3 || unique.has(sourceUrl)) continue;
-    unique.set(sourceUrl, {
+    if (!identity || title.length < 3 || unique.has(identity)) continue;
+    unique.set(identity, {
       sourceUrl,
       title,
       author: String(candidate.author || "").replace(/\s+/g, " ").trim().slice(0, 80),
@@ -117,6 +129,9 @@ export async function collectBrowserResearch(env: ResearchRuntimeEnv, candidates
   if (selected.length !== 3) throw new Error("未从小红书公开搜索页读取到 3 篇可核验笔记，请确认已登录后重试");
 
   const db = drizzle(env.DB, { schema });
+  if (force) {
+    await db.delete(researchReferences).where(eq(researchReferences.researchDate, date));
+  }
   for (const candidate of selected) {
     const likes = parseVisibleMetric(candidate.likesText || "");
     const item: ResearchItem = {
