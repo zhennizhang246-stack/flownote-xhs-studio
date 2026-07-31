@@ -1,0 +1,1 @@
+.queue{display:flex;align-items:center;justify-content:space-between;padding:22rpx 0;border-bottom:1rpx solid #e0ddd5}.queue:last-child{border-bottom:0}.queue-name,.queue-meta{display:block}.queue-name{font-size:27rpx;font-weight:600}.queue-meta{margin-top:8rpx;color:#788078;font-size:20rpx}

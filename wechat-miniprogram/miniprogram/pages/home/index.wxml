@@ -1,0 +1,42 @@
+<view class="page">
+  <text class="kicker">XIAOHONGSHU CREATIVE SERVICE</text>
+  <view class="page-title">创作工作台</view>
+  <view class="subtle">上传最多 10 张项目实景图，建立属于当前微信账户的独立项目。</view>
+
+  <view class="card">
+    <view class="section-title"><text>项目实景图</text><text class="pill">{{images.length}} / 10</text></view>
+    <view class="upload" bindtap="chooseImages">
+      <view class="upload-plus">＋</view>
+      <text>从相册或相机添加图片</text>
+    </view>
+    <view class="image-grid" wx:if="{{images.length}}">
+      <view class="image-wrap" wx:for="{{images}}" wx:key="tempFilePath">
+        <image src="{{item.tempFilePath}}" mode="aspectFill" />
+        <button class="remove" data-index="{{index}}" bindtap="removeImage">×</button>
+      </view>
+    </view>
+
+    <view class="field"><text class="field-label">项目名称</text><input class="input" value="{{form.name}}" data-key="name" bindinput="updateField" placeholder="例如：栖光木境" /></view>
+    <view class="grid-two">
+      <view class="field"><text class="field-label">城市</text><input class="input" value="{{form.location}}" data-key="location" bindinput="updateField" placeholder="浙江 · 温州" /></view>
+      <view class="field"><text class="field-label">面积</text><input class="input" value="{{form.area}}" data-key="area" bindinput="updateField" placeholder="150m²" /></view>
+    </view>
+    <view class="field"><text class="field-label">项目分类</text><picker mode="selector" range="{{categories}}" value="{{categoryIndex}}" bindchange="changeCategory"><view class="picker">{{categories[categoryIndex]}}</view></picker></view>
+    <view class="field"><text class="field-label">设计说明</text><textarea class="textarea" value="{{form.brief}}" data-key="brief" bindinput="updateField" placeholder="空间材质、光线、功能与客户需求" /></view>
+    <button class="button" loading="{{saving}}" disabled="{{saving}}" bindtap="createProject">生成封面标题与文案</button>
+  </view>
+
+  <view class="card draft-card" wx:if="{{draft}}">
+    <view class="section-title"><text>生成结果</text><text class="pill">可继续编辑</text></view>
+    <view class="cover">
+      <image wx:if="{{images[0]}}" src="{{images[0].tempFilePath}}" mode="aspectFill" />
+      <view class="cover-shade"></view>
+      <view class="cover-copy"><text class="cover-title">{{draft.coverTitle}}</text><text class="cover-subtitle">{{draft.coverSubtitle}}</text></view>
+    </view>
+    <view class="field"><text class="field-label">笔记标题</text><view class="draft-text title-text">{{draft.title}}</view></view>
+    <view class="field"><text class="field-label">正文</text><view class="draft-text body-text">{{draft.body}}</view></view>
+    <view class="tags"><text wx:for="{{draft.tags}}" wx:key="*this">#{{item}}</text></view>
+    <button class="button secondary" bindtap="copyDraft">复制文案，前往小红书发布</button>
+    <view class="safe-note">小程序不会冒充小红书自动发布。取得小红书官方接口权限前，保留人工确认与发布。</view>
+  </view>
+</view>

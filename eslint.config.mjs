@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Native WeChat mini-program and cloud functions use the CommonJS runtime.
+    "wechat-miniprogram/**",
   ]),
 ]);
 
