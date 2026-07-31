@@ -26,7 +26,7 @@ export async function POST(request: Request) {
   try {
     const payload = await request.json() as { name?: string; location?: string; area?: string; projectType?: string; category?: string; audience?: string; brief?: string; images?: UploadedImage[] };
     const images = payload.images || []; if (!images.length) return Response.json({ error: "请至少上传一张项目实景图" }, { status: 400 });
-    if (images.length > 12) return Response.json({ error: "每个项目最多上传 12 张图片" }, { status: 400 });
+    if (images.length > 10) return Response.json({ error: "每个项目最多上传 10 张图片" }, { status: 400 });
     const runtime = env as unknown as RuntimeEnv; if (!runtime.PROJECT_MEDIA) throw new Error("项目图片存储暂不可用"); const db = getDb();
     const allowedCategories = new Set(["商业项目", "住宅项目", "办公项目", "酒店项目", "展厅陈列项目", "其他项目"]);
     const category = allowedCategories.has(payload.category || "") ? payload.category! : "住宅项目";

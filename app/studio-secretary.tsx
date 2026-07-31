@@ -112,6 +112,7 @@ const navItems: Array<{ id: Tab; number: string; label: string }> = [
   { id: "service", number: "05", label: "小红书客服" },
 ];
 const projectCategories = ["全部项目", "商业项目", "住宅项目", "办公项目", "酒店项目", "展厅陈列项目", "其他项目"];
+const MAX_PROJECT_IMAGES = 10;
 const toDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
   const reader = new FileReader();
   reader.onload = () => resolve(String(reader.result));
@@ -246,12 +247,28 @@ export function StudioSecretary() {
 
   const updateMeta = (key: keyof ProjectMeta, value: string) => setMeta((current) => ({ ...current, [key]: value }));
   const handleFiles = (event: ChangeEvent<HTMLInputElement>) => {
-    const next = Array.from(event.target.files || []);
-    if (!next.length) return;
-    setFiles(next);
-    setPreviews(next.map((file) => URL.createObjectURL(file)));
-    setNotice(`已接收 ${next.length} 张项目实景图，将保存到资产库`);
+    const incoming = Array.from(event.target.files || []);
+    event.target.value = "";
+    if (!incoming.length) return;
+    const merged = [...files, ...incoming].filter((file, index, all) => (
+      all.findIndex((item) => `${item.name}-${item.size}-${item.lastModified}` === `${file.name}-${file.size}-${file.lastModified}`) === index
+    )).slice(0, MAX_PROJECT_IMAGES);
+    setFiles(merged);
+    setPreviews(merged.map((file) => URL.createObjectURL(file)));
+    setDraft((current) => ({ ...current, coverIndex: Math.min(current.coverIndex ?? 0, Math.max(merged.length - 1, 0)) }));
+    setNotice(incoming.length + files.length > MAX_PROJECT_IMAGES
+      ? `最多添加 ${MAX_PROJECT_IMAGES} 张图片，超出的图片未加入`
+      : `已添加 ${merged.length} / ${MAX_PROJECT_IMAGES} 张项目实景图，可继续分批添加`);
     setPhase("ready");
+  };
+
+  const removeFile = (index: number) => {
+    if (!files.length) return;
+    const nextFiles = files.filter((_, fileIndex) => fileIndex !== index);
+    setFiles(nextFiles);
+    setPreviews(nextFiles.map((file) => URL.createObjectURL(file)));
+    setDraft((current) => ({ ...current, coverIndex: Math.min(current.coverIndex ?? 0, Math.max(nextFiles.length - 1, 0)) }));
+    setNotice(`已保留 ${nextFiles.length} / ${MAX_PROJECT_IMAGES} 张图片`);
   };
 
   async function refreshProjects() {
@@ -493,10 +510,10 @@ export function StudioSecretary() {
 
   const creatorView = <div className="content-grid">
     <section className="creator-card">
-      <div className="section-heading"><div><span>PROJECT INTAKE</span><h2>交给秘书一个新项目</h2></div><span className="counter">{files.length || 7} 张实景图</span></div>
+      <div className="section-heading"><div><span>PROJECT INTAKE</span><h2>交给秘书一个新项目</h2></div><span className="counter">{files.length ? `${files.length} / ${MAX_PROJECT_IMAGES} 张实景图` : "最多 10 张实景图"}</span></div>
       <form onSubmit={handleGenerate}>
-        <label className="upload-zone"><input type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={handleFiles}/><div className="upload-icon">＋</div><strong>上传项目实景图</strong><span>图片将存入项目资产库，可安排未来任意时间发布</span></label>
-        <div className="thumb-strip">{previews.slice(0, 7).map((image, index) => <button type="button" className={index === (draft.coverIndex ?? 0) ? "thumb selected" : "thumb"} key={`${image}-${index}`} onClick={() => setDraft((current) => ({ ...current, coverIndex: index }))} aria-label={`选择第 ${index + 1} 张作为封面`}><img src={image} alt=""/></button>)}</div>
+        <label className="upload-zone"><input type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={handleFiles}/><div className="upload-icon">＋</div><strong>{files.length ? "继续添加项目实景图" : "上传项目实景图"}</strong><span>可分批人工添加，最多 10 张；点击缩略图选择封面</span></label>
+        <div className="thumb-strip">{previews.slice(0, MAX_PROJECT_IMAGES).map((image, index) => <div className="thumb-wrap" key={`${image}-${index}`}><button type="button" className={index === (draft.coverIndex ?? 0) ? "thumb selected" : "thumb"} onClick={() => setDraft((current) => ({ ...current, coverIndex: index }))} aria-label={`选择第 ${index + 1} 张作为封面`}><img src={image} alt=""/></button>{files.length > 0 && <button type="button" className="remove-thumb" onClick={() => removeFile(index)} aria-label={`删除第 ${index + 1} 张图片`}>×</button>}<span>{index + 1}</span></div>)}</div>
         <div className="form-grid">
           <label className="wide"><span>项目名称</span><input value={meta.name} onChange={(event) => updateMeta("name", event.target.value)}/></label>
           <label><span>所在地</span><input value={meta.location} onChange={(event) => updateMeta("location", event.target.value)}/></label>

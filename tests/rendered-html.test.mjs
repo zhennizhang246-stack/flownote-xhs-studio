@@ -22,8 +22,18 @@ test("ships the studio secretary product surface", async () => {
   assert.match(page, /确认并同步保存/);
   assert.match(page, /©2026/);
   assert.match(page, /由 MJ 制作/);
+  assert.match(page, /最多 10 张实景图/);
+  assert.match(page, /可分批人工添加，最多 10 张/);
   assert.match(page, /保存项目并生成封面与文案/);
   assert.match(page, /浙江 · 温州/);
+});
+
+test("accepts and analyzes at most ten project images", async () => {
+  const projects = await readFile(new URL("../app/api/projects/route.ts", import.meta.url), "utf8");
+  const generate = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
+  assert.match(projects, /images\.length > 10/);
+  assert.match(projects, /最多上传 10 张图片/);
+  assert.match(generate, /slice\(0,10\)/);
 });
 
 test("generates and persists three selectable title options", async () => {
