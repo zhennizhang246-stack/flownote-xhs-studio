@@ -1,0 +1,6 @@
+<view class="page"><text class="kicker">PRIVATE WORKSPACE</text><view class="page-title">我的工作区</view><view class="subtle">微信身份自动建立独立账户，其他用户不能查看你的项目与创作记录。</view>
+  <view class="identity card"><view class="avatar">栖</view><view><text class="identity-title">微信独立工作区</text><text class="identity-id">ID · {{account.id || '连接中'}}</text></view></view>
+  <view class="card"><view class="section-title"><text>手机号码</text><text class="pill">可选绑定</text></view><view class="subtle">手机号仅用于账户安全与后续腾讯云身份迁移，不会公开展示。</view><button class="button light" open-type="getPhoneNumber" bindgetphonenumber="getPhoneNumber">{{phoneAuthorized ? '已取得授权，等待云端绑定' : '微信授权绑定手机号'}}</button></view>
+  <view class="card"><view class="section-title"><text>小红书账户</text><text class="pill">当前设备</text></view><view class="field"><text class="field-label">我的小红书主页链接</text><input class="input" value="{{profileUrl}}" bindblur="saveProfile" placeholder="粘贴自己的小红书主页链接" /></view><button class="button secondary" disabled="{{!profileUrl}}" bindtap="copyProfile">复制小红书主页链接</button><view class="safe-note">小程序不能共享其他人的小红书登录状态。正式自动发布需要小红书开放平台授权。</view></view>
+  <view class="card"><view class="section-title"><text>账户保护</text><text class="pill">OPENID 隔离</text></view><view class="protection"><text>✓ 项目与图片按微信账户隔离</text><text>✓ 发布前必须人工确认</text><text>✓ 不保存小红书密码</text><text>✓ 不复制高热笔记原文</text></view></view>
+</view>

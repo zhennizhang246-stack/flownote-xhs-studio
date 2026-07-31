@@ -1,0 +1,4 @@
+{
+  "desc": "账户工作区页面不参与微信搜索索引",
+  "rules": [{ "action": "disallow", "page": "*" }]
+}
