@@ -13,7 +13,13 @@ function decodeDataUrl(dataUrl: string) {
 }
 export async function GET() {
   try { const db = getDb(); const rows = await db.select().from(projects).orderBy(desc(projects.createdAt)).limit(30);
-    return Response.json({ projects: rows.map((row) => ({ ...row, draft: JSON.parse(row.draftJson || "{}") })) });
+    const images = await db.select().from(projectImages);
+    return Response.json({ projects: rows.map((row) => ({
+      ...row,
+      draft: JSON.parse(row.draftJson || "{}"),
+      images: images.filter((image) => image.projectId === row.id).sort((a, b) => a.sortOrder - b.sortOrder)
+        .map((image) => ({ ...image, url: `/api/media/${image.id}` })),
+    })) });
   } catch (error) { return Response.json({ error: error instanceof Error ? error.message : "读取项目失败" }, { status: 500 }); }
 }
 export async function POST(request: Request) {
