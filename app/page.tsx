@@ -2,6 +2,7 @@
 
 import { requireChatGPTUser } from "./chatgpt-auth";
 import { siteContent } from "../lib/site-content";
+import { canClaimLegacyData } from "../lib/account";
 
 export const dynamic = "force-dynamic";
 
@@ -12,5 +13,6 @@ export const metadata = {
 
 export default async function Home() {
   const user = await requireChatGPTUser("/");
-  return <StudioSecretary accountName={user.displayName} />;
+  const accountEmail = user.email.trim().toLowerCase().slice(0, 320);
+  return <StudioSecretary accountName={user.displayName} isSiteOwner={canClaimLegacyData(accountEmail)} />;
 }

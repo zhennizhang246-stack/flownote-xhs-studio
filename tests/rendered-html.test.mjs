@@ -181,13 +181,18 @@ test("publishes a sign-in-gated multi-account workspace without sharing Xiaohong
   const settings = await readFile(new URL("../app/api/settings/route.ts", import.meta.url), "utf8");
   assert.match(page, /requireChatGPTUser/);
   assert.match(page, /force-dynamic/);
+  assert.match(page, /canClaimLegacyData/);
   assert.match(studio, /其他账户首次使用需重新登录小红书/);
+  assert.match(studio, /网站作者专属工作区/);
+  assert.match(studio, /新账户独立工作区/);
+  assert.match(studio, /其他账户无法访问/);
   assert.match(studio, /mj-xhs-profile-url/);
   assert.doesNotMatch(studio, /60f6318b0000000001015907/);
   assert.match(account, /PRIMARY_OWNER_EMAIL/);
   assert.match(projects, /requireAccountEmail/);
   assert.match(projects, /projects\.ownerEmail/);
   assert.match(settings, /accountAutomationSettings/);
+  assert.match(settings, /onConflictDoNothing/);
 });
 
 test("publishes a WeChat share page synchronized with the main site content", async () => {
@@ -203,4 +208,24 @@ test("publishes a WeChat share page synchronized with the main site content", as
   assert.match(sharedContent, /shareDescription/);
   assert.match(page, /siteContent/);
   assert.match(layout, /siteContent/);
+});
+
+test("keeps every private author resource scoped to the signed-in account", async () => {
+  const protectedRoutes = [
+    "../app/api/projects/route.ts",
+    "../app/api/projects/[id]/route.ts",
+    "../app/api/projects/[id]/cover/route.ts",
+    "../app/api/projects/[id]/schedule/route.ts",
+    "../app/api/media/[id]/route.ts",
+    "../app/api/generate/route.ts",
+    "../app/api/research/route.ts",
+    "../app/api/customer-service/route.ts",
+    "../app/api/settings/route.ts",
+    "../app/api/publish/official/route.ts",
+  ];
+  for (const route of protectedRoutes) {
+    const source = await readFile(new URL(route, import.meta.url), "utf8");
+    assert.match(source, /requireAccountEmail/, `${route} must authenticate the caller`);
+    assert.match(source, /ownerEmail/, `${route} must scope records to the caller`);
+  }
 });
