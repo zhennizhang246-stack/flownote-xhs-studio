@@ -9,10 +9,81 @@ test("ships the studio secretary product surface", async () => {
   assert.match(page, /项目资产库/);
   assert.match(page, /自动工作节奏/);
   assert.match(page, /每日 3 篇小红书高热参考解析/);
-  assert.match(page, /确认并打开小红书发布页/);
+  assert.match(page, /确认并预填小红书发布页/);
+  assert.match(page, /确认本篇并自动发布/);
+  assert.match(page, /MJ 发布桥 1.2 已连接/);
+  assert.match(page, /秘书会打开小红书/);
+  assert.match(page, /from=menu&target=image/);
+  assert.match(page, /renderCoverDataUrl/);
+  assert.match(page, /5 \* 60_000/);
   assert.match(page, /确认并加入三天队列/);
+  assert.match(page, /商业项目/);
+  assert.match(page, /住宅项目/);
+  assert.match(page, /办公项目/);
+  assert.match(page, /酒店项目/);
+  assert.match(page, /展厅陈列项目/);
+  assert.match(page, /小红书客服助手/);
+  assert.match(page, /高风险站外导流模板 · 已禁用自动发送/);
+  assert.match(page, /3 个标题方案 · 点击选择/);
+  assert.match(page, /确认并同步保存/);
+  assert.match(page, /©2026/);
+  assert.match(page, /由 MJ 制作/);
+  assert.match(page, /最多 10 张实景图/);
+  assert.match(page, /可分批人工添加，最多 10 张/);
+  assert.match(page, /人工立即发布/);
+  assert.match(page, /官方 API 自动发布/);
+  assert.match(page, /等待官方授权/);
   assert.match(page, /保存项目并生成封面与文案/);
   assert.match(page, /浙江 · 温州/);
+});
+
+test("ships a local bridge with manual prefill and single-use auto-publish authorization", async () => {
+  const manifest = JSON.parse(await readFile(new URL("../browser-extension/manifest.json", import.meta.url), "utf8"));
+  const siteBridge = await readFile(new URL("../browser-extension/site-bridge.js", import.meta.url), "utf8");
+  const prefill = await readFile(new URL("../browser-extension/xhs-prefill.js", import.meta.url), "utf8");
+  const research = await readFile(new URL("../browser-extension/xhs-research.js", import.meta.url), "utf8");
+  assert.equal(manifest.manifest_version, 3);
+  assert.ok(manifest.content_scripts.some((entry) => entry.matches.includes("https://creator.xiaohongshu.com/publish/*")));
+  assert.match(siteBridge, /MJ_XHS_DRAFT_STORED/);
+  assert.match(prefill, /DataTransfer/);
+  assert.match(prefill, /findTitleField/);
+  assert.match(prefill, /findBodyField/);
+  assert.match(prefill, /coverFile/);
+  assert.match(prefill, /authorizationIsValid/);
+  assert.match(prefill, /autoPublishConsumedAt/);
+  assert.match(prefill, /hasVerificationBlocker/);
+  assert.match(prefill, /candidates\.length === 1/);
+  assert.match(prefill, /button\.click\(\)/);
+  assert.match(siteBridge, /MJ_XHS_RESEARCH_REQUEST/);
+  assert.match(research, /collectCandidates/);
+  assert.match(research, /安全验证/);
+  assert.match(research, /MJ_XHS_RESEARCH_RESULTS/);
+});
+
+test("uses Node CI instead of applying Deno lint rules to the Node app", async () => {
+  const workflow = await readFile(new URL("../.github/workflows/node.yml", import.meta.url), "utf8");
+  assert.match(workflow, /name: Node CI/);
+  assert.match(workflow, /node-version: "24"/);
+  assert.match(workflow, /npm ci/);
+  assert.match(workflow, /npm run lint/);
+  assert.match(workflow, /npm test/);
+  assert.doesNotMatch(workflow, /deno lint/);
+});
+
+test("accepts and analyzes at most ten project images", async () => {
+  const projects = await readFile(new URL("../app/api/projects/route.ts", import.meta.url), "utf8");
+  const generate = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
+  assert.match(projects, /images\.length > 10/);
+  assert.match(projects, /最多上传 10 张图片/);
+  assert.match(generate, /slice\(0,10\)/);
+});
+
+test("generates and persists three selectable title options", async () => {
+  const generate = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
+  const project = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
+  assert.match(generate, /titleOptions 必须正好包含 3 个标题/);
+  assert.match(generate, /draft\.titleOptions=options/);
+  assert.match(project, /titleOptions/);
 });
 
 test("binds durable project storage", async () => {
@@ -24,18 +95,33 @@ test("binds durable project storage", async () => {
   assert.match(schema, /draft_json/);
   assert.match(schema, /automation_settings/);
   assert.match(schema, /research_references/);
+  assert.match(schema, /customer_messages/);
+  assert.match(schema, /category/);
+  assert.match(schema, /publish_mode/);
+});
+
+test("ships a durable, human-reviewed customer service handoff", async () => {
+  const route = await readFile(new URL("../app/api/customer-service/route.ts", import.meta.url), "utf8");
+  assert.match(route, /SAFE_REPLY/);
+  assert.match(route, /suggestedReply/);
+  assert.doesNotMatch(route, /LIKE-MJ0666666/);
 });
 
 test("ships configurable scheduling and daily research APIs", async () => {
   const settings = await readFile(new URL("../app/api/settings/route.ts", import.meta.url), "utf8");
   const research = await readFile(new URL("../app/api/research/route.ts", import.meta.url), "utf8");
   const researchService = await readFile(new URL("../lib/research.ts", import.meta.url), "utf8");
+  const generate = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
   assert.match(settings, /publishCadenceDays/);
   assert.match(settings, /researchTime/);
   assert.match(research, /collectDailyResearch/);
   assert.match(researchService, /type: "web_search"/);
   assert.match(researchService, /不得大段摘录或改写原文/);
   assert.match(researchService, /isXiaohongshuNoteUrl/);
+  assert.match(researchService, /collectBrowserResearch/);
+  assert.match(researchService, /abstractReusablePattern/);
+  assert.match(generate, /近期研究规律/);
+  assert.match(generate, /不得复制标题、原句、段落或封面版式/);
 });
 
 test("requires a human-approved draft before scheduling", async () => {

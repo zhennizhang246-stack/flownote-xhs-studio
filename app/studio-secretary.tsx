@@ -4,6 +4,7 @@ import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 
 type Draft = {
   title: string;
+  titleOptions: string[];
   coverTitle: string;
   coverSubtitle: string;
   body: string;
@@ -18,6 +19,7 @@ type ProjectMeta = {
   location: string;
   area: string;
   projectType: string;
+  category: string;
   audience: string;
   brief: string;
 };
@@ -38,6 +40,8 @@ type AutomationSettings = {
   researchTime: string;
   dailyResearchEnabled: boolean;
   requireApproval: boolean;
+  publishMode: "manual" | "official_api";
+  officialApiConnected: boolean;
   timezone: string;
 };
 type ResearchReference = {
@@ -56,11 +60,52 @@ type ResearchReference = {
   audienceInsight: string;
   reusablePattern: string;
 };
-type Tab = "creator" | "assets" | "calendar" | "research";
+type CustomerMessage = {
+  id: number;
+  senderName: string;
+  message: string;
+  sourceUrl: string;
+  suggestedReply: string;
+  status: "pending" | "replied";
+  createdAt: string;
+  repliedAt?: string | null;
+};
+type BrowserResearchCandidate = {
+  sourceUrl: string;
+  title: string;
+  author?: string;
+  likesText?: string;
+  coverUrl?: string;
+  coverAlt?: string;
+  cardText?: string;
+};
+type XhsBridgeDraft = {
+  version: 2;
+  projectId: number;
+  projectName: string;
+  title: string;
+  body: string;
+  tags: string[];
+  coverDataUrl: string;
+  images: Array<{ url: string; fileName: string }>;
+  publishAction: "prefill" | "auto_publish";
+  authorization?: {
+    confirmedAt: string;
+    expiresAt: string;
+    nonce: string;
+  };
+  createdAt: string;
+};
+type Tab = "creator" | "assets" | "calendar" | "research" | "service";
 
 const seededImages = Array.from({ length: 7 }, (_, i) => `/projects/warm-wood-home/0${i + 1}.jpg`);
 const seededDraft: Draft = {
   title: "温州150m²，把自然搬进日常的家",
+  titleOptions: [
+    "温州150m²，把自然搬进日常的家",
+    "原木与光，住进松弛的四季",
+    "150m²自然系住宅的生活秩序",
+  ],
   coverTitle: "住进自然里",
   coverSubtitle: "浙江温州 · 150m² 木质住宅",
   body: "比起堆叠风格，我们更想让这个家拥有接近自然的呼吸感。\n\n从玄关开始，温润木色一路延伸到客餐厅、厨房与卧室。克制的材质关系让光影成为空间里真正的主角；绿植、框景与大面积留白，则把四季变化悄悄带进日常。\n\n开放的客餐厅让家人自然聚拢，厨房岛台承接备餐与交流，洗衣房和衣帽间把功能收进秩序里。设计没有刻意制造视觉喧哗，而是在每一次行走、停留与收纳中，留下松弛。\n\n好的住宅不急着表达，它会在住进去之后，慢慢回应生活。",
@@ -75,6 +120,7 @@ const initialMeta: ProjectMeta = {
   location: "浙江 · 温州",
   area: "150m²",
   projectType: "住宅空间",
+  category: "住宅项目",
   audience: "重视自然、松弛感与收纳秩序的改善型家庭",
   brief: "温润木质、自然光与绿意贯穿全屋；客餐厅一体，包含厨房、家政、卧室、衣帽间与卫浴。",
 };
@@ -84,6 +130,8 @@ const defaultSettings: AutomationSettings = {
   researchTime: "09:00",
   dailyResearchEnabled: true,
   requireApproval: true,
+  publishMode: "manual",
+  officialApiConnected: false,
   timezone: "Asia/Shanghai",
 };
 const navItems: Array<{ id: Tab; number: string; label: string }> = [
@@ -91,7 +139,10 @@ const navItems: Array<{ id: Tab; number: string; label: string }> = [
   { id: "assets", number: "02", label: "项目资产库" },
   { id: "calendar", number: "03", label: "发布日历" },
   { id: "research", number: "04", label: "流量参考" },
+  { id: "service", number: "05", label: "小红书客服" },
 ];
+const projectCategories = ["全部项目", "商业项目", "住宅项目", "办公项目", "酒店项目", "展厅陈列项目", "其他项目"];
+const MAX_PROJECT_IMAGES = 10;
 const toDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
   const reader = new FileReader();
   reader.onload = () => resolve(String(reader.result));
@@ -122,13 +173,109 @@ const statusLabels: Record<string, string> = {
   scheduled: "已排期",
   published: "已发布",
 };
-const XHS_PUBLISH_URL = "https://creator.xiaohongshu.com/publish/publish?source=official&from=tab_switch";
+const XHS_PUBLISH_URL = "https://creator.xiaohongshu.com/publish/publish?source=official&from=menu&target=image";
+const XHS_BRIDGE_SOURCE = "mj-xhs-studio";
+const XHS_BRIDGE_EXTENSION_URL = "/downloads/mj-xhs-draft-bridge.zip";
+
+function collectResearchFromBridge(force: boolean) {
+  return new Promise<BrowserResearchCandidate[]>((resolve, reject) => {
+    const requestId = crypto.randomUUID();
+    const timeout = window.setTimeout(() => {
+      window.removeEventListener("message", receiveResult);
+      reject(new Error("等待小红书公开搜索结果超时，请确认搜索页已打开且账号已登录"));
+    }, 35_000);
+    function receiveResult(event: MessageEvent) {
+      if (event.source !== window || event.origin !== window.location.origin) return;
+      const message = event.data as {
+        source?: string;
+        type?: string;
+        version?: number;
+        requestId?: string;
+        candidates?: BrowserResearchCandidate[];
+        error?: string;
+      };
+      if (message.source !== "mj-xhs-bridge"
+        || message.type !== "MJ_XHS_RESEARCH_RESULT"
+        || message.version !== 3
+        || message.requestId !== requestId) return;
+      window.clearTimeout(timeout);
+      window.removeEventListener("message", receiveResult);
+      if (message.error) reject(new Error(message.error));
+      else resolve(Array.isArray(message.candidates) ? message.candidates : []);
+    }
+    window.addEventListener("message", receiveResult);
+    window.postMessage({
+      source: XHS_BRIDGE_SOURCE,
+      type: "MJ_XHS_RESEARCH_REQUEST",
+      requestId,
+      force,
+    }, window.location.origin);
+  });
+}
+
+const loadImage = (source: string) => new Promise<HTMLImageElement>((resolve, reject) => {
+  const image = new Image();
+  image.onload = () => resolve(image);
+  image.onerror = () => reject(new Error("封面底图读取失败"));
+  image.src = source;
+});
+
+async function renderCoverDataUrl(source: string, title: string, subtitle: string) {
+  const image = await loadImage(source);
+  const canvas = document.createElement("canvas");
+  canvas.width = 1080;
+  canvas.height = 1440;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("当前浏览器无法生成封面");
+  const scale = Math.max(canvas.width / image.naturalWidth, canvas.height / image.naturalHeight);
+  const drawWidth = image.naturalWidth * scale;
+  const drawHeight = image.naturalHeight * scale;
+  context.drawImage(image, (canvas.width - drawWidth) / 2, (canvas.height - drawHeight) / 2, drawWidth, drawHeight);
+  const shade = context.createLinearGradient(0, 350, 0, canvas.height);
+  shade.addColorStop(0, "rgba(18,23,19,0.03)");
+  shade.addColorStop(1, "rgba(18,23,19,0.88)");
+  context.fillStyle = shade;
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = "rgba(255,255,255,.92)";
+  context.font = '24px Georgia, "Songti SC", serif';
+  context.fillText("ORIGINAL DESIGN · INTERIOR", 82, 112);
+  context.strokeStyle = "rgba(255,255,255,.55)";
+  context.lineWidth = 2;
+  context.beginPath();
+  context.moveTo(82, 142);
+  context.lineTo(998, 142);
+  context.stroke();
+  context.font = '88px Georgia, "Songti SC", serif';
+  const chars = [...title.trim()];
+  const lines: string[] = [];
+  let line = "";
+  for (const char of chars) {
+    const candidate = `${line}${char}`;
+    if (context.measureText(candidate).width > 870 && line) {
+      lines.push(line);
+      line = char;
+    } else {
+      line = candidate;
+    }
+  }
+  if (line) lines.push(line);
+  lines.slice(0, 3).forEach((text, index) => context.fillText(text, 82, 1090 + index * 100));
+  context.font = '28px system-ui, "Microsoft YaHei", sans-serif';
+  context.fillStyle = "rgba(255,255,255,.82)";
+  context.fillText(subtitle.trim(), 84, 1380);
+  return canvas.toDataURL("image/jpeg", 0.92);
+}
 
 function localFallback(meta: ProjectMeta): Draft {
   const location = meta.location || "项目所在地待确认";
   const area = meta.area || "面积待确认";
   return {
     title: `${location}${area}，让自然成为家的底色`,
+    titleOptions: [
+      `${location}${area}，让自然成为家的底色`,
+      "从光线与材质开始设计一个家",
+      "克制留白，让居住回到松弛日常",
+    ],
     coverTitle: "让家自然生长",
     coverSubtitle: `${location} · ${area} ${meta.projectType || "空间设计"}`,
     body: `这个项目从真实的居住感受出发，而不是先定义一种风格。\n\n${meta.brief || "我们从光线、材质、动线与收纳重新梳理空间。"}\n\n画面里的材质、自然光和克制留白共同构成温和的空间秩序。功能被收进日常动线里，人在其中可以更松弛地停留、交流和生活。\n\n如果你也在寻找适合自己的居住方式，欢迎带着户型与需求来聊聊。`,
@@ -156,6 +303,12 @@ export function StudioSecretary() {
   const [settingsNotice, setSettingsNotice] = useState("");
   const [researching, setResearching] = useState(false);
   const [researchNotice, setResearchNotice] = useState("");
+  const [assetCategory, setAssetCategory] = useState("全部项目");
+  const [messages, setMessages] = useState<CustomerMessage[]>([]);
+  const [messageForm, setMessageForm] = useState({ senderName: "", message: "", sourceUrl: "" });
+  const [serviceNotice, setServiceNotice] = useState("");
+  const [lastSyncedAt, setLastSyncedAt] = useState("");
+  const [bridgeReady, setBridgeReady] = useState(false);
 
   const coverImage = previews[draft.coverIndex ?? 0] || seededImages[0];
   const phaseLabel = {
@@ -170,21 +323,27 @@ export function StudioSecretary() {
   );
   const scheduledProjects = projects.filter((project) => project.scheduledAt)
     .sort((a, b) => String(a.scheduledAt).localeCompare(String(b.scheduledAt)));
+  const visibleProjects = assetCategory === "全部项目"
+    ? projects
+    : projects.filter((project) => project.category === assetCategory);
 
   useEffect(() => {
     async function loadWorkspace() {
       try {
-        const [projectResponse, settingsResponse, researchResponse] = await Promise.all([
+        const [projectResponse, settingsResponse, researchResponse, serviceResponse] = await Promise.all([
           fetch("/api/projects"),
           fetch("/api/settings"),
           fetch("/api/research"),
+          fetch("/api/customer-service"),
         ]);
         const projectPayload = projectResponse.ok ? await projectResponse.json() as { projects: ProjectRecord[] } : { projects: [] };
         const settingsPayload = settingsResponse.ok ? await settingsResponse.json() as { settings: AutomationSettings } : { settings: defaultSettings };
         const researchPayload = researchResponse.ok ? await researchResponse.json() as { references: ResearchReference[] } : { references: [] };
+        const servicePayload = serviceResponse.ok ? await serviceResponse.json() as { messages: CustomerMessage[] } : { messages: [] };
         setProjects(projectPayload.projects);
         setSettings(settingsPayload.settings);
         setReferences(researchPayload.references);
+        setMessages(servicePayload.messages);
         setScheduleDrafts(Object.fromEntries(projectPayload.projects.map((project) => [
           project.id,
           project.scheduledAt ? dateTimeInput(new Date(project.scheduledAt)) : nextSlot(settingsPayload.settings),
@@ -208,14 +367,44 @@ export function StudioSecretary() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    function receiveBridgeStatus(event: MessageEvent) {
+      if (event.source !== window || event.origin !== window.location.origin) return;
+      const message = event.data as { source?: string; type?: string; version?: number };
+      if (message?.source !== "mj-xhs-bridge") return;
+      if (message.version === 3 && (message.type === "MJ_XHS_BRIDGE_READY" || message.type === "MJ_XHS_DRAFT_STORED")) {
+        setBridgeReady(true);
+      }
+    }
+    window.addEventListener("message", receiveBridgeStatus);
+    window.postMessage({ source: XHS_BRIDGE_SOURCE, type: "MJ_XHS_BRIDGE_PING" }, window.location.origin);
+    return () => window.removeEventListener("message", receiveBridgeStatus);
+  }, []);
+
   const updateMeta = (key: keyof ProjectMeta, value: string) => setMeta((current) => ({ ...current, [key]: value }));
   const handleFiles = (event: ChangeEvent<HTMLInputElement>) => {
-    const next = Array.from(event.target.files || []);
-    if (!next.length) return;
-    setFiles(next);
-    setPreviews(next.map((file) => URL.createObjectURL(file)));
-    setNotice(`已接收 ${next.length} 张项目实景图，将保存到资产库`);
+    const incoming = Array.from(event.target.files || []);
+    event.target.value = "";
+    if (!incoming.length) return;
+    const merged = [...files, ...incoming].filter((file, index, all) => (
+      all.findIndex((item) => `${item.name}-${item.size}-${item.lastModified}` === `${file.name}-${file.size}-${file.lastModified}`) === index
+    )).slice(0, MAX_PROJECT_IMAGES);
+    setFiles(merged);
+    setPreviews(merged.map((file) => URL.createObjectURL(file)));
+    setDraft((current) => ({ ...current, coverIndex: Math.min(current.coverIndex ?? 0, Math.max(merged.length - 1, 0)) }));
+    setNotice(incoming.length + files.length > MAX_PROJECT_IMAGES
+      ? `最多添加 ${MAX_PROJECT_IMAGES} 张图片，超出的图片未加入`
+      : `已添加 ${merged.length} / ${MAX_PROJECT_IMAGES} 张项目实景图，可继续分批添加`);
     setPhase("ready");
+  };
+
+  const removeFile = (index: number) => {
+    if (!files.length) return;
+    const nextFiles = files.filter((_, fileIndex) => fileIndex !== index);
+    setFiles(nextFiles);
+    setPreviews(nextFiles.map((file) => URL.createObjectURL(file)));
+    setDraft((current) => ({ ...current, coverIndex: Math.min(current.coverIndex ?? 0, Math.max(nextFiles.length - 1, 0)) }));
+    setNotice(`已保留 ${nextFiles.length} / ${MAX_PROJECT_IMAGES} 张图片`);
   };
 
   async function refreshProjects() {
@@ -290,7 +479,11 @@ export function StudioSecretary() {
       setSettingsNotice(error.error || "设置保存失败");
       return;
     }
-    setSettingsNotice(`已保存：每 ${settings.publishCadenceDays} 天 ${settings.publishTime} 排期，每日 ${settings.researchTime} 收集参考`);
+    const payload = await response.json() as { settings?: AutomationSettings };
+    if (payload.settings) setSettings(payload.settings);
+    setSettingsNotice(settings.publishMode === "official_api"
+      ? `已启用官方 API 自动发布：每 ${settings.publishCadenceDays} 天 ${settings.publishTime} 执行`
+      : `已保存人工发布模式：每 ${settings.publishCadenceDays} 天 ${settings.publishTime} 提醒发布`);
   }
 
   async function scheduleProject(projectId: number) {
@@ -316,10 +509,11 @@ export function StudioSecretary() {
       location: project.location,
       area: project.area,
       projectType: project.projectType,
+      category: project.category || "住宅项目",
       audience: project.audience,
       brief: project.brief,
     });
-    setDraft({ ...seededDraft, ...project.draft, tags: project.draft?.tags || [], highlights: project.draft?.highlights || [], riskNotes: project.draft?.riskNotes || [] });
+    setDraft({ ...seededDraft, ...project.draft, titleOptions: project.draft?.titleOptions?.length === 3 ? project.draft.titleOptions : [project.draft?.title || seededDraft.title, ...seededDraft.titleOptions.filter((title) => title !== project.draft?.title)].slice(0, 3), tags: project.draft?.tags || [], highlights: project.draft?.highlights || [], riskNotes: project.draft?.riskNotes || [] });
     setPreviews(project.images?.map((image) => image.url) || []);
     setFiles([]);
     setPhase("done");
@@ -343,13 +537,22 @@ export function StudioSecretary() {
       return false;
     }
     setNotice(status === "approved" ? "封面与文案已人工确认，可随时发布或加入三天队列" : status === "published" ? "已记录为发布完成" : "编辑内容已保存到项目资产库");
+    setLastSyncedAt(new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }));
     await refreshProjects();
     return true;
   }
 
-  async function publishNow() {
+  async function publishNow(autoPublish = false) {
     if (!currentProjectId) {
       setNotice("请先上传图片并生成正式项目，再进入发布流程");
+      return;
+    }
+    if (autoPublish && !bridgeReady) {
+      setNotice("自动发布需要先安装并连接 MJ 发布桥；你仍可使用人工预填发布");
+      return;
+    }
+    if (autoPublish && !window.confirm(`确认自动发布「${draft.title.trim()}」？\n\n平台会同步封面、图片、标题、正文与标签，并在 5 分钟内授权扩展点击一次小红书官方“发布”按钮。`)) {
+      setNotice("已取消本次自动发布，项目内容没有提交到小红书");
       return;
     }
     const publishWindow = window.open(XHS_PUBLISH_URL, "_blank", "noopener,noreferrer");
@@ -358,12 +561,67 @@ export function StudioSecretary() {
       publishWindow?.close();
       return;
     }
+    let project = projects.find((item) => item.id === currentProjectId);
+    if (!project?.images?.length) {
+      const response = await fetch("/api/projects");
+      if (response.ok) {
+        const payload = await response.json() as { projects: ProjectRecord[] };
+        project = payload.projects.find((item) => item.id === currentProjectId);
+      }
+    }
+    let coverDataUrl = "";
+    try {
+      coverDataUrl = await renderCoverDataUrl(coverImage, draft.coverTitle, draft.coverSubtitle);
+    } catch (error) {
+      publishWindow?.close();
+      setNotice(error instanceof Error ? error.message : "封面生成失败，请重试");
+      return;
+    }
+    const coverIndex = Math.max(0, draft.coverIndex ?? 0);
+    const images = (project?.images || [])
+      .filter((_, index) => index !== coverIndex)
+      .slice(0, 9)
+      .map((image) => ({
+        url: new URL(image.url, window.location.origin).href,
+        fileName: image.fileName,
+      }));
+    const createdAt = new Date();
+    const bridgeDraft: XhsBridgeDraft = {
+      version: 2,
+      projectId: currentProjectId,
+      projectName: meta.name,
+      title: draft.title.trim(),
+      body: draft.body.trim(),
+      tags: draft.tags.map((tag) => tag.replace(/^#/, "").trim()).filter(Boolean),
+      coverDataUrl,
+      images,
+      publishAction: autoPublish ? "auto_publish" : "prefill",
+      authorization: autoPublish ? {
+        confirmedAt: createdAt.toISOString(),
+        expiresAt: new Date(createdAt.getTime() + 5 * 60_000).toISOString(),
+        nonce: crypto.randomUUID(),
+      } : undefined,
+      createdAt: createdAt.toISOString(),
+    };
+    window.postMessage({
+      source: XHS_BRIDGE_SOURCE,
+      type: "MJ_XHS_DRAFT",
+      payload: bridgeDraft,
+    }, window.location.origin);
     const copy = `${draft.title}\n\n${draft.body}\n\n${draft.tags.map((tag) => `#${tag.replace(/^#/, "")}`).join(" ")}`;
     try {
       await navigator.clipboard.writeText(copy);
-      setNotice("已确认并复制完整文案；官方小红书发布页已打开，请上传所选项目图片后发布");
+      setNotice(autoPublish
+        ? "已同步成品封面、图片、标题与正文；MJ 发布桥将在页面准备完成后执行一次自动发布"
+        : bridgeReady
+        ? "已把图片、标题与正文交给 MJ 发布桥；小红书发布页将自动预填，请检查后人工点击发布"
+        : "已复制完整文案并打开小红书发布页；安装 MJ 发布桥后可自动预填图片、标题与正文");
     } catch {
-      setNotice("已确认内容并打开官方小红书发布页；请从编辑区复制文案后发布");
+      setNotice(autoPublish
+        ? "已把本次限时授权交给 MJ 发布桥，正在等待小红书页面完成预填并发布"
+        : bridgeReady
+        ? "已把确认内容交给 MJ 发布桥；请在小红书发布页检查后人工点击发布"
+        : "已打开小红书发布页；当前未检测到 MJ 发布桥，请手动粘贴文案并上传图片");
     }
   }
 
@@ -394,18 +652,21 @@ export function StudioSecretary() {
   async function runResearch(force: boolean) {
     if (researching) return;
     setResearching(true);
-    setResearchNotice("正在检索公开高热室内设计内容并解析…");
+    setResearchNotice("秘书正在打开小红书公开搜索页，筛选室内设计高热笔记…");
     try {
+      if (!bridgeReady) throw new Error("请安装或更新 MJ 发布桥 1.2，刷新平台后再开始今日研究");
+      const browserCandidates = await collectResearchFromBridge(force);
+      setResearchNotice(`已从小红书读取 ${browserCandidates.length} 篇公开笔记，正在筛选并建立原创分析…`);
       const response = await fetch("/api/research", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ force }),
+        body: JSON.stringify({ force, browserCandidates }),
       });
       const payload = await response.json() as { references?: ResearchReference[]; error?: string };
       if (!response.ok) throw new Error(payload.error || "每日研究失败");
       const latest = payload.references || [];
       setReferences((current) => [...latest, ...current.filter((item) => item.researchDate !== localDate())]);
-      setResearchNotice(`今日 3 条参考已完成：只提炼结构与视觉规律，不复制原文`);
+      setResearchNotice("今日 3 篇参考已完成：来源为小红书公开笔记，只提炼结构与视觉规律，不复制原文");
     } catch (error) {
       setResearchNotice(error instanceof Error ? error.message : "每日研究失败");
     } finally {
@@ -413,16 +674,57 @@ export function StudioSecretary() {
     }
   }
 
+  async function saveCustomerMessage() {
+    setServiceNotice("正在保存留言并生成合规回复…");
+    const response = await fetch("/api/customer-service", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(messageForm),
+    });
+    const payload = await response.json() as { message?: CustomerMessage; error?: string };
+    if (!response.ok || !payload.message) {
+      setServiceNotice(payload.error || "留言保存失败");
+      return;
+    }
+    setMessages((current) => [payload.message!, ...current]);
+    setMessageForm({ senderName: "", message: "", sourceUrl: "" });
+    setServiceNotice("留言已归档，已生成站内合规回复建议");
+  }
+
+  async function copyServiceReply(item: CustomerMessage) {
+    try {
+      await navigator.clipboard.writeText(item.suggestedReply);
+      setServiceNotice(`已复制给「${item.senderName}」的回复，请在小红书站内人工确认发送`);
+    } catch {
+      setServiceNotice("无法自动复制，请手动选中回复内容");
+    }
+  }
+
+  async function markMessageReplied(item: CustomerMessage) {
+    const response = await fetch("/api/customer-service", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: item.id, status: "replied" }),
+    });
+    if (!response.ok) {
+      setServiceNotice("客服状态更新失败");
+      return;
+    }
+    setMessages((current) => current.map((message) => message.id === item.id ? { ...message, status: "replied" } : message));
+    setServiceNotice(`「${item.senderName}」已标记为已回复`);
+  }
+
   const creatorView = <div className="content-grid">
     <section className="creator-card">
-      <div className="section-heading"><div><span>PROJECT INTAKE</span><h2>交给秘书一个新项目</h2></div><span className="counter">{files.length || 7} 张实景图</span></div>
+      <div className="section-heading"><div><span>PROJECT INTAKE</span><h2>交给秘书一个新项目</h2></div><span className="counter">{files.length ? `${files.length} / ${MAX_PROJECT_IMAGES} 张实景图` : "最多 10 张实景图"}</span></div>
       <form onSubmit={handleGenerate}>
-        <label className="upload-zone"><input type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={handleFiles}/><div className="upload-icon">＋</div><strong>上传项目实景图</strong><span>图片将存入项目资产库，可安排未来任意时间发布</span></label>
-        <div className="thumb-strip">{previews.slice(0, 7).map((image, index) => <button type="button" className={index === (draft.coverIndex ?? 0) ? "thumb selected" : "thumb"} key={`${image}-${index}`} onClick={() => setDraft((current) => ({ ...current, coverIndex: index }))} aria-label={`选择第 ${index + 1} 张作为封面`}><img src={image} alt=""/></button>)}</div>
+        <label className="upload-zone"><input type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={handleFiles}/><div className="upload-icon">＋</div><strong>{files.length ? "继续添加项目实景图" : "上传项目实景图"}</strong><span>可分批人工添加，最多 10 张；点击缩略图选择封面</span></label>
+        <div className="thumb-strip">{previews.slice(0, MAX_PROJECT_IMAGES).map((image, index) => <div className="thumb-wrap" key={`${image}-${index}`}><button type="button" className={index === (draft.coverIndex ?? 0) ? "thumb selected" : "thumb"} onClick={() => setDraft((current) => ({ ...current, coverIndex: index }))} aria-label={`选择第 ${index + 1} 张作为封面`}><img src={image} alt=""/></button>{files.length > 0 && <button type="button" className="remove-thumb" onClick={() => removeFile(index)} aria-label={`删除第 ${index + 1} 张图片`}>×</button>}<span>{index + 1}</span></div>)}</div>
         <div className="form-grid">
           <label className="wide"><span>项目名称</span><input value={meta.name} onChange={(event) => updateMeta("name", event.target.value)}/></label>
           <label><span>所在地</span><input value={meta.location} onChange={(event) => updateMeta("location", event.target.value)}/></label>
           <label><span>项目面积</span><input value={meta.area} onChange={(event) => updateMeta("area", event.target.value)}/></label>
+          <label><span>资产库分区</span><select value={meta.category} onChange={(event) => updateMeta("category", event.target.value)}>{projectCategories.slice(1).map((category) => <option key={category}>{category}</option>)}</select></label>
           <label><span>空间类型</span><input value={meta.projectType} onChange={(event) => updateMeta("projectType", event.target.value)}/></label>
           <label><span>目标客户</span><input value={meta.audience} onChange={(event) => updateMeta("audience", event.target.value)}/></label>
           <label className="wide"><span>已知设计信息</span><textarea value={meta.brief} onChange={(event) => updateMeta("brief", event.target.value)}/></label>
@@ -434,19 +736,28 @@ export function StudioSecretary() {
     <section className="preview-panel">
       <div className="section-heading compact"><div><span>LIVE PREVIEW</span><h2>发布预览</h2></div><span className="mode-label">{draft.mode || "AI 分析"}</span></div>
       <div className="phone-frame"><div className="cover-preview"><img src={coverImage} alt="项目封面预览"/><div className="cover-shade"/><span className="cover-eyebrow">ORIGINAL DESIGN · RESIDENCE</span><div className="cover-copy"><h3>{draft.coverTitle}</h3><p>{draft.coverSubtitle}</p></div><span className="page-count">01 / {previews.length}</span></div></div>
+      <div className={`bridge-status ${bridgeReady ? "connected" : ""}`}>
+        <span>{bridgeReady ? "MJ 发布桥 1.2 已连接" : "未连接最新版 MJ 发布桥"}</span>
+        <p>{bridgeReady ? "成品封面、项目图片、标题、正文与标签会保持统一；可选择人工发布或单篇确认后自动发布。" : "安装一次浏览器扩展，即可把已确认内容自动带入小红书官方图文发布页。"}</p>
+        {!bridgeReady && <a href={XHS_BRIDGE_EXTENSION_URL} download>下载或更新 MJ 发布桥扩展</a>}
+      </div>
       <div className="publish-actions">
-        <button className="secondary-action" onClick={() => void publishNow()}>确认并打开小红书发布页</button>
-        <button className="icon-action" onClick={() => void saveProject("drafted")} aria-label="保存到项目资产库">存</button>
+        <button className="secondary-action" onClick={() => void publishNow()}>确认并预填小红书发布页</button>
+        <button className="auto-publish-action" disabled={!bridgeReady} onClick={() => void publishNow(true)}>确认本篇并自动发布</button>
+        <button className="queue-action" onClick={() => void approveAndSchedule()}>确认并加入三天队列</button>
+        <button className="icon-action" onClick={() => void saveProject("drafted")} aria-label="保存到项目资产库">保存到资产库</button>
       </div>
     </section>
     <section className="editorial-card editor-mode">
-      <div className="editorial-title"><span>EDITABLE COPY</span><label><small>笔记标题</small><textarea value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}/></label><div className="fact-row">{facts.map((fact) => <span key={fact}>{fact}</span>)}</div></div>
+      <div className="editorial-title"><span>EDITABLE COPY</span><label><small>已选择的笔记标题</small><textarea value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}/></label><div className="fact-row">{facts.map((fact) => <span key={fact}>{fact}</span>)}</div></div>
       <div className="copy-column">
+        <div className="title-options"><small>3 个标题方案 · 点击选择</small>{draft.titleOptions.map((title, index) => <button className={draft.title === title ? "active" : ""} key={`${title}-${index}`} onClick={() => setDraft((current) => ({ ...current, title }))}><span>0{index + 1}</span>{title}<em>{draft.title === title ? "已选择" : "选择"}</em></button>)}</div>
         <label><small>封面主标题</small><input value={draft.coverTitle} onChange={(event) => setDraft((current) => ({ ...current, coverTitle: event.target.value }))}/></label>
         <label><small>封面副标题</small><input value={draft.coverSubtitle} onChange={(event) => setDraft((current) => ({ ...current, coverSubtitle: event.target.value }))}/></label>
         <label><small>正文</small><textarea className="body-editor" value={draft.body} onChange={(event) => setDraft((current) => ({ ...current, body: event.target.value }))}/></label>
         <label><small>话题标签（用逗号或空格分隔）</small><input value={draft.tags.join("，")} onChange={(event) => setDraft((current) => ({ ...current, tags: event.target.value.split(/[，,\s#]+/).filter(Boolean).slice(0, 12) }))}/></label>
-        <div className="editor-actions"><button onClick={() => void saveProject("drafted")}>保存到资产库</button><button className="approve-action" onClick={() => void saveProject("approved")}>确认封面与文案</button><button onClick={() => void approveAndSchedule()}>确认并加入三天队列</button></div>
+        <div className="editor-actions"><button onClick={() => void saveProject("drafted")}>保存到资产库</button><button className="approve-action" onClick={() => void saveProject("approved")}>确认并同步保存</button><button onClick={() => void approveAndSchedule()}>确认并加入三天队列</button></div>
+        <p className="sync-state">{lastSyncedAt ? `✓ 已于 ${lastSyncedAt} 同步更新到项目资产库` : "确认后会同步更新封面、标题、正文与标签，并保存到项目资产库"}</p>
       </div>
       <div className="analysis-column"><div><span className="mini-heading">图片分析要点</span><ul>{draft.highlights.map((item) => <li key={item}>{item}</li>)}</ul></div><div className="risk-box"><span>发布前确认</span>{draft.riskNotes.map((note) => <p key={note}>{note}</p>)}</div></div>
     </section>
@@ -454,13 +765,14 @@ export function StudioSecretary() {
 
   const assetView = <section className="dashboard-card">
     <div className="section-heading"><div><span>PROJECT ASSET LIBRARY</span><h2>项目资产库</h2><p>所有实景图、项目信息、生成文案与排期都按项目长期保存。</p></div><button className="small-action" onClick={() => setActiveTab("creator")}>＋ 新建项目</button></div>
+    <div className="category-tabs">{projectCategories.map((category) => <button className={assetCategory === category ? "active" : ""} key={category} onClick={() => setAssetCategory(category)}>{category}<span>{category === "全部项目" ? projects.length : projects.filter((project) => project.category === category).length}</span></button>)}</div>
     <div className="asset-grid">
       <article className="asset-card featured"><img src={seededImages[1]} alt="温州150平方米住宅"/><div><span className="state-pill">示例项目</span><h3>栖光木境</h3><p>浙江 · 温州　150m²　住宅空间</p><small>7 张实景图 · 已生成封面与文案</small></div></article>
-      {projects.map((project) => <article className="asset-card" key={project.id}>
+      {visibleProjects.map((project) => <article className="asset-card" key={project.id}>
         {project.images?.[0] ? <img src={project.images[0].url} alt={project.name}/> : <div className="asset-placeholder">栖</div>}
         <div><span className={`state-pill ${project.status}`}>{statusLabels[project.status] || project.status}</span><h3>{project.name}</h3><p>{project.location || "地点待补充"}　{project.area || "面积待补充"}</p><small>{project.images?.length || 0} 张实景图 · {project.scheduledAt ? new Date(project.scheduledAt).toLocaleString("zh-CN") : "尚未排期"}</small><div className="asset-actions"><button onClick={() => loadProject(project)}>打开编辑</button>{["approved", "scheduled"].includes(project.status) && <button onClick={() => void markPublished(project)}>标记已发布</button>}</div></div>
       </article>)}
-      {!projects.length && <div className="empty-state"><strong>资产库等待第一个正式项目</strong><p>在创作工作台上传图片并生成后，项目会自动归档到这里。</p></div>}
+      {!visibleProjects.length && <div className="empty-state"><strong>{assetCategory}暂无项目</strong><p>在创作工作台上传图片并选择对应分区，项目会自动归档到这里。</p></div>}
     </div>
   </section>;
 
@@ -468,6 +780,11 @@ export function StudioSecretary() {
     <section className="dashboard-card settings-card">
       <div className="section-heading"><div><span>AUTOMATION SETTINGS</span><h2>自动工作节奏</h2><p>所有时间均按北京时间执行，可随时修改。</p></div><span className="counter">Asia / Shanghai</span></div>
       <div className="settings-grid">
+        <div className="publish-mode-picker wide">
+          <span>发布模式</span>
+          <button className={settings.publishMode === "manual" ? "active" : ""} onClick={() => setSettings((current) => ({ ...current, publishMode: "manual" }))}><strong>人工立即发布</strong><small>确认后复制文案并打开小红书官方发布页</small><em>始终可用</em></button>
+          <button className={settings.publishMode === "official_api" ? "active" : ""} disabled={!settings.officialApiConnected} onClick={() => setSettings((current) => ({ ...current, publishMode: "official_api" }))}><strong>官方 API 自动发布</strong><small>仅使用小红书官方授权接口，到期后自动提交</small><em>{settings.officialApiConnected ? "已连接" : "等待官方授权"}</em></button>
+        </div>
         <label><span>默认发布时间</span><input type="time" value={settings.publishTime} onChange={(event) => setSettings((current) => ({ ...current, publishTime: event.target.value }))}/></label>
         <label><span>发布间隔</span><div className="number-control"><input type="number" min="1" max="30" value={settings.publishCadenceDays} onChange={(event) => setSettings((current) => ({ ...current, publishCadenceDays: Number(event.target.value) }))}/><em>天</em></div></label>
         <label><span>每日参考收集时间</span><input type="time" value={settings.researchTime} onChange={(event) => setSettings((current) => ({ ...current, researchTime: event.target.value }))}/></label>
@@ -475,7 +792,7 @@ export function StudioSecretary() {
         <label className="toggle-row wide"><span>发布前保留人工确认</span><input type="checkbox" checked={settings.requireApproval} onChange={(event) => setSettings((current) => ({ ...current, requireApproval: event.target.checked }))}/></label>
       </div>
       <button className="primary-action settings-save" onClick={() => void saveSettings()}><span>保存自动配置</span><span>→</span></button>
-      <p className="notice">{settingsNotice || "系统每三天准备一条已确认内容并提醒发布；正式发布通过小红书官方创作服务平台完成。"}</p>
+      <p className="notice">{settingsNotice || (settings.officialApiConnected ? "官方发布接口已连接，可选择自动发布；人工发布入口仍保留。" : "当前未获得小红书官方发布 API 授权，系统会准备发布包并提醒人工发布。")}</p>
     </section>
     <section className="dashboard-card queue-card">
       <div className="section-heading"><div><span>PUBLISH QUEUE</span><h2>项目发布日历</h2><p>仅人工确认后的内容可排期；到期后进入官方发布交接流程。</p></div><span className="counter">{scheduledProjects.length} 个已排期</span></div>
@@ -491,7 +808,7 @@ export function StudioSecretary() {
   </div>;
 
   const researchView = <section className="dashboard-card">
-    <div className="section-heading"><div><span>DAILY CONTENT INTELLIGENCE</span><h2>每日 3 篇小红书高热参考解析</h2><p>来源严格限定为小红书笔记详情页，只研究选题、封面和叙事规律，为未来项目生成原创内容。</p></div><button className="small-action" disabled={researching} onClick={() => void runResearch(true)}>{researching ? "正在研究…" : "刷新今日 3 篇"}</button></div>
+    <div className="section-heading"><div><span>DAILY CONTENT INTELLIGENCE</span><h2>每日 3 篇小红书高热参考解析</h2><p>秘书会进入小红书公开搜索页，筛选室内设计公司与实景案例笔记，只研究选题、封面和叙事规律。</p></div><button className="small-action" disabled={researching} onClick={() => void runResearch(true)}>{researching ? "正在小红书研究…" : "刷新今日 3 篇"}</button></div>
     <div className="research-summary"><div><strong>{settings.researchTime}</strong><span>每日自动收集</span></div><div><strong>3 篇</strong><span>室内设计高热参考</span></div><div><strong>原创</strong><span>只提炼规律，不复制原文</span></div></div>
     <p className="research-notice">{researchNotice || `最近研究日：${references[0]?.researchDate || "等待首次收集"}`}</p>
     <div className="research-grid">
@@ -501,15 +818,42 @@ export function StudioSecretary() {
         <div className="research-analysis"><h3>文案结构</h3><p>{reference.copyAnalysis}</p><h3>封面规律</h3><p>{reference.coverAnalysis}</p><h3>可复用方法</h3><p>{reference.reusablePattern}</p></div>
         <div className="source-row"><span>{reference.metricsNote}</span><a href={reference.sourceUrl} target="_blank" rel="noreferrer">查看原始来源 ↗</a></div>
       </article>)}
-      {!references.length && <div className="empty-state research-empty"><strong>今日研究尚未生成</strong><p>点击“刷新今日 3 篇”，秘书会检索公开高热室内设计内容并建立分析档案。</p><button onClick={() => void runResearch(false)}>开始今日研究</button></div>}
+      {!references.length && <div className="empty-state research-empty"><strong>今日研究尚未生成</strong><p>点击“开始今日研究”，秘书会打开小红书、读取公开可见的高热室内设计笔记并建立分析档案。</p><button onClick={() => void runResearch(false)}>开始今日研究</button></div>}
     </div>
   </section>;
+
+  const serviceView = <div className="service-layout">
+    <section className="dashboard-card service-intake">
+      <div className="section-heading"><div><span>CUSTOMER SERVICE</span><h2>小红书客服助手</h2><p>集中整理客户留言，生成站内合规回复，人工确认后发送。</p></div><a className="small-action service-link" href="https://creator.xiaohongshu.com/" target="_blank" rel="noreferrer">打开小红书后台 ↗</a></div>
+      <div className="integration-warning"><strong>当前为人工交接模式</strong><p>尚未连接小红书官方消息 API，平台不会伪造或自动抓取私信。请从官方后台查看留言并粘贴到这里。</p></div>
+      <div className="service-form">
+        <label><span>客户昵称</span><input value={messageForm.senderName} onChange={(event) => setMessageForm((current) => ({ ...current, senderName: event.target.value }))} placeholder="例如：温州小林"/></label>
+        <label><span>小红书留言或私信</span><textarea value={messageForm.message} onChange={(event) => setMessageForm((current) => ({ ...current, message: event.target.value }))} placeholder="粘贴客户原始留言"/></label>
+        <label><span>来源链接（可选）</span><input value={messageForm.sourceUrl} onChange={(event) => setMessageForm((current) => ({ ...current, sourceUrl: event.target.value }))} placeholder="小红书笔记或用户页面链接"/></label>
+        <button className="primary-action" onClick={() => void saveCustomerMessage()}><span>归档留言并生成回复</span><span>→</span></button>
+      </div>
+      <div className="blocked-template"><span>高风险站外导流模板 · 已禁用自动发送</span><code>✨vx：LIKE-MJ0666666</code><p>小红书官方规则将直接展示微信号等联系方式列为联系方式导流，可能影响账号流量或权限。</p></div>
+      <p className="notice">{serviceNotice}</p>
+    </section>
+    <section className="dashboard-card service-inbox">
+      <div className="section-heading"><div><span>MESSAGE INBOX</span><h2>客户留言箱</h2><p>先理解客户需求，再发送有帮助的站内回复。</p></div><span className="counter">{messages.filter((item) => item.status === "pending").length} 条待回复</span></div>
+      <div className="message-list">
+        {messages.map((item) => <article className={`message-card ${item.status}`} key={item.id}>
+          <div className="message-meta"><div><strong>{item.senderName}</strong><small>{new Date(item.createdAt).toLocaleString("zh-CN")}</small></div><span>{item.status === "replied" ? "已回复" : "待回复"}</span></div>
+          <blockquote>{item.message}</blockquote>
+          <div className="reply-suggestion"><small>建议回复</small><p>{item.suggestedReply}</p></div>
+          <div className="message-actions"><button onClick={() => void copyServiceReply(item)}>复制合规回复</button><button onClick={() => void markMessageReplied(item)} disabled={item.status === "replied"}>{item.status === "replied" ? "已完成" : "标记已回复"}</button>{item.sourceUrl && <a href={item.sourceUrl} target="_blank" rel="noreferrer">查看来源 ↗</a>}</div>
+        </article>)}
+        {!messages.length && <div className="empty-state"><strong>还没有客服留言</strong><p>从小红书官方后台复制客户留言到左侧，平台会自动建立待回复记录。</p></div>}
+      </div>
+    </section>
+  </div>;
 
   return <main className="app-shell">
     <aside className="sidebar">
       <div className="brand"><span className="brand-mark">栖</span><div><strong>栖作</strong><small>STUDIO SECRETARY</small></div></div>
       <nav>{navItems.map((item) => <button className={activeTab === item.id ? "nav-item active" : "nav-item"} key={item.id} onClick={() => setActiveTab(item.id)}><span>{item.number}</span>{item.label}</button>)}</nav>
-      <div className="cadence-card"><span className="live-dot"/><small>自动工作节奏</small><strong>{settings.publishTime}</strong><p>每 {settings.publishCadenceDays} 天准备发布 · 每日 {settings.researchTime} 研究</p></div>
+      <div className="cadence-card copyright-card"><small>©2026</small><strong>由 MJ 制作</strong><p>网站平台</p></div>
       <p className="sidebar-note">图片、事实、排期与参考均按项目归档。正式发布前保留人工确认。</p>
     </aside>
     <section className="workspace">
@@ -518,6 +862,7 @@ export function StudioSecretary() {
       {activeTab === "assets" && assetView}
       {activeTab === "calendar" && calendarView}
       {activeTab === "research" && researchView}
+      {activeTab === "service" && serviceView}
     </section>
   </main>;
 }

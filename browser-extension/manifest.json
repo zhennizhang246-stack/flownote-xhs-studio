@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "MJ 小红书发布桥",
+  "version": "1.2.0",
+  "description": "同步 MJ 创作平台内容到小红书官方发布页，并在用户发起研究时读取公开可见的室内设计笔记卡片。",
+  "permissions": ["storage", "tabs"],
+  "host_permissions": [
+    "https://xhs-studio-secretary.mj051225.chatgpt.site/*",
+    "https://creator.xiaohongshu.com/*",
+    "https://www.xiaohongshu.com/*",
+    "http://127.0.0.1/*",
+    "http://localhost/*"
+  ],
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "action": {
+    "default_title": "MJ 小红书发布桥",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://xhs-studio-secretary.mj051225.chatgpt.site/*",
+        "http://127.0.0.1/*",
+        "http://localhost/*"
+      ],
+      "js": ["site-bridge.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["https://creator.xiaohongshu.com/publish/*"],
+      "js": ["xhs-prefill.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://www.xiaohongshu.com/search_result*"],
+      "js": ["xhs-research.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

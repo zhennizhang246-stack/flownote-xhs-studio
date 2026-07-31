@@ -1,0 +1,1 @@
+ALTER TABLE `automation_settings` ADD `publish_mode` text DEFAULT 'manual' NOT NULL;
