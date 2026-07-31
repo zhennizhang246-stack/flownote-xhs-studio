@@ -229,3 +229,18 @@ test("keeps every private author resource scoped to the signed-in account", asyn
     assert.match(source, /ownerEmail/, `${route} must scope records to the caller`);
   }
 });
+
+test("ships a touch-friendly mobile application layout", async () => {
+  const layout = await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  assert.match(layout, /viewportFit: "cover"/);
+  assert.match(layout, /appleWebApp/);
+  assert.match(studio, /aria-label="平台功能导航"/);
+  assert.match(studio, /aria-current=/);
+  assert.match(styles, /safe-area-inset-bottom/);
+  assert.match(styles, /position:fixed/);
+  assert.match(styles, /repeat\(5,minmax\(0,1fr\)\)/);
+  assert.match(styles, /min-height:46px/);
+  assert.match(styles, /font-size:16px/);
+});
