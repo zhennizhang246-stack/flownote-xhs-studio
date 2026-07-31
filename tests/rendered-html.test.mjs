@@ -18,8 +18,20 @@ test("ships the studio secretary product surface", async () => {
   assert.match(page, /展厅陈列项目/);
   assert.match(page, /小红书客服助手/);
   assert.match(page, /高风险站外导流模板 · 已禁用自动发送/);
+  assert.match(page, /3 个标题方案 · 点击选择/);
+  assert.match(page, /确认并同步保存/);
+  assert.match(page, /©2026/);
+  assert.match(page, /由 MJ 制作/);
   assert.match(page, /保存项目并生成封面与文案/);
   assert.match(page, /浙江 · 温州/);
+});
+
+test("generates and persists three selectable title options", async () => {
+  const generate = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
+  const project = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
+  assert.match(generate, /titleOptions 必须正好包含 3 个标题/);
+  assert.match(generate, /draft\.titleOptions=options/);
+  assert.match(project, /titleOptions/);
 });
 
 test("binds durable project storage", async () => {

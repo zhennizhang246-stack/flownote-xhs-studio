@@ -4,6 +4,7 @@ import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 
 type Draft = {
   title: string;
+  titleOptions: string[];
   coverTitle: string;
   coverSubtitle: string;
   body: string;
@@ -72,6 +73,11 @@ type Tab = "creator" | "assets" | "calendar" | "research" | "service";
 const seededImages = Array.from({ length: 7 }, (_, i) => `/projects/warm-wood-home/0${i + 1}.jpg`);
 const seededDraft: Draft = {
   title: "温州150m²，把自然搬进日常的家",
+  titleOptions: [
+    "温州150m²，把自然搬进日常的家",
+    "原木与光，住进松弛的四季",
+    "150m²自然系住宅的生活秩序",
+  ],
   coverTitle: "住进自然里",
   coverSubtitle: "浙江温州 · 150m² 木质住宅",
   body: "比起堆叠风格，我们更想让这个家拥有接近自然的呼吸感。\n\n从玄关开始，温润木色一路延伸到客餐厅、厨房与卧室。克制的材质关系让光影成为空间里真正的主角；绿植、框景与大面积留白，则把四季变化悄悄带进日常。\n\n开放的客餐厅让家人自然聚拢，厨房岛台承接备餐与交流，洗衣房和衣帽间把功能收进秩序里。设计没有刻意制造视觉喧哗，而是在每一次行走、停留与收纳中，留下松弛。\n\n好的住宅不急着表达，它会在住进去之后，慢慢回应生活。",
@@ -143,6 +149,11 @@ function localFallback(meta: ProjectMeta): Draft {
   const area = meta.area || "面积待确认";
   return {
     title: `${location}${area}，让自然成为家的底色`,
+    titleOptions: [
+      `${location}${area}，让自然成为家的底色`,
+      "从光线与材质开始设计一个家",
+      "克制留白，让居住回到松弛日常",
+    ],
     coverTitle: "让家自然生长",
     coverSubtitle: `${location} · ${area} ${meta.projectType || "空间设计"}`,
     body: `这个项目从真实的居住感受出发，而不是先定义一种风格。\n\n${meta.brief || "我们从光线、材质、动线与收纳重新梳理空间。"}\n\n画面里的材质、自然光和克制留白共同构成温和的空间秩序。功能被收进日常动线里，人在其中可以更松弛地停留、交流和生活。\n\n如果你也在寻找适合自己的居住方式，欢迎带着户型与需求来聊聊。`,
@@ -174,6 +185,7 @@ export function StudioSecretary() {
   const [messages, setMessages] = useState<CustomerMessage[]>([]);
   const [messageForm, setMessageForm] = useState({ senderName: "", message: "", sourceUrl: "" });
   const [serviceNotice, setServiceNotice] = useState("");
+  const [lastSyncedAt, setLastSyncedAt] = useState("");
 
   const coverImage = previews[draft.coverIndex ?? 0] || seededImages[0];
   const phaseLabel = {
@@ -344,7 +356,7 @@ export function StudioSecretary() {
       audience: project.audience,
       brief: project.brief,
     });
-    setDraft({ ...seededDraft, ...project.draft, tags: project.draft?.tags || [], highlights: project.draft?.highlights || [], riskNotes: project.draft?.riskNotes || [] });
+    setDraft({ ...seededDraft, ...project.draft, titleOptions: project.draft?.titleOptions?.length === 3 ? project.draft.titleOptions : [project.draft?.title || seededDraft.title, ...seededDraft.titleOptions.filter((title) => title !== project.draft?.title)].slice(0, 3), tags: project.draft?.tags || [], highlights: project.draft?.highlights || [], riskNotes: project.draft?.riskNotes || [] });
     setPreviews(project.images?.map((image) => image.url) || []);
     setFiles([]);
     setPhase("done");
@@ -368,6 +380,7 @@ export function StudioSecretary() {
       return false;
     }
     setNotice(status === "approved" ? "封面与文案已人工确认，可随时发布或加入三天队列" : status === "published" ? "已记录为发布完成" : "编辑内容已保存到项目资产库");
+    setLastSyncedAt(new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }));
     await refreshProjects();
     return true;
   }
@@ -507,13 +520,15 @@ export function StudioSecretary() {
       </div>
     </section>
     <section className="editorial-card editor-mode">
-      <div className="editorial-title"><span>EDITABLE COPY</span><label><small>笔记标题</small><textarea value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}/></label><div className="fact-row">{facts.map((fact) => <span key={fact}>{fact}</span>)}</div></div>
+      <div className="editorial-title"><span>EDITABLE COPY</span><label><small>已选择的笔记标题</small><textarea value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}/></label><div className="fact-row">{facts.map((fact) => <span key={fact}>{fact}</span>)}</div></div>
       <div className="copy-column">
+        <div className="title-options"><small>3 个标题方案 · 点击选择</small>{draft.titleOptions.map((title, index) => <button className={draft.title === title ? "active" : ""} key={`${title}-${index}`} onClick={() => setDraft((current) => ({ ...current, title }))}><span>0{index + 1}</span>{title}<em>{draft.title === title ? "已选择" : "选择"}</em></button>)}</div>
         <label><small>封面主标题</small><input value={draft.coverTitle} onChange={(event) => setDraft((current) => ({ ...current, coverTitle: event.target.value }))}/></label>
         <label><small>封面副标题</small><input value={draft.coverSubtitle} onChange={(event) => setDraft((current) => ({ ...current, coverSubtitle: event.target.value }))}/></label>
         <label><small>正文</small><textarea className="body-editor" value={draft.body} onChange={(event) => setDraft((current) => ({ ...current, body: event.target.value }))}/></label>
         <label><small>话题标签（用逗号或空格分隔）</small><input value={draft.tags.join("，")} onChange={(event) => setDraft((current) => ({ ...current, tags: event.target.value.split(/[，,\s#]+/).filter(Boolean).slice(0, 12) }))}/></label>
-        <div className="editor-actions"><button onClick={() => void saveProject("drafted")}>保存到资产库</button><button className="approve-action" onClick={() => void saveProject("approved")}>确认封面与文案</button><button onClick={() => void approveAndSchedule()}>确认并加入三天队列</button></div>
+        <div className="editor-actions"><button onClick={() => void saveProject("drafted")}>保存到资产库</button><button className="approve-action" onClick={() => void saveProject("approved")}>确认并同步保存</button><button onClick={() => void approveAndSchedule()}>确认并加入三天队列</button></div>
+        <p className="sync-state">{lastSyncedAt ? `✓ 已于 ${lastSyncedAt} 同步更新到项目资产库` : "确认后会同步更新封面、标题、正文与标签，并保存到项目资产库"}</p>
       </div>
       <div className="analysis-column"><div><span className="mini-heading">图片分析要点</span><ul>{draft.highlights.map((item) => <li key={item}>{item}</li>)}</ul></div><div className="risk-box"><span>发布前确认</span>{draft.riskNotes.map((note) => <p key={note}>{note}</p>)}</div></div>
     </section>
@@ -604,7 +619,7 @@ export function StudioSecretary() {
     <aside className="sidebar">
       <div className="brand"><span className="brand-mark">栖</span><div><strong>栖作</strong><small>STUDIO SECRETARY</small></div></div>
       <nav>{navItems.map((item) => <button className={activeTab === item.id ? "nav-item active" : "nav-item"} key={item.id} onClick={() => setActiveTab(item.id)}><span>{item.number}</span>{item.label}</button>)}</nav>
-      <div className="cadence-card"><span className="live-dot"/><small>自动工作节奏</small><strong>{settings.publishTime}</strong><p>每 {settings.publishCadenceDays} 天准备发布 · 每日 {settings.researchTime} 研究</p></div>
+      <div className="cadence-card copyright-card"><small>©2026</small><strong>由 MJ 制作</strong><p>网站平台</p></div>
       <p className="sidebar-note">图片、事实、排期与参考均按项目归档。正式发布前保留人工确认。</p>
     </aside>
     <section className="workspace">
