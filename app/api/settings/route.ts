@@ -54,6 +54,14 @@ export async function GET() {
         }).returning();
       }
     }
+    if (!settings) {
+      await db.insert(accountAutomationSettings).values({
+        ownerEmail,
+        ...defaults,
+        updatedAt: new Date().toISOString(),
+      }).onConflictDoNothing();
+      [settings] = await db.select().from(accountAutomationSettings).where(eq(accountAutomationSettings.ownerEmail, ownerEmail)).limit(1);
+    }
     return Response.json({ settings: { ...(settings || defaults), officialApiConnected: officialApiConnected(ownerEmail) } });
   } catch (error) {
     return apiError(error, "读取设置失败");

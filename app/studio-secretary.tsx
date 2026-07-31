@@ -456,7 +456,7 @@ function localFallback(meta: ProjectMeta): Draft {
   };
 }
 
-export function StudioSecretary({ accountName }: { accountName: string }) {
+export function StudioSecretary({ accountName, isSiteOwner }: { accountName: string; isSiteOwner: boolean }) {
   const [activeTab, setActiveTab] = useState<Tab>("creator");
   const [meta, setMeta] = useState(initialMeta);
   const [files, setFiles] = useState<File[]>([]);
@@ -1189,7 +1189,7 @@ export function StudioSecretary({ accountName }: { accountName: string }) {
       <p className="sidebar-note">图片、事实、排期与参考均按项目归档。正式发布前保留人工确认。</p>
     </aside>
     <section className="workspace">
-      <header className="topbar"><div><p className="kicker">XIAOHONGSHU CREATIVE SERVICE</p><h1>小红书创作服务平台</h1><p className="account-workspace">当前独立工作区：{accountName}</p></div><div className="topbar-actions"><span className={`status-chip ${phase}`}>{phaseLabel}</span><a className="avatar" href="https://www.xiaohongshu.com/" target="_blank" rel="noreferrer" aria-label="登录当前浏览器的小红书账户">XHS</a></div></header>
+      <header className="topbar"><div><p className="kicker">XIAOHONGSHU CREATIVE SERVICE</p><h1>小红书创作服务平台</h1><p className="account-workspace">{isSiteOwner ? "网站作者专属工作区" : "新账户独立工作区"}：{accountName}</p><p className="account-privacy">仅当前登录账户可查看本工作区资料，其他账户无法访问。</p></div><div className="topbar-actions"><span className={`status-chip ${phase}`}>{phaseLabel}</span><a className="avatar" href="https://www.xiaohongshu.com/" target="_blank" rel="noreferrer" aria-label="登录当前浏览器的小红书账户">XHS</a></div></header>
       <div className={`xhs-session-banner ${bridgeReady ? "connected" : ""}`}><div><strong>{bridgeReady ? "当前浏览器发布桥已连接" : "其他账户首次使用需重新登录小红书"}</strong><p>{bridgeReady ? "研究、评论与发布只使用这个浏览器当前登录的小红书账户，不会共享其他人的登录状态。" : "请先在当前浏览器登录自己的小红书账户，并安装 MJ 发布桥，再开始编辑创作和发布。"}</p><label><span>当前小红书主页链接</span><input value={profileUrl} onChange={(event) => { const value = event.target.value.trim(); setProfileUrl(value); window.localStorage.setItem("mj-xhs-profile-url", value); }} placeholder="登录后复制自己的小红书主页链接"/></label></div><div>{!bridgeReady && <a href={XHS_BRIDGE_EXTENSION_URL} download>下载发布桥</a>}<a href="https://www.xiaohongshu.com/" target="_blank" rel="noreferrer">登录小红书 ↗</a></div></div>
       {activeTab === "creator" && creatorView}
       {activeTab === "assets" && assetView}
