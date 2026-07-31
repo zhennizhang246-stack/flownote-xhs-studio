@@ -1,7 +1,8 @@
 import { env } from "cloudflare:workers";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { getDb } from "../../../../../db";
 import { projects } from "../../../../../db/schema";
+import { apiError, requireAccountEmail } from "../../../../../lib/account";
 
 type RuntimeEnv = { PROJECT_MEDIA?: R2Bucket };
 
@@ -16,6 +17,7 @@ function decodeCover(value: string) {
 
 export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
+    const ownerEmail = await requireAccountEmail();
     const { id } = await context.params;
     const projectId = Number(id);
     if (!Number.isInteger(projectId) || projectId < 1) {
@@ -26,12 +28,12 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     const payload = await request.json() as { data?: string };
     const bytes = decodeCover(String(payload.data || ""));
     const db = getDb();
-    const [project] = await db.select({ id: projects.id }).from(projects).where(eq(projects.id, projectId)).limit(1);
+    const [project] = await db.select({ id: projects.id }).from(projects).where(and(eq(projects.id, projectId), eq(projects.ownerEmail, ownerEmail))).limit(1);
     if (!project) return Response.json({ error: "项目不存在" }, { status: 404 });
     const objectKey = `projects/${projectId}/approved-cover.jpg`;
     await runtime.PROJECT_MEDIA.put(objectKey, bytes, { httpMetadata: { contentType: "image/jpeg" } });
     return Response.json({ saved: true });
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : "封面保存失败" }, { status: 500 });
+    return apiError(error, "封面保存失败");
   }
 }

@@ -1,6 +1,7 @@
 import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { customerMessages } from "../../../db/schema";
+import { apiError, canClaimLegacyData, requireAccountEmail } from "../../../lib/account";
 
 const DEFAULT_REPLY = "感谢关注栖作设计✨ 方便说下项目城市、面积、空间类型和预计启动时间吗？我们会根据实际情况整理初步建议。";
 const MANUAL_REVIEW_PATTERN = /微信|vx|电话|手机号|投诉|退款|维权|曝光|侵权|抄袭|骗子|垃圾|举报|差评/i;
@@ -27,16 +28,19 @@ function withEligibility<T extends { message: string }>(item: T) {
 
 export async function GET() {
   try {
+    const ownerEmail = await requireAccountEmail();
     const db = getDb();
-    const messages = await db.select().from(customerMessages).orderBy(desc(customerMessages.createdAt)).limit(100);
+    if (canClaimLegacyData(ownerEmail)) await db.update(customerMessages).set({ ownerEmail }).where(eq(customerMessages.ownerEmail, ""));
+    const messages = await db.select().from(customerMessages).where(eq(customerMessages.ownerEmail, ownerEmail)).orderBy(desc(customerMessages.createdAt)).limit(100);
     return Response.json({ messages: messages.map(withEligibility), integration: "browser_comment_bridge" });
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : "读取客服留言失败" }, { status: 500 });
+    return apiError(error, "读取客服留言失败");
   }
 }
 
 export async function POST(request: Request) {
   try {
+    const ownerEmail = await requireAccountEmail();
     const payload = await request.json() as {
       senderName?: string;
       message?: string;
@@ -52,6 +56,7 @@ export async function POST(request: Request) {
         const sourceUrl = String(candidate.sourceUrl || "").trim().slice(0, 500);
         if (!message || !sourceUrl) continue;
         const [existing] = await db.select().from(customerMessages).where(and(
+          eq(customerMessages.ownerEmail, ownerEmail),
           eq(customerMessages.senderName, senderName),
           eq(customerMessages.message, message),
           eq(customerMessages.sourceUrl, sourceUrl),
@@ -61,6 +66,7 @@ export async function POST(request: Request) {
           continue;
         }
         const [created] = await db.insert(customerMessages).values({
+          ownerEmail,
           senderName,
           message,
           sourceUrl,
@@ -74,6 +80,7 @@ export async function POST(request: Request) {
     if (!message) return Response.json({ error: "请填写客户留言" }, { status: 400 });
     const db = getDb();
     const [saved] = await db.insert(customerMessages).values({
+      ownerEmail,
       senderName: String(payload.senderName || "小红书访客").trim().slice(0, 80) || "小红书访客",
       message,
       sourceUrl: String(payload.sourceUrl || "").trim().slice(0, 500),
@@ -81,12 +88,13 @@ export async function POST(request: Request) {
     }).returning();
     return Response.json({ message: withEligibility(saved) }, { status: 201 });
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : "保存客服留言失败" }, { status: 500 });
+    return apiError(error, "保存客服留言失败");
   }
 }
 
 export async function PATCH(request: Request) {
   try {
+    const ownerEmail = await requireAccountEmail();
     const payload = await request.json() as { id?: number; status?: string };
     const id = Number(payload.id);
     if (!Number.isInteger(id) || id < 1) return Response.json({ error: "留言编号无效" }, { status: 400 });
@@ -95,10 +103,10 @@ export async function PATCH(request: Request) {
     const [updated] = await db.update(customerMessages).set({
       status,
       repliedAt: status === "replied" ? new Date().toISOString() : null,
-    }).where(eq(customerMessages.id, id)).returning();
+    }).where(and(eq(customerMessages.id, id), eq(customerMessages.ownerEmail, ownerEmail))).returning();
     if (!updated) return Response.json({ error: "留言不存在" }, { status: 404 });
     return Response.json({ message: withEligibility(updated) });
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : "客服状态更新失败" }, { status: 500 });
+    return apiError(error, "客服状态更新失败");
   }
 }

@@ -118,6 +118,18 @@ actions tied to the current ChatGPT user. Leave public content anonymous.
   prevent duplicate submissions. The browser-assisted manual flow remains
   available at all times.
 
+## Public multi-account access
+
+- The public URL starts with dispatch-owned ChatGPT sign-in. Each signed-in
+  account receives an isolated D1 workspace for projects, settings, research,
+  and comment records.
+- Existing unowned records can only be claimed by the account matching the
+  secret `PRIMARY_OWNER_EMAIL`; other users cannot see or modify them.
+- Xiaohongshu login stays browser-local. Each user logs in to Xiaohongshu in
+  their own browser, installs the publishing bridge, and saves their own profile
+  URL locally for comment management. Xiaohongshu cookies and credentials are
+  never stored by the site.
+
 ## Learn More
 
 - [vinext Documentation](https://github.com/cloudflare/vinext)

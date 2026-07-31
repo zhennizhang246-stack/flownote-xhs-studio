@@ -1,6 +1,7 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { getDb } from "../../../../db";
 import { projects } from "../../../../db/schema";
+import { apiError, requireAccountEmail } from "../../../../lib/account";
 
 type Draft = {
   title: string;
@@ -73,6 +74,7 @@ function cleanDraft(value: unknown): Draft {
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
+    const ownerEmail = await requireAccountEmail();
     const { id } = await context.params;
     const projectId = Number(id);
     if (!Number.isInteger(projectId) || projectId < 1) return Response.json({ error: "项目编号无效" }, { status: 400 });
@@ -80,7 +82,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     if (!payload.status || !validStatuses.has(payload.status)) return Response.json({ error: "项目状态无效" }, { status: 400 });
 
     const db = getDb();
-    const [existing] = await db.select().from(projects).where(eq(projects.id, projectId)).limit(1);
+    const [existing] = await db.select().from(projects).where(and(eq(projects.id, projectId), eq(projects.ownerEmail, ownerEmail))).limit(1);
     if (!existing) return Response.json({ error: "项目不存在" }, { status: 404 });
 
     const draft = payload.draft ? cleanDraft(payload.draft) : cleanDraft(JSON.parse(existing.draftJson || "{}"));
@@ -94,9 +96,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
         : null,
       publishedAt: status === "published" ? now : existing.publishedAt,
       publishUrl: status === "published" ? String(payload.publishUrl || existing.publishUrl || "").trim().slice(0, 500) : existing.publishUrl,
-    }).where(eq(projects.id, projectId)).returning();
+    }).where(and(eq(projects.id, projectId), eq(projects.ownerEmail, ownerEmail))).returning();
     return Response.json({ project: { ...updated, draft } });
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : "项目更新失败" }, { status: 500 });
+    return apiError(error, "项目更新失败");
   }
 }

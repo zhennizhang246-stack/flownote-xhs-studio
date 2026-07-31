@@ -203,7 +203,6 @@ const statusLabels: Record<string, string> = {
 const XHS_PUBLISH_URL = "https://creator.xiaohongshu.com/publish/publish?source=official&from=menu&target=image";
 const XHS_BRIDGE_SOURCE = "mj-xhs-studio";
 const XHS_BRIDGE_EXTENSION_URL = "/downloads/mj-xhs-draft-bridge.zip";
-const XHS_PROFILE_URL = "https://www.xiaohongshu.com/user/profile/60f6318b0000000001015907";
 const coverFontStacks: Record<CoverStyle["fontFamily"], string> = {
   serif: 'Georgia, "Songti SC", serif',
   sans: 'system-ui, "Microsoft YaHei", sans-serif',
@@ -267,7 +266,7 @@ function collectResearchFromBridge(force: boolean) {
   });
 }
 
-function syncCommentsFromBridge() {
+function syncCommentsFromBridge(profileUrl: string) {
   return new Promise<Array<{ senderName: string; message: string; sourceUrl: string }>>((resolve, reject) => {
     const requestId = crypto.randomUUID();
     const timeout = window.setTimeout(() => {
@@ -298,7 +297,7 @@ function syncCommentsFromBridge() {
       source: XHS_BRIDGE_SOURCE,
       type: "MJ_XHS_COMMENT_SYNC_REQUEST",
       requestId,
-      profileUrl: XHS_PROFILE_URL,
+      profileUrl,
     }, window.location.origin);
   });
 }
@@ -457,7 +456,7 @@ function localFallback(meta: ProjectMeta): Draft {
   };
 }
 
-export function StudioSecretary() {
+export function StudioSecretary({ accountName }: { accountName: string }) {
   const [activeTab, setActiveTab] = useState<Tab>("creator");
   const [meta, setMeta] = useState(initialMeta);
   const [files, setFiles] = useState<File[]>([]);
@@ -479,6 +478,9 @@ export function StudioSecretary() {
   const [serviceNotice, setServiceNotice] = useState("");
   const [lastSyncedAt, setLastSyncedAt] = useState("");
   const [bridgeReady, setBridgeReady] = useState(false);
+  const [profileUrl, setProfileUrl] = useState(() => (
+    typeof window === "undefined" ? "" : window.localStorage.getItem("mj-xhs-profile-url") || ""
+  ));
 
   const coverImage = previews[draft.coverIndex ?? 0] || seededImages[0];
   const phaseLabel = {
@@ -917,9 +919,13 @@ export function StudioSecretary() {
       setServiceNotice("请安装或更新 MJ 发布桥 1.3，刷新平台后再同步笔记评论");
       return;
     }
+    if (!profileUrl) {
+      setServiceNotice("请先在页面顶部填写当前登录账号的小红书主页链接");
+      return;
+    }
     setServiceNotice("秘书正在打开你的主页与最近笔记，读取公开可见的待回复评论…");
     try {
-      const comments = await syncCommentsFromBridge();
+      const comments = await syncCommentsFromBridge(profileUrl);
       const response = await fetch("/api/customer-service", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -1144,7 +1150,7 @@ export function StudioSecretary() {
 
   const serviceView = <div className="service-layout">
     <section className="dashboard-card service-intake">
-      <div className="section-heading"><div><span>NOTE COMMENT SECRETARY</span><h2>笔记评论自动回复秘书</h2><p>同步本人公开笔记中的可见评论，识别咨询意图，生成合规回复并管理处理状态。</p></div><a className="small-action service-link" href={XHS_PROFILE_URL} target="_blank" rel="noreferrer">打开我的小红书主页 ↗</a></div>
+      <div className="section-heading"><div><span>NOTE COMMENT SECRETARY</span><h2>笔记评论自动回复秘书</h2><p>同步当前登录账号公开笔记中的可见评论，识别咨询意图，生成合规回复并管理处理状态。</p></div><a className="small-action service-link" href={profileUrl || "https://www.xiaohongshu.com/"} target="_blank" rel="noreferrer">打开当前小红书主页 ↗</a></div>
       <div className="integration-warning"><strong>发布桥评论管理模式</strong><p>只读取本人公开笔记中当前可见的评论，不读取私信。登录验证、投诉争议、联系方式和风控提示均转人工。</p></div>
       <div className="comment-automation-actions">
         <button className="primary-action" onClick={() => void syncNoteComments()}><span>同步最近笔记评论</span><span>↻</span></button>
@@ -1182,7 +1188,8 @@ export function StudioSecretary() {
       <p className="sidebar-note">图片、事实、排期与参考均按项目归档。正式发布前保留人工确认。</p>
     </aside>
     <section className="workspace">
-      <header className="topbar"><div><p className="kicker">XIAOHONGSHU CREATIVE SERVICE</p><h1>小红书创作服务平台</h1></div><div className="topbar-actions"><span className={`status-chip ${phase}`}>{phaseLabel}</span><a className="avatar" href="https://www.xiaohongshu.com/user/profile/60f6318b0000000001015907" target="_blank" rel="noreferrer" aria-label="打开小红书账户">ZS</a></div></header>
+      <header className="topbar"><div><p className="kicker">XIAOHONGSHU CREATIVE SERVICE</p><h1>小红书创作服务平台</h1><p className="account-workspace">当前独立工作区：{accountName}</p></div><div className="topbar-actions"><span className={`status-chip ${phase}`}>{phaseLabel}</span><a className="avatar" href="https://www.xiaohongshu.com/" target="_blank" rel="noreferrer" aria-label="登录当前浏览器的小红书账户">XHS</a></div></header>
+      <div className={`xhs-session-banner ${bridgeReady ? "connected" : ""}`}><div><strong>{bridgeReady ? "当前浏览器发布桥已连接" : "其他账户首次使用需重新登录小红书"}</strong><p>{bridgeReady ? "研究、评论与发布只使用这个浏览器当前登录的小红书账户，不会共享其他人的登录状态。" : "请先在当前浏览器登录自己的小红书账户，并安装 MJ 发布桥，再开始编辑创作和发布。"}</p><label><span>当前小红书主页链接</span><input value={profileUrl} onChange={(event) => { const value = event.target.value.trim(); setProfileUrl(value); window.localStorage.setItem("mj-xhs-profile-url", value); }} placeholder="登录后复制自己的小红书主页链接"/></label></div><div>{!bridgeReady && <a href={XHS_BRIDGE_EXTENSION_URL} download>下载发布桥</a>}<a href="https://www.xiaohongshu.com/" target="_blank" rel="noreferrer">登录小红书 ↗</a></div></div>
       {activeTab === "creator" && creatorView}
       {activeTab === "assets" && assetView}
       {activeTab === "calendar" && calendarView}
