@@ -16,6 +16,12 @@ npm run dev
 npm run build
 ```
 
+## 小红书人工确认发布
+
+网站通过 `browser-extension/` 中的 Manifest V3 浏览器扩展，把人工确认后的项目图片、标题、正文和话题预填到小红书官方创作中心。扩展不会点击最终“发布”按钮，也不会处理或绕过登录、验证码、审核与风控。
+
+部署包同时提供 `/downloads/mj-xhs-draft-bridge.zip`。解压后，在 Chrome 或 Edge 的扩展管理页开启开发者模式并选择“加载已解压的扩展程序”。安装完成后刷新网站，发布预览区会显示“MJ 发布桥已连接”。
+
 This starter does not use `wrangler.jsonc`.
 
 ## Included Shape

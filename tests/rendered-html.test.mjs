@@ -9,7 +9,9 @@ test("ships the studio secretary product surface", async () => {
   assert.match(page, /项目资产库/);
   assert.match(page, /自动工作节奏/);
   assert.match(page, /每日 3 篇小红书高热参考解析/);
-  assert.match(page, /确认并打开小红书发布页/);
+  assert.match(page, /确认并预填小红书发布页/);
+  assert.match(page, /MJ 发布桥已连接/);
+  assert.match(page, /最终发布仍由你确认/);
   assert.match(page, /确认并加入三天队列/);
   assert.match(page, /商业项目/);
   assert.match(page, /住宅项目/);
@@ -29,6 +31,20 @@ test("ships the studio secretary product surface", async () => {
   assert.match(page, /等待官方授权/);
   assert.match(page, /保存项目并生成封面与文案/);
   assert.match(page, /浙江 · 温州/);
+});
+
+test("ships a local bridge that prefills but never publishes a Xiaohongshu note", async () => {
+  const manifest = JSON.parse(await readFile(new URL("../browser-extension/manifest.json", import.meta.url), "utf8"));
+  const siteBridge = await readFile(new URL("../browser-extension/site-bridge.js", import.meta.url), "utf8");
+  const prefill = await readFile(new URL("../browser-extension/xhs-prefill.js", import.meta.url), "utf8");
+  assert.equal(manifest.manifest_version, 3);
+  assert.ok(manifest.content_scripts.some((entry) => entry.matches.includes("https://creator.xiaohongshu.com/publish/*")));
+  assert.match(siteBridge, /MJ_XHS_DRAFT_STORED/);
+  assert.match(prefill, /DataTransfer/);
+  assert.match(prefill, /findTitleField/);
+  assert.match(prefill, /findBodyField/);
+  assert.match(prefill, /最终点击“发布”由你本人完成/);
+  assert.doesNotMatch(prefill, /\.click\(/);
 });
 
 test("uses Node CI instead of applying Deno lint rules to the Node app", async () => {

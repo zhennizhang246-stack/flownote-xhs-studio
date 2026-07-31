@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "MJ 小红书发布桥",
+  "version": "1.0.0",
+  "description": "把 MJ 创作平台中人工确认的图片、标题和正文预填到小红书官方发布页，最终发布始终由用户确认。",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://xhs-studio-secretary.mj051225.chatgpt.site/*",
+    "https://creator.xiaohongshu.com/*",
+    "http://127.0.0.1/*",
+    "http://localhost/*"
+  ],
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "action": {
+    "default_title": "MJ 小红书发布桥",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://xhs-studio-secretary.mj051225.chatgpt.site/*",
+        "http://127.0.0.1/*",
+        "http://localhost/*"
+      ],
+      "js": ["site-bridge.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["https://creator.xiaohongshu.com/publish/*"],
+      "js": ["xhs-prefill.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
