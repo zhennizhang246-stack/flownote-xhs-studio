@@ -24,8 +24,21 @@ test("ships the studio secretary product surface", async () => {
   assert.match(page, /由 MJ 制作/);
   assert.match(page, /最多 10 张实景图/);
   assert.match(page, /可分批人工添加，最多 10 张/);
+  assert.match(page, /人工立即发布/);
+  assert.match(page, /官方 API 自动发布/);
+  assert.match(page, /等待官方授权/);
   assert.match(page, /保存项目并生成封面与文案/);
   assert.match(page, /浙江 · 温州/);
+});
+
+test("uses Node CI instead of applying Deno lint rules to the Node app", async () => {
+  const workflow = await readFile(new URL("../.github/workflows/deno.yml", import.meta.url), "utf8");
+  assert.match(workflow, /name: Node CI/);
+  assert.match(workflow, /node-version: "24"/);
+  assert.match(workflow, /npm ci/);
+  assert.match(workflow, /npm run lint/);
+  assert.match(workflow, /npm test/);
+  assert.doesNotMatch(workflow, /deno lint/);
 });
 
 test("accepts and analyzes at most ten project images", async () => {
@@ -55,6 +68,7 @@ test("binds durable project storage", async () => {
   assert.match(schema, /research_references/);
   assert.match(schema, /customer_messages/);
   assert.match(schema, /category/);
+  assert.match(schema, /publish_mode/);
 });
 
 test("ships a durable, human-reviewed customer service handoff", async () => {

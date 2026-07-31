@@ -40,6 +40,8 @@ type AutomationSettings = {
   researchTime: string;
   dailyResearchEnabled: boolean;
   requireApproval: boolean;
+  publishMode: "manual" | "official_api";
+  officialApiConnected: boolean;
   timezone: string;
 };
 type ResearchReference = {
@@ -102,6 +104,8 @@ const defaultSettings: AutomationSettings = {
   researchTime: "09:00",
   dailyResearchEnabled: true,
   requireApproval: true,
+  publishMode: "manual",
+  officialApiConnected: false,
   timezone: "Asia/Shanghai",
 };
 const navItems: Array<{ id: Tab; number: string; label: string }> = [
@@ -343,7 +347,11 @@ export function StudioSecretary() {
       setSettingsNotice(error.error || "设置保存失败");
       return;
     }
-    setSettingsNotice(`已保存：每 ${settings.publishCadenceDays} 天 ${settings.publishTime} 排期，每日 ${settings.researchTime} 收集参考`);
+    const payload = await response.json() as { settings?: AutomationSettings };
+    if (payload.settings) setSettings(payload.settings);
+    setSettingsNotice(settings.publishMode === "official_api"
+      ? `已启用官方 API 自动发布：每 ${settings.publishCadenceDays} 天 ${settings.publishTime} 执行`
+      : `已保存人工发布模式：每 ${settings.publishCadenceDays} 天 ${settings.publishTime} 提醒发布`);
   }
 
   async function scheduleProject(projectId: number) {
@@ -568,6 +576,11 @@ export function StudioSecretary() {
     <section className="dashboard-card settings-card">
       <div className="section-heading"><div><span>AUTOMATION SETTINGS</span><h2>自动工作节奏</h2><p>所有时间均按北京时间执行，可随时修改。</p></div><span className="counter">Asia / Shanghai</span></div>
       <div className="settings-grid">
+        <div className="publish-mode-picker wide">
+          <span>发布模式</span>
+          <button className={settings.publishMode === "manual" ? "active" : ""} onClick={() => setSettings((current) => ({ ...current, publishMode: "manual" }))}><strong>人工立即发布</strong><small>确认后复制文案并打开小红书官方发布页</small><em>始终可用</em></button>
+          <button className={settings.publishMode === "official_api" ? "active" : ""} disabled={!settings.officialApiConnected} onClick={() => setSettings((current) => ({ ...current, publishMode: "official_api" }))}><strong>官方 API 自动发布</strong><small>仅使用小红书官方授权接口，到期后自动提交</small><em>{settings.officialApiConnected ? "已连接" : "等待官方授权"}</em></button>
+        </div>
         <label><span>默认发布时间</span><input type="time" value={settings.publishTime} onChange={(event) => setSettings((current) => ({ ...current, publishTime: event.target.value }))}/></label>
         <label><span>发布间隔</span><div className="number-control"><input type="number" min="1" max="30" value={settings.publishCadenceDays} onChange={(event) => setSettings((current) => ({ ...current, publishCadenceDays: Number(event.target.value) }))}/><em>天</em></div></label>
         <label><span>每日参考收集时间</span><input type="time" value={settings.researchTime} onChange={(event) => setSettings((current) => ({ ...current, researchTime: event.target.value }))}/></label>
@@ -575,7 +588,7 @@ export function StudioSecretary() {
         <label className="toggle-row wide"><span>发布前保留人工确认</span><input type="checkbox" checked={settings.requireApproval} onChange={(event) => setSettings((current) => ({ ...current, requireApproval: event.target.checked }))}/></label>
       </div>
       <button className="primary-action settings-save" onClick={() => void saveSettings()}><span>保存自动配置</span><span>→</span></button>
-      <p className="notice">{settingsNotice || "系统每三天准备一条已确认内容并提醒发布；正式发布通过小红书官方创作服务平台完成。"}</p>
+      <p className="notice">{settingsNotice || (settings.officialApiConnected ? "官方发布接口已连接，可选择自动发布；人工发布入口仍保留。" : "当前未获得小红书官方发布 API 授权，系统会准备发布包并提醒人工发布。")}</p>
     </section>
     <section className="dashboard-card queue-card">
       <div className="section-heading"><div><span>PUBLISH QUEUE</span><h2>项目发布日历</h2><p>仅人工确认后的内容可排期；到期后进入官方发布交接流程。</p></div><span className="counter">{scheduledProjects.length} 个已排期</span></div>

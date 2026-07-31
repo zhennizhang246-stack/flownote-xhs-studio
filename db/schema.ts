@@ -26,6 +26,7 @@ export const automationSettings = sqliteTable("automation_settings", {
   researchTime: text("research_time").notNull().default("09:00"),
   dailyResearchEnabled: integer("daily_research_enabled", { mode: "boolean" }).notNull().default(true),
   requireApproval: integer("require_approval", { mode: "boolean" }).notNull().default(true),
+  publishMode: text("publish_mode").notNull().default("manual"),
   updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
