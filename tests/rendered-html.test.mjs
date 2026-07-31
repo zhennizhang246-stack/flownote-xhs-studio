@@ -114,6 +114,8 @@ test("binds durable project storage", async () => {
   assert.match(schema, /customer_messages/);
   assert.match(schema, /category/);
   assert.match(schema, /publish_mode/);
+  assert.match(schema, /owner_email/);
+  assert.match(schema, /account_automation_settings/);
 });
 
 test("ships a durable, guarded note comment reply manager", async () => {
@@ -169,4 +171,21 @@ test("persists designed covers and gates official publishing behind approved cre
   assert.match(publisher, /\["approved", "scheduled"\]/);
   assert.match(publisher, /publishDueProjects/);
   assert.match(worker, /publishDueProjects/);
+});
+
+test("publishes a sign-in-gated multi-account workspace without sharing Xiaohongshu sessions", async () => {
+  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  const account = await readFile(new URL("../lib/account.ts", import.meta.url), "utf8");
+  const projects = await readFile(new URL("../app/api/projects/route.ts", import.meta.url), "utf8");
+  const settings = await readFile(new URL("../app/api/settings/route.ts", import.meta.url), "utf8");
+  assert.match(page, /requireChatGPTUser/);
+  assert.match(page, /force-dynamic/);
+  assert.match(studio, /其他账户首次使用需重新登录小红书/);
+  assert.match(studio, /mj-xhs-profile-url/);
+  assert.doesNotMatch(studio, /60f6318b0000000001015907/);
+  assert.match(account, /PRIMARY_OWNER_EMAIL/);
+  assert.match(projects, /requireAccountEmail/);
+  assert.match(projects, /projects\.ownerEmail/);
+  assert.match(settings, /accountAutomationSettings/);
 });

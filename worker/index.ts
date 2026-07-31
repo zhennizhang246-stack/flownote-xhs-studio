@@ -1,7 +1,6 @@
 /** Cloudflare Worker entry point for the vinext-starter template. */
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
-import { collectDailyResearch } from "../lib/research";
 import { publishDueProjects } from "../lib/official-publish";
 
 interface Env {
@@ -13,6 +12,7 @@ interface Env {
   XHS_OFFICIAL_PUBLISH_ENDPOINT?: string;
   XHS_OFFICIAL_PUBLISH_TOKEN?: string;
   XHS_OFFICIAL_ACCOUNT_ID?: string;
+  PRIMARY_OWNER_EMAIL?: string;
   IMAGES: {
     input(stream: ReadableStream): {
       transform(options: Record<string, unknown>): {
@@ -52,7 +52,6 @@ const worker = {
   },
   async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
     ctx.waitUntil(Promise.allSettled([
-      collectDailyResearch(env),
       publishDueProjects(env),
     ]));
   },

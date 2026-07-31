@@ -1,10 +1,10 @@
 import { env } from "cloudflare:workers";
 import { eq } from "drizzle-orm";
 import { getDb } from "../../../db";
-import { automationSettings } from "../../../db/schema";
+import { accountAutomationSettings, automationSettings } from "../../../db/schema";
+import { apiError, canClaimLegacyData, requireAccountEmail } from "../../../lib/account";
 
 const defaults = {
-  id: 1,
   timezone: "Asia/Shanghai",
   publishTime: "12:00",
   publishCadenceDays: 3,
@@ -19,7 +19,7 @@ type RuntimeEnv = {
   XHS_OFFICIAL_PUBLISH_TOKEN?: string;
 };
 
-function officialApiConnected() {
+function officialApiConnected(ownerEmail: string) {
   const runtime = env as unknown as RuntimeEnv;
   try {
     const endpoint = new URL(runtime.XHS_OFFICIAL_PUBLISH_ENDPOINT || "");
@@ -27,7 +27,7 @@ function officialApiConnected() {
       endpoint.protocol === "https:"
       && (endpoint.hostname === "xiaohongshu.com" || endpoint.hostname.endsWith(".xiaohongshu.com"))
       && runtime.XHS_OFFICIAL_PUBLISH_TOKEN,
-    );
+    ) && canClaimLegacyData(ownerEmail);
   } catch {
     return false;
   }
@@ -35,16 +35,34 @@ function officialApiConnected() {
 
 export async function GET() {
   try {
+    const ownerEmail = await requireAccountEmail();
     const db = getDb();
-    const [settings] = await db.select().from(automationSettings).where(eq(automationSettings.id, 1)).limit(1);
-    return Response.json({ settings: { ...(settings || defaults), officialApiConnected: officialApiConnected() } });
+    let [settings] = await db.select().from(accountAutomationSettings).where(eq(accountAutomationSettings.ownerEmail, ownerEmail)).limit(1);
+    if (!settings && canClaimLegacyData(ownerEmail)) {
+      const [legacy] = await db.select().from(automationSettings).where(eq(automationSettings.id, 1)).limit(1);
+      if (legacy) {
+        [settings] = await db.insert(accountAutomationSettings).values({
+          ownerEmail,
+          timezone: legacy.timezone,
+          publishTime: legacy.publishTime,
+          publishCadenceDays: legacy.publishCadenceDays,
+          researchTime: legacy.researchTime,
+          dailyResearchEnabled: legacy.dailyResearchEnabled,
+          requireApproval: legacy.requireApproval,
+          publishMode: legacy.publishMode,
+          updatedAt: legacy.updatedAt,
+        }).returning();
+      }
+    }
+    return Response.json({ settings: { ...(settings || defaults), officialApiConnected: officialApiConnected(ownerEmail) } });
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : "读取设置失败" }, { status: 500 });
+    return apiError(error, "读取设置失败");
   }
 }
 
 export async function PUT(request: Request) {
   try {
+    const ownerEmail = await requireAccountEmail();
     const payload = await request.json() as Partial<typeof defaults>;
     const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
     const publishTime = String(payload.publishTime || defaults.publishTime);
@@ -54,13 +72,13 @@ export async function PUT(request: Request) {
     if (!timePattern.test(publishTime) || !timePattern.test(researchTime)) {
       return Response.json({ error: "时间格式无效" }, { status: 400 });
     }
-    if (requestedMode === "official_api" && !officialApiConnected()) {
+    if (requestedMode === "official_api" && !officialApiConnected(ownerEmail)) {
       return Response.json({
         error: "尚未获得小红书官方发布 API 授权，自动发布不能启用；人工发布仍可正常使用",
       }, { status: 409 });
     }
     const values = {
-      id: 1,
+      ownerEmail,
       timezone: "Asia/Shanghai",
       publishTime,
       publishCadenceDays: cadence,
@@ -71,12 +89,12 @@ export async function PUT(request: Request) {
       updatedAt: new Date().toISOString(),
     };
     const db = getDb();
-    await db.insert(automationSettings).values(values).onConflictDoUpdate({
-      target: automationSettings.id,
+    await db.insert(accountAutomationSettings).values(values).onConflictDoUpdate({
+      target: accountAutomationSettings.ownerEmail,
       set: values,
     });
-    return Response.json({ settings: { ...values, officialApiConnected: officialApiConnected() } });
+    return Response.json({ settings: { ...values, officialApiConnected: officialApiConnected(ownerEmail) } });
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : "保存设置失败" }, { status: 500 });
+    return apiError(error, "保存设置失败");
   }
 }

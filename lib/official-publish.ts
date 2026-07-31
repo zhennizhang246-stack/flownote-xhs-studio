@@ -1,7 +1,7 @@
 import { and, eq, inArray, lte } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import * as schema from "../db/schema";
-import { automationSettings, projectImages, projects } from "../db/schema";
+import { accountAutomationSettings, projectImages, projects } from "../db/schema";
 
 export type OfficialPublishEnv = {
   DB: D1Database;
@@ -9,6 +9,7 @@ export type OfficialPublishEnv = {
   XHS_OFFICIAL_PUBLISH_ENDPOINT?: string;
   XHS_OFFICIAL_PUBLISH_TOKEN?: string;
   XHS_OFFICIAL_ACCOUNT_ID?: string;
+  PRIMARY_OWNER_EMAIL?: string;
 };
 
 type Draft = {
@@ -50,11 +51,11 @@ function publishedUrl(payload: unknown) {
   }
 }
 
-export async function publishProjectOfficial(env: OfficialPublishEnv, projectId: number) {
+export async function publishProjectOfficial(env: OfficialPublishEnv, ownerEmail: string, projectId: number) {
   const endpoint = officialEndpoint(env);
   if (!env.PROJECT_MEDIA) throw new Error("项目图片存储暂不可用");
   const db = drizzle(env.DB, { schema });
-  const [project] = await db.select().from(projects).where(eq(projects.id, projectId)).limit(1);
+  const [project] = await db.select().from(projects).where(and(eq(projects.id, projectId), eq(projects.ownerEmail, ownerEmail))).limit(1);
   if (!project) throw new Error("项目不存在");
   if (!["approved", "scheduled"].includes(project.status)) throw new Error("项目必须先人工确认后才能提交");
   const draft = JSON.parse(project.draftJson || "{}") as Draft;
@@ -86,7 +87,7 @@ export async function publishProjectOfficial(env: OfficialPublishEnv, projectId:
   }
 
   const [locked] = await db.update(projects).set({ status: "publishing" })
-    .where(and(eq(projects.id, project.id), inArray(projects.status, ["approved", "scheduled"])))
+    .where(and(eq(projects.id, project.id), eq(projects.ownerEmail, ownerEmail), inArray(projects.status, ["approved", "scheduled"])))
     .returning({ id: projects.id });
   if (!locked) throw new Error("项目正在提交或状态已发生变化，请刷新后查看");
   try {
@@ -109,11 +110,12 @@ export async function publishProjectOfficial(env: OfficialPublishEnv, projectId:
       status: "published",
       publishedAt: now,
       publishUrl: url,
-    }).where(eq(projects.id, project.id));
+    }).where(and(eq(projects.id, project.id), eq(projects.ownerEmail, ownerEmail)));
     return { projectId: project.id, publishedAt: now, publishUrl: url };
   } catch (error) {
     await db.update(projects).set({ status: project.status }).where(and(
       eq(projects.id, project.id),
+      eq(projects.ownerEmail, ownerEmail),
       eq(projects.status, "publishing"),
     ));
     throw error;
@@ -122,16 +124,18 @@ export async function publishProjectOfficial(env: OfficialPublishEnv, projectId:
 
 export async function publishDueProjects(env: OfficialPublishEnv, limit = 3) {
   if (!env.XHS_OFFICIAL_PUBLISH_ENDPOINT || !env.XHS_OFFICIAL_PUBLISH_TOKEN || !env.PROJECT_MEDIA) return [];
+  const ownerEmail = env.PRIMARY_OWNER_EMAIL?.trim().toLowerCase();
+  if (!ownerEmail) return [];
   const db = drizzle(env.DB, { schema });
-  const [settings] = await db.select().from(automationSettings).where(eq(automationSettings.id, 1)).limit(1);
+  const [settings] = await db.select().from(accountAutomationSettings).where(eq(accountAutomationSettings.ownerEmail, ownerEmail)).limit(1);
   if (settings?.publishMode !== "official_api") return [];
   const due = await db.select({ id: projects.id }).from(projects)
-    .where(and(eq(projects.status, "scheduled"), lte(projects.scheduledAt, new Date().toISOString())))
+    .where(and(eq(projects.ownerEmail, ownerEmail), eq(projects.status, "scheduled"), lte(projects.scheduledAt, new Date().toISOString())))
     .limit(Math.min(5, Math.max(1, limit)));
   const results: Array<{ projectId: number; publishedAt?: string; publishUrl?: string; error?: string }> = [];
   for (const item of due) {
     try {
-      results.push(await publishProjectOfficial(env, item.id));
+      results.push(await publishProjectOfficial(env, ownerEmail, item.id));
     } catch (error) {
       results.push({ projectId: item.id, error: error instanceof Error ? error.message : "自动提交失败" });
     }
