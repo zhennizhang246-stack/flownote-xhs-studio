@@ -18,6 +18,7 @@ type ProjectMeta = {
   location: string;
   area: string;
   projectType: string;
+  category: string;
   audience: string;
   brief: string;
 };
@@ -56,7 +57,17 @@ type ResearchReference = {
   audienceInsight: string;
   reusablePattern: string;
 };
-type Tab = "creator" | "assets" | "calendar" | "research";
+type CustomerMessage = {
+  id: number;
+  senderName: string;
+  message: string;
+  sourceUrl: string;
+  suggestedReply: string;
+  status: "pending" | "replied";
+  createdAt: string;
+  repliedAt?: string | null;
+};
+type Tab = "creator" | "assets" | "calendar" | "research" | "service";
 
 const seededImages = Array.from({ length: 7 }, (_, i) => `/projects/warm-wood-home/0${i + 1}.jpg`);
 const seededDraft: Draft = {
@@ -75,6 +86,7 @@ const initialMeta: ProjectMeta = {
   location: "浙江 · 温州",
   area: "150m²",
   projectType: "住宅空间",
+  category: "住宅项目",
   audience: "重视自然、松弛感与收纳秩序的改善型家庭",
   brief: "温润木质、自然光与绿意贯穿全屋；客餐厅一体，包含厨房、家政、卧室、衣帽间与卫浴。",
 };
@@ -91,7 +103,9 @@ const navItems: Array<{ id: Tab; number: string; label: string }> = [
   { id: "assets", number: "02", label: "项目资产库" },
   { id: "calendar", number: "03", label: "发布日历" },
   { id: "research", number: "04", label: "流量参考" },
+  { id: "service", number: "05", label: "小红书客服" },
 ];
+const projectCategories = ["全部项目", "商业项目", "住宅项目", "办公项目", "酒店项目", "展厅陈列项目", "其他项目"];
 const toDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
   const reader = new FileReader();
   reader.onload = () => resolve(String(reader.result));
@@ -156,6 +170,10 @@ export function StudioSecretary() {
   const [settingsNotice, setSettingsNotice] = useState("");
   const [researching, setResearching] = useState(false);
   const [researchNotice, setResearchNotice] = useState("");
+  const [assetCategory, setAssetCategory] = useState("全部项目");
+  const [messages, setMessages] = useState<CustomerMessage[]>([]);
+  const [messageForm, setMessageForm] = useState({ senderName: "", message: "", sourceUrl: "" });
+  const [serviceNotice, setServiceNotice] = useState("");
 
   const coverImage = previews[draft.coverIndex ?? 0] || seededImages[0];
   const phaseLabel = {
@@ -170,21 +188,27 @@ export function StudioSecretary() {
   );
   const scheduledProjects = projects.filter((project) => project.scheduledAt)
     .sort((a, b) => String(a.scheduledAt).localeCompare(String(b.scheduledAt)));
+  const visibleProjects = assetCategory === "全部项目"
+    ? projects
+    : projects.filter((project) => project.category === assetCategory);
 
   useEffect(() => {
     async function loadWorkspace() {
       try {
-        const [projectResponse, settingsResponse, researchResponse] = await Promise.all([
+        const [projectResponse, settingsResponse, researchResponse, serviceResponse] = await Promise.all([
           fetch("/api/projects"),
           fetch("/api/settings"),
           fetch("/api/research"),
+          fetch("/api/customer-service"),
         ]);
         const projectPayload = projectResponse.ok ? await projectResponse.json() as { projects: ProjectRecord[] } : { projects: [] };
         const settingsPayload = settingsResponse.ok ? await settingsResponse.json() as { settings: AutomationSettings } : { settings: defaultSettings };
         const researchPayload = researchResponse.ok ? await researchResponse.json() as { references: ResearchReference[] } : { references: [] };
+        const servicePayload = serviceResponse.ok ? await serviceResponse.json() as { messages: CustomerMessage[] } : { messages: [] };
         setProjects(projectPayload.projects);
         setSettings(settingsPayload.settings);
         setReferences(researchPayload.references);
+        setMessages(servicePayload.messages);
         setScheduleDrafts(Object.fromEntries(projectPayload.projects.map((project) => [
           project.id,
           project.scheduledAt ? dateTimeInput(new Date(project.scheduledAt)) : nextSlot(settingsPayload.settings),
@@ -316,6 +340,7 @@ export function StudioSecretary() {
       location: project.location,
       area: project.area,
       projectType: project.projectType,
+      category: project.category || "住宅项目",
       audience: project.audience,
       brief: project.brief,
     });
@@ -413,6 +438,46 @@ export function StudioSecretary() {
     }
   }
 
+  async function saveCustomerMessage() {
+    setServiceNotice("正在保存留言并生成合规回复…");
+    const response = await fetch("/api/customer-service", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(messageForm),
+    });
+    const payload = await response.json() as { message?: CustomerMessage; error?: string };
+    if (!response.ok || !payload.message) {
+      setServiceNotice(payload.error || "留言保存失败");
+      return;
+    }
+    setMessages((current) => [payload.message!, ...current]);
+    setMessageForm({ senderName: "", message: "", sourceUrl: "" });
+    setServiceNotice("留言已归档，已生成站内合规回复建议");
+  }
+
+  async function copyServiceReply(item: CustomerMessage) {
+    try {
+      await navigator.clipboard.writeText(item.suggestedReply);
+      setServiceNotice(`已复制给「${item.senderName}」的回复，请在小红书站内人工确认发送`);
+    } catch {
+      setServiceNotice("无法自动复制，请手动选中回复内容");
+    }
+  }
+
+  async function markMessageReplied(item: CustomerMessage) {
+    const response = await fetch("/api/customer-service", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: item.id, status: "replied" }),
+    });
+    if (!response.ok) {
+      setServiceNotice("客服状态更新失败");
+      return;
+    }
+    setMessages((current) => current.map((message) => message.id === item.id ? { ...message, status: "replied" } : message));
+    setServiceNotice(`「${item.senderName}」已标记为已回复`);
+  }
+
   const creatorView = <div className="content-grid">
     <section className="creator-card">
       <div className="section-heading"><div><span>PROJECT INTAKE</span><h2>交给秘书一个新项目</h2></div><span className="counter">{files.length || 7} 张实景图</span></div>
@@ -423,6 +488,7 @@ export function StudioSecretary() {
           <label className="wide"><span>项目名称</span><input value={meta.name} onChange={(event) => updateMeta("name", event.target.value)}/></label>
           <label><span>所在地</span><input value={meta.location} onChange={(event) => updateMeta("location", event.target.value)}/></label>
           <label><span>项目面积</span><input value={meta.area} onChange={(event) => updateMeta("area", event.target.value)}/></label>
+          <label><span>资产库分区</span><select value={meta.category} onChange={(event) => updateMeta("category", event.target.value)}>{projectCategories.slice(1).map((category) => <option key={category}>{category}</option>)}</select></label>
           <label><span>空间类型</span><input value={meta.projectType} onChange={(event) => updateMeta("projectType", event.target.value)}/></label>
           <label><span>目标客户</span><input value={meta.audience} onChange={(event) => updateMeta("audience", event.target.value)}/></label>
           <label className="wide"><span>已知设计信息</span><textarea value={meta.brief} onChange={(event) => updateMeta("brief", event.target.value)}/></label>
@@ -436,7 +502,8 @@ export function StudioSecretary() {
       <div className="phone-frame"><div className="cover-preview"><img src={coverImage} alt="项目封面预览"/><div className="cover-shade"/><span className="cover-eyebrow">ORIGINAL DESIGN · RESIDENCE</span><div className="cover-copy"><h3>{draft.coverTitle}</h3><p>{draft.coverSubtitle}</p></div><span className="page-count">01 / {previews.length}</span></div></div>
       <div className="publish-actions">
         <button className="secondary-action" onClick={() => void publishNow()}>确认并打开小红书发布页</button>
-        <button className="icon-action" onClick={() => void saveProject("drafted")} aria-label="保存到项目资产库">存</button>
+        <button className="queue-action" onClick={() => void approveAndSchedule()}>确认并加入三天队列</button>
+        <button className="icon-action" onClick={() => void saveProject("drafted")} aria-label="保存到项目资产库">保存到资产库</button>
       </div>
     </section>
     <section className="editorial-card editor-mode">
@@ -454,13 +521,14 @@ export function StudioSecretary() {
 
   const assetView = <section className="dashboard-card">
     <div className="section-heading"><div><span>PROJECT ASSET LIBRARY</span><h2>项目资产库</h2><p>所有实景图、项目信息、生成文案与排期都按项目长期保存。</p></div><button className="small-action" onClick={() => setActiveTab("creator")}>＋ 新建项目</button></div>
+    <div className="category-tabs">{projectCategories.map((category) => <button className={assetCategory === category ? "active" : ""} key={category} onClick={() => setAssetCategory(category)}>{category}<span>{category === "全部项目" ? projects.length : projects.filter((project) => project.category === category).length}</span></button>)}</div>
     <div className="asset-grid">
       <article className="asset-card featured"><img src={seededImages[1]} alt="温州150平方米住宅"/><div><span className="state-pill">示例项目</span><h3>栖光木境</h3><p>浙江 · 温州　150m²　住宅空间</p><small>7 张实景图 · 已生成封面与文案</small></div></article>
-      {projects.map((project) => <article className="asset-card" key={project.id}>
+      {visibleProjects.map((project) => <article className="asset-card" key={project.id}>
         {project.images?.[0] ? <img src={project.images[0].url} alt={project.name}/> : <div className="asset-placeholder">栖</div>}
         <div><span className={`state-pill ${project.status}`}>{statusLabels[project.status] || project.status}</span><h3>{project.name}</h3><p>{project.location || "地点待补充"}　{project.area || "面积待补充"}</p><small>{project.images?.length || 0} 张实景图 · {project.scheduledAt ? new Date(project.scheduledAt).toLocaleString("zh-CN") : "尚未排期"}</small><div className="asset-actions"><button onClick={() => loadProject(project)}>打开编辑</button>{["approved", "scheduled"].includes(project.status) && <button onClick={() => void markPublished(project)}>标记已发布</button>}</div></div>
       </article>)}
-      {!projects.length && <div className="empty-state"><strong>资产库等待第一个正式项目</strong><p>在创作工作台上传图片并生成后，项目会自动归档到这里。</p></div>}
+      {!visibleProjects.length && <div className="empty-state"><strong>{assetCategory}暂无项目</strong><p>在创作工作台上传图片并选择对应分区，项目会自动归档到这里。</p></div>}
     </div>
   </section>;
 
@@ -505,6 +573,33 @@ export function StudioSecretary() {
     </div>
   </section>;
 
+  const serviceView = <div className="service-layout">
+    <section className="dashboard-card service-intake">
+      <div className="section-heading"><div><span>CUSTOMER SERVICE</span><h2>小红书客服助手</h2><p>集中整理客户留言，生成站内合规回复，人工确认后发送。</p></div><a className="small-action service-link" href="https://creator.xiaohongshu.com/" target="_blank" rel="noreferrer">打开小红书后台 ↗</a></div>
+      <div className="integration-warning"><strong>当前为人工交接模式</strong><p>尚未连接小红书官方消息 API，平台不会伪造或自动抓取私信。请从官方后台查看留言并粘贴到这里。</p></div>
+      <div className="service-form">
+        <label><span>客户昵称</span><input value={messageForm.senderName} onChange={(event) => setMessageForm((current) => ({ ...current, senderName: event.target.value }))} placeholder="例如：温州小林"/></label>
+        <label><span>小红书留言或私信</span><textarea value={messageForm.message} onChange={(event) => setMessageForm((current) => ({ ...current, message: event.target.value }))} placeholder="粘贴客户原始留言"/></label>
+        <label><span>来源链接（可选）</span><input value={messageForm.sourceUrl} onChange={(event) => setMessageForm((current) => ({ ...current, sourceUrl: event.target.value }))} placeholder="小红书笔记或用户页面链接"/></label>
+        <button className="primary-action" onClick={() => void saveCustomerMessage()}><span>归档留言并生成回复</span><span>→</span></button>
+      </div>
+      <div className="blocked-template"><span>高风险站外导流模板 · 已禁用自动发送</span><code>✨vx：LIKE-MJ0666666</code><p>小红书官方规则将直接展示微信号等联系方式列为联系方式导流，可能影响账号流量或权限。</p></div>
+      <p className="notice">{serviceNotice}</p>
+    </section>
+    <section className="dashboard-card service-inbox">
+      <div className="section-heading"><div><span>MESSAGE INBOX</span><h2>客户留言箱</h2><p>先理解客户需求，再发送有帮助的站内回复。</p></div><span className="counter">{messages.filter((item) => item.status === "pending").length} 条待回复</span></div>
+      <div className="message-list">
+        {messages.map((item) => <article className={`message-card ${item.status}`} key={item.id}>
+          <div className="message-meta"><div><strong>{item.senderName}</strong><small>{new Date(item.createdAt).toLocaleString("zh-CN")}</small></div><span>{item.status === "replied" ? "已回复" : "待回复"}</span></div>
+          <blockquote>{item.message}</blockquote>
+          <div className="reply-suggestion"><small>建议回复</small><p>{item.suggestedReply}</p></div>
+          <div className="message-actions"><button onClick={() => void copyServiceReply(item)}>复制合规回复</button><button onClick={() => void markMessageReplied(item)} disabled={item.status === "replied"}>{item.status === "replied" ? "已完成" : "标记已回复"}</button>{item.sourceUrl && <a href={item.sourceUrl} target="_blank" rel="noreferrer">查看来源 ↗</a>}</div>
+        </article>)}
+        {!messages.length && <div className="empty-state"><strong>还没有客服留言</strong><p>从小红书官方后台复制客户留言到左侧，平台会自动建立待回复记录。</p></div>}
+      </div>
+    </section>
+  </div>;
+
   return <main className="app-shell">
     <aside className="sidebar">
       <div className="brand"><span className="brand-mark">栖</span><div><strong>栖作</strong><small>STUDIO SECRETARY</small></div></div>
@@ -518,6 +613,7 @@ export function StudioSecretary() {
       {activeTab === "assets" && assetView}
       {activeTab === "calendar" && calendarView}
       {activeTab === "research" && researchView}
+      {activeTab === "service" && serviceView}
     </section>
   </main>;
 }

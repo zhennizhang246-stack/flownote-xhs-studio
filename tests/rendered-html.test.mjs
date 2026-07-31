@@ -11,6 +11,13 @@ test("ships the studio secretary product surface", async () => {
   assert.match(page, /每日 3 篇小红书高热参考解析/);
   assert.match(page, /确认并打开小红书发布页/);
   assert.match(page, /确认并加入三天队列/);
+  assert.match(page, /商业项目/);
+  assert.match(page, /住宅项目/);
+  assert.match(page, /办公项目/);
+  assert.match(page, /酒店项目/);
+  assert.match(page, /展厅陈列项目/);
+  assert.match(page, /小红书客服助手/);
+  assert.match(page, /高风险站外导流模板 · 已禁用自动发送/);
   assert.match(page, /保存项目并生成封面与文案/);
   assert.match(page, /浙江 · 温州/);
 });
@@ -24,6 +31,15 @@ test("binds durable project storage", async () => {
   assert.match(schema, /draft_json/);
   assert.match(schema, /automation_settings/);
   assert.match(schema, /research_references/);
+  assert.match(schema, /customer_messages/);
+  assert.match(schema, /category/);
+});
+
+test("ships a durable, human-reviewed customer service handoff", async () => {
+  const route = await readFile(new URL("../app/api/customer-service/route.ts", import.meta.url), "utf8");
+  assert.match(route, /SAFE_REPLY/);
+  assert.match(route, /suggestedReply/);
+  assert.doesNotMatch(route, /LIKE-MJ0666666/);
 });
 
 test("ships configurable scheduling and daily research APIs", async () => {
