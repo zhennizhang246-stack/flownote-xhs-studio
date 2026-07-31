@@ -15,6 +15,13 @@
       "when": 1785463324987,
       "tag": "0001_confused_post",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1785468399821,
+      "tag": "0002_glorious_rafael_vega",
+      "breakpoints": true
     }
   ]
 }

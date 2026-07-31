@@ -43,6 +43,18 @@ function chinaDate() {
   }).format(new Date());
 }
 
+function isXiaohongshuNoteUrl(value: string) {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase();
+    return url.protocol === "https:"
+      && (host === "xiaohongshu.com" || host.endsWith(".xiaohongshu.com"))
+      && (url.pathname.includes("/discovery/item/") || url.pathname.includes("/explore/"));
+  } catch {
+    return false;
+  }
+}
+
 const researchSchema = {
   type: "object",
   additionalProperties: false,
@@ -98,7 +110,8 @@ export async function collectDailyResearch(env: ResearchRuntimeEnv, force = fals
 将数值写为 0，并在 metricsNote 说明可见的热度信号与限制，metricConfidence 写 estimated。
 只分析选题、叙事结构、首屏信息层级、封面构图、字体位置、色彩和受众需求。
 不得大段摘录或改写原文，不得建议复制原句或照搬封面。
-sourceUrl 必须是实际来源页面，优先 xiaohongshu.com 的笔记链接。
+  sourceUrl 必须是实际可访问的小红书笔记详情页（xiaohongshu.com/discovery/item 或 /explore），
+  不得使用搜索页、聚合页、其他网站或虚构链接。
 reusablePattern 必须是可用于未来原创项目的抽象方法。`;
 
   const response = await fetch("https://api.openai.com/v1/responses", {
@@ -129,8 +142,8 @@ reusablePattern 必须是可用于未来原创项目的抽象方法。`;
 
   const payload = await response.json() as Record<string, unknown>;
   const parsed = JSON.parse(outputText(payload)) as { items: ResearchItem[] };
-  const items = parsed.items.filter((item) => /^https?:\/\//.test(item.sourceUrl)).slice(0, 3);
-  if (items.length !== 3) throw new Error("联网研究未返回 3 条有效来源");
+  const items = parsed.items.filter((item) => isXiaohongshuNoteUrl(item.sourceUrl)).slice(0, 3);
+  if (items.length !== 3) throw new Error("未找到 3 篇可核验的小红书室内设计笔记，请稍后重试");
 
   const db = drizzle(env.DB, { schema });
   for (const item of items) {
