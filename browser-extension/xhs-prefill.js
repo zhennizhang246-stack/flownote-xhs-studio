@@ -3,6 +3,10 @@ let activeDraftSignature = "";
 let uploadStarted = false;
 let titleFilled = false;
 let bodyFilled = false;
+let imageUploadCompleted = false;
+let imagesTransferredAt = 0;
+let autoPublishAttempted = false;
+let currentDraft = null;
 
 function statusPanel() {
   let panel = document.getElementById("mj-xhs-bridge-status");
@@ -89,23 +93,42 @@ function fetchImage(image) {
   });
 }
 
+function coverFile(draft) {
+  const [metadata, base64] = String(draft.coverDataUrl || "").split(",");
+  if (!metadata?.startsWith("data:image/jpeg;base64") || !base64) return null;
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  const safeName = String(draft.projectName || "MJ项目").replace(/[\\/:*?"<>|]/g, "-").slice(0, 60);
+  return new File([bytes], `${safeName}-封面.jpg`, { type: "image/jpeg" });
+}
+
 async function uploadImages(draft) {
-  if (uploadStarted || !draft.images.length) return;
+  if (uploadStarted || (!draft.coverDataUrl && !draft.images.length)) return;
   const input = findImageInput();
   if (!input) return;
   uploadStarted = true;
-  setStatus(`正在预填 ${draft.images.length} 张项目图片…`);
+  setStatus(`正在同步成品封面与 ${draft.images.length} 张项目图片…`);
   try {
     const files = [];
+    const cover = coverFile(draft);
+    if (cover) files.push(cover);
     for (const image of draft.images) files.push(await fetchImage(image));
+    if (!files.length) throw new Error("没有可同步的项目图片");
     const transfer = new DataTransfer();
     files.forEach((file) => transfer.items.add(file));
     input.files = transfer.files;
     input.dispatchEvent(new Event("input", { bubbles: true }));
     input.dispatchEvent(new Event("change", { bubbles: true }));
-    setStatus(`已带入 ${files.length} 张图片，正在等待编辑区…`);
+    imageUploadCompleted = true;
+    imagesTransferredAt = Date.now();
+    setStatus(`已带入 ${files.length} 张图片，首图为平台生成的统一封面；正在等待编辑区…`);
+    window.setTimeout(() => {
+      if (currentDraft) applyDraft(currentDraft);
+    }, 4500);
   } catch (error) {
     uploadStarted = false;
+    imageUploadCompleted = false;
     setStatus(`${error.message || "图片预填失败"}，可在页面中手动上传`, true);
   }
 }
@@ -135,8 +158,64 @@ function fillCopy(draft) {
     bodyFilled = true;
   }
   if (titleFilled && bodyFilled) {
-    setStatus("图片、标题和正文已预填。请逐项检查，最终点击“发布”由你本人完成。");
+    setStatus(draft.publishAction === "auto_publish"
+      ? "封面、图片、标题和正文已统一，正在等待官方发布按钮可用…"
+      : "封面、图片、标题和正文已预填。请逐项检查，最终点击“发布”由你本人完成。");
   }
+  tryAutoPublish(draft);
+}
+
+function authorizationIsValid(draft) {
+  if (draft.publishAction !== "auto_publish" || !draft.authorization?.nonce) return false;
+  const confirmedAt = Date.parse(draft.authorization.confirmedAt);
+  const expiresAt = Date.parse(draft.authorization.expiresAt);
+  const now = Date.now();
+  return Number.isFinite(confirmedAt)
+    && Number.isFinite(expiresAt)
+    && confirmedAt <= now + 60_000
+    && now <= expiresAt
+    && expiresAt - confirmedAt <= 5 * 60_000;
+}
+
+function findPublishButton() {
+  const candidates = [...document.querySelectorAll("button")].filter((button) => (
+    button.textContent?.trim() === "发布"
+    && button.getClientRects().length > 0
+  ));
+  return candidates.length === 1 ? candidates[0] : null;
+}
+
+function hasVerificationBlocker() {
+  const text = document.body?.innerText || "";
+  return /安全验证|请完成验证|账号异常|验证码/.test(text);
+}
+
+function tryAutoPublish(draft) {
+  if (autoPublishAttempted || !authorizationIsValid(draft)) return;
+  if (!imageUploadCompleted || !titleFilled || !bodyFilled) return;
+  if (Date.now() - imagesTransferredAt < 4000) return;
+  if (hasVerificationBlocker()) {
+    setStatus("检测到安全验证或账号提示，已停止自动操作，请你在页面中处理。", true);
+    return;
+  }
+  const button = findPublishButton();
+  if (!button || button.disabled || button.getAttribute("aria-disabled") === "true") return;
+  autoPublishAttempted = true;
+  const consumedDraft = {
+    ...draft,
+    publishAction: "prefill",
+    authorization: undefined,
+    autoPublishConsumedAt: new Date().toISOString(),
+  };
+  chrome.storage.local.set({ [DRAFT_KEY]: consumedDraft }, () => {
+    if (chrome.runtime.lastError) {
+      autoPublishAttempted = false;
+      setStatus("无法消费本次自动发布授权，请改为人工点击发布。", true);
+      return;
+    }
+    setStatus("已使用本次限时授权点击一次官方发布按钮，正在等待小红书返回结果。");
+    button.click();
+  });
 }
 
 function applyDraft(draft) {
@@ -150,7 +229,11 @@ function applyDraft(draft) {
     uploadStarted = false;
     titleFilled = false;
     bodyFilled = false;
+    imageUploadCompleted = false;
+    imagesTransferredAt = 0;
+    autoPublishAttempted = false;
   }
+  currentDraft = draft;
   void uploadImages(draft);
   fillCopy(draft);
 }

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "MJ 小红书发布桥",
-  "version": "1.0.0",
-  "description": "把 MJ 创作平台中人工确认的图片、标题和正文预填到小红书官方发布页，最终发布始终由用户确认。",
+  "version": "1.1.0",
+  "description": "把 MJ 创作平台中确认的封面、图片、标题和正文同步到小红书官方发布页，并支持单篇限时授权自动发布。",
   "permissions": ["storage"],
   "host_permissions": [
     "https://xhs-studio-secretary.mj051225.chatgpt.site/*",

@@ -2,11 +2,12 @@ const STUDIO_SOURCE = "mj-xhs-studio";
 const BRIDGE_SOURCE = "mj-xhs-bridge";
 
 function notifyPage(type) {
-  window.postMessage({ source: BRIDGE_SOURCE, type }, window.location.origin);
+  window.postMessage({ source: BRIDGE_SOURCE, type, version: 2 }, window.location.origin);
 }
 
 function normalizeDraft(value) {
-  if (!value || value.version !== 1 || !Number.isInteger(value.projectId)) return null;
+  if (!value || value.version !== 2 || !Number.isInteger(value.projectId)) return null;
+  const coverDataUrl = String(value.coverDataUrl || "");
   const images = Array.isArray(value.images)
     ? value.images.slice(0, 10).map((image) => ({
       url: String(image?.url || "").slice(0, 2000),
@@ -14,7 +15,7 @@ function normalizeDraft(value) {
     })).filter((image) => /^https?:\/\//.test(image.url))
     : [];
   return {
-    version: 1,
+    version: 2,
     projectId: value.projectId,
     projectName: String(value.projectName || "").slice(0, 120),
     title: String(value.title || "").trim().slice(0, 100),
@@ -22,7 +23,16 @@ function normalizeDraft(value) {
     tags: Array.isArray(value.tags)
       ? value.tags.slice(0, 20).map((tag) => String(tag).replace(/^#/, "").trim().slice(0, 40)).filter(Boolean)
       : [],
+    coverDataUrl: coverDataUrl.length <= 8_000_000 && /^data:image\/jpeg;base64,[a-zA-Z0-9+/=]+$/.test(coverDataUrl)
+      ? coverDataUrl
+      : "",
     images,
+    publishAction: value.publishAction === "auto_publish" ? "auto_publish" : "prefill",
+    authorization: value.publishAction === "auto_publish" && value.authorization ? {
+      confirmedAt: String(value.authorization.confirmedAt || ""),
+      expiresAt: String(value.authorization.expiresAt || ""),
+      nonce: String(value.authorization.nonce || "").slice(0, 120),
+    } : undefined,
     createdAt: String(value.createdAt || new Date().toISOString()),
   };
 }

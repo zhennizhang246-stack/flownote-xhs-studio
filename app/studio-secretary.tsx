@@ -71,13 +71,20 @@ type CustomerMessage = {
   repliedAt?: string | null;
 };
 type XhsBridgeDraft = {
-  version: 1;
+  version: 2;
   projectId: number;
   projectName: string;
   title: string;
   body: string;
   tags: string[];
+  coverDataUrl: string;
   images: Array<{ url: string; fileName: string }>;
+  publishAction: "prefill" | "auto_publish";
+  authorization?: {
+    confirmedAt: string;
+    expiresAt: string;
+    nonce: string;
+  };
   createdAt: string;
 };
 type Tab = "creator" | "assets" | "calendar" | "research" | "service";
@@ -157,9 +164,62 @@ const statusLabels: Record<string, string> = {
   scheduled: "已排期",
   published: "已发布",
 };
-const XHS_PUBLISH_URL = "https://creator.xiaohongshu.com/publish/publish?source=official&from=tab_switch";
+const XHS_PUBLISH_URL = "https://creator.xiaohongshu.com/publish/publish?source=official&from=menu&target=image";
 const XHS_BRIDGE_SOURCE = "mj-xhs-studio";
 const XHS_BRIDGE_EXTENSION_URL = "/downloads/mj-xhs-draft-bridge.zip";
+
+const loadImage = (source: string) => new Promise<HTMLImageElement>((resolve, reject) => {
+  const image = new Image();
+  image.onload = () => resolve(image);
+  image.onerror = () => reject(new Error("封面底图读取失败"));
+  image.src = source;
+});
+
+async function renderCoverDataUrl(source: string, title: string, subtitle: string) {
+  const image = await loadImage(source);
+  const canvas = document.createElement("canvas");
+  canvas.width = 1080;
+  canvas.height = 1440;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("当前浏览器无法生成封面");
+  const scale = Math.max(canvas.width / image.naturalWidth, canvas.height / image.naturalHeight);
+  const drawWidth = image.naturalWidth * scale;
+  const drawHeight = image.naturalHeight * scale;
+  context.drawImage(image, (canvas.width - drawWidth) / 2, (canvas.height - drawHeight) / 2, drawWidth, drawHeight);
+  const shade = context.createLinearGradient(0, 350, 0, canvas.height);
+  shade.addColorStop(0, "rgba(18,23,19,0.03)");
+  shade.addColorStop(1, "rgba(18,23,19,0.88)");
+  context.fillStyle = shade;
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = "rgba(255,255,255,.92)";
+  context.font = '24px Georgia, "Songti SC", serif';
+  context.fillText("ORIGINAL DESIGN · INTERIOR", 82, 112);
+  context.strokeStyle = "rgba(255,255,255,.55)";
+  context.lineWidth = 2;
+  context.beginPath();
+  context.moveTo(82, 142);
+  context.lineTo(998, 142);
+  context.stroke();
+  context.font = '88px Georgia, "Songti SC", serif';
+  const chars = [...title.trim()];
+  const lines: string[] = [];
+  let line = "";
+  for (const char of chars) {
+    const candidate = `${line}${char}`;
+    if (context.measureText(candidate).width > 870 && line) {
+      lines.push(line);
+      line = char;
+    } else {
+      line = candidate;
+    }
+  }
+  if (line) lines.push(line);
+  lines.slice(0, 3).forEach((text, index) => context.fillText(text, 82, 1090 + index * 100));
+  context.font = '28px system-ui, "Microsoft YaHei", sans-serif';
+  context.fillStyle = "rgba(255,255,255,.82)";
+  context.fillText(subtitle.trim(), 84, 1380);
+  return canvas.toDataURL("image/jpeg", 0.92);
+}
 
 function localFallback(meta: ProjectMeta): Draft {
   const location = meta.location || "项目所在地待确认";
@@ -265,9 +325,9 @@ export function StudioSecretary() {
   useEffect(() => {
     function receiveBridgeStatus(event: MessageEvent) {
       if (event.source !== window || event.origin !== window.location.origin) return;
-      const message = event.data as { source?: string; type?: string };
+      const message = event.data as { source?: string; type?: string; version?: number };
       if (message?.source !== "mj-xhs-bridge") return;
-      if (message.type === "MJ_XHS_BRIDGE_READY" || message.type === "MJ_XHS_DRAFT_STORED") {
+      if (message.version === 2 && (message.type === "MJ_XHS_BRIDGE_READY" || message.type === "MJ_XHS_DRAFT_STORED")) {
         setBridgeReady(true);
       }
     }
@@ -437,32 +497,67 @@ export function StudioSecretary() {
     return true;
   }
 
-  async function publishNow() {
+  async function publishNow(autoPublish = false) {
     if (!currentProjectId) {
       setNotice("请先上传图片并生成正式项目，再进入发布流程");
       return;
     }
-    const project = projects.find((item) => item.id === currentProjectId);
-    const images = project?.images?.map((image) => ({
-      url: new URL(image.url, window.location.origin).href,
-      fileName: image.fileName,
-    })) || [];
-    const bridgeDraft: XhsBridgeDraft = {
-      version: 1,
-      projectId: currentProjectId,
-      projectName: meta.name,
-      title: draft.title.trim(),
-      body: draft.body.trim(),
-      tags: draft.tags.map((tag) => tag.replace(/^#/, "").trim()).filter(Boolean),
-      images,
-      createdAt: new Date().toISOString(),
-    };
+    if (autoPublish && !bridgeReady) {
+      setNotice("自动发布需要先安装并连接 MJ 发布桥；你仍可使用人工预填发布");
+      return;
+    }
+    if (autoPublish && !window.confirm(`确认自动发布「${draft.title.trim()}」？\n\n平台会同步封面、图片、标题、正文与标签，并在 5 分钟内授权扩展点击一次小红书官方“发布”按钮。`)) {
+      setNotice("已取消本次自动发布，项目内容没有提交到小红书");
+      return;
+    }
     const publishWindow = window.open(XHS_PUBLISH_URL, "_blank", "noopener,noreferrer");
     const approved = await saveProject("approved");
     if (!approved) {
       publishWindow?.close();
       return;
     }
+    let project = projects.find((item) => item.id === currentProjectId);
+    if (!project?.images?.length) {
+      const response = await fetch("/api/projects");
+      if (response.ok) {
+        const payload = await response.json() as { projects: ProjectRecord[] };
+        project = payload.projects.find((item) => item.id === currentProjectId);
+      }
+    }
+    let coverDataUrl = "";
+    try {
+      coverDataUrl = await renderCoverDataUrl(coverImage, draft.coverTitle, draft.coverSubtitle);
+    } catch (error) {
+      publishWindow?.close();
+      setNotice(error instanceof Error ? error.message : "封面生成失败，请重试");
+      return;
+    }
+    const coverIndex = Math.max(0, draft.coverIndex ?? 0);
+    const images = (project?.images || [])
+      .filter((_, index) => index !== coverIndex)
+      .slice(0, 9)
+      .map((image) => ({
+        url: new URL(image.url, window.location.origin).href,
+        fileName: image.fileName,
+      }));
+    const createdAt = new Date();
+    const bridgeDraft: XhsBridgeDraft = {
+      version: 2,
+      projectId: currentProjectId,
+      projectName: meta.name,
+      title: draft.title.trim(),
+      body: draft.body.trim(),
+      tags: draft.tags.map((tag) => tag.replace(/^#/, "").trim()).filter(Boolean),
+      coverDataUrl,
+      images,
+      publishAction: autoPublish ? "auto_publish" : "prefill",
+      authorization: autoPublish ? {
+        confirmedAt: createdAt.toISOString(),
+        expiresAt: new Date(createdAt.getTime() + 5 * 60_000).toISOString(),
+        nonce: crypto.randomUUID(),
+      } : undefined,
+      createdAt: createdAt.toISOString(),
+    };
     window.postMessage({
       source: XHS_BRIDGE_SOURCE,
       type: "MJ_XHS_DRAFT",
@@ -471,11 +566,15 @@ export function StudioSecretary() {
     const copy = `${draft.title}\n\n${draft.body}\n\n${draft.tags.map((tag) => `#${tag.replace(/^#/, "")}`).join(" ")}`;
     try {
       await navigator.clipboard.writeText(copy);
-      setNotice(bridgeReady
+      setNotice(autoPublish
+        ? "已同步成品封面、图片、标题与正文；MJ 发布桥将在页面准备完成后执行一次自动发布"
+        : bridgeReady
         ? "已把图片、标题与正文交给 MJ 发布桥；小红书发布页将自动预填，请检查后人工点击发布"
         : "已复制完整文案并打开小红书发布页；安装 MJ 发布桥后可自动预填图片、标题与正文");
     } catch {
-      setNotice(bridgeReady
+      setNotice(autoPublish
+        ? "已把本次限时授权交给 MJ 发布桥，正在等待小红书页面完成预填并发布"
+        : bridgeReady
         ? "已把确认内容交给 MJ 发布桥；请在小红书发布页检查后人工点击发布"
         : "已打开小红书发布页；当前未检测到 MJ 发布桥，请手动粘贴文案并上传图片");
     }
@@ -590,12 +689,13 @@ export function StudioSecretary() {
       <div className="section-heading compact"><div><span>LIVE PREVIEW</span><h2>发布预览</h2></div><span className="mode-label">{draft.mode || "AI 分析"}</span></div>
       <div className="phone-frame"><div className="cover-preview"><img src={coverImage} alt="项目封面预览"/><div className="cover-shade"/><span className="cover-eyebrow">ORIGINAL DESIGN · RESIDENCE</span><div className="cover-copy"><h3>{draft.coverTitle}</h3><p>{draft.coverSubtitle}</p></div><span className="page-count">01 / {previews.length}</span></div></div>
       <div className={`bridge-status ${bridgeReady ? "connected" : ""}`}>
-        <span>{bridgeReady ? "MJ 发布桥已连接" : "尚未安装 MJ 发布桥"}</span>
-        <p>{bridgeReady ? "点击下方按钮后，图片、标题和正文会自动预填；最终发布仍由你确认。" : "安装一次浏览器扩展，即可把已确认内容自动带入小红书官方发布页。"}</p>
-        {!bridgeReady && <a href={XHS_BRIDGE_EXTENSION_URL} download>下载 MJ 发布桥扩展</a>}
+        <span>{bridgeReady ? "MJ 发布桥 1.1 已连接" : "未连接最新版 MJ 发布桥"}</span>
+        <p>{bridgeReady ? "成品封面、项目图片、标题、正文与标签会保持统一；可选择人工发布或单篇确认后自动发布。" : "安装一次浏览器扩展，即可把已确认内容自动带入小红书官方图文发布页。"}</p>
+        {!bridgeReady && <a href={XHS_BRIDGE_EXTENSION_URL} download>下载或更新 MJ 发布桥扩展</a>}
       </div>
       <div className="publish-actions">
         <button className="secondary-action" onClick={() => void publishNow()}>确认并预填小红书发布页</button>
+        <button className="auto-publish-action" disabled={!bridgeReady} onClick={() => void publishNow(true)}>确认本篇并自动发布</button>
         <button className="queue-action" onClick={() => void approveAndSchedule()}>确认并加入三天队列</button>
         <button className="icon-action" onClick={() => void saveProject("drafted")} aria-label="保存到项目资产库">保存到资产库</button>
       </div>
