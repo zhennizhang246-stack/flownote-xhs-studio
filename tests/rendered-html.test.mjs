@@ -189,3 +189,18 @@ test("publishes a sign-in-gated multi-account workspace without sharing Xiaohong
   assert.match(projects, /projects\.ownerEmail/);
   assert.match(settings, /accountAutomationSettings/);
 });
+
+test("publishes a WeChat share page synchronized with the main site content", async () => {
+  const sharePage = await readFile(new URL("../app/wechat/page.tsx", import.meta.url), "utf8");
+  const sharedContent = await readFile(new URL("../lib/site-content.ts", import.meta.url), "utf8");
+  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const layout = await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
+  assert.match(sharePage, /微信转发专页/);
+  assert.match(sharePage, /与主站同步/);
+  assert.match(sharePage, /openGraph/);
+  assert.match(sharePage, /href="\/"/);
+  assert.match(sharePage, /siteContent\.features/);
+  assert.match(sharedContent, /shareDescription/);
+  assert.match(page, /siteContent/);
+  assert.match(layout, /siteContent/);
+});
