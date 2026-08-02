@@ -14,6 +14,18 @@ type Draft = {
   riskNotes: string[];
   coverIndex?: number;
   mode?: string;
+  styleVariants?: StyleVariant[];
+};
+type StyleVariant = {
+  id: "lifestyle" | "professional" | "minimal";
+  name: string;
+  description: string;
+  title: string;
+  coverTitle: string;
+  coverSubtitle: string;
+  coverStyle?: CoverStyle;
+  body: string;
+  tags: string[];
 };
 type CoverStyle = {
   fontFamily: "serif" | "sans" | "kai";
@@ -143,13 +155,13 @@ const seededDraft: Draft = {
   mode: "案例预览",
 };
 const initialMeta: ProjectMeta = {
-  name: "栖光木境",
-  location: "浙江 · 温州",
-  area: "150m²",
-  projectType: "住宅空间",
+  name: "",
+  location: "",
+  area: "",
+  projectType: "",
   category: "住宅项目",
-  audience: "重视自然、松弛感与收纳秩序的改善型家庭",
-  brief: "温润木质、自然光与绿意贯穿全屋；客餐厅一体，包含厨房、家政、卧室、衣帽间与卫浴。",
+  audience: "",
+  brief: "",
 };
 const defaultSettings: AutomationSettings = {
   publishTime: "12:00",
@@ -481,6 +493,8 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
   const [profileUrl, setProfileUrl] = useState(() => (
     typeof window === "undefined" ? "" : window.localStorage.getItem("mj-xhs-profile-url") || ""
   ));
+  const [showOptionalMeta, setShowOptionalMeta] = useState(false);
+  const [activeStyle, setActiveStyle] = useState<StyleVariant["id"]>("lifestyle");
 
   const coverImage = previews[draft.coverIndex ?? 0] || seededImages[0];
   const phaseLabel = {
@@ -490,7 +504,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
     done: "封面与文案已完成",
   }[phase];
   const facts = useMemo(
-    () => [meta.location || "地点待确认", meta.area || "面积待确认", meta.projectType || "空间类型待确认"],
+    () => [meta.location, meta.area, meta.projectType].filter(Boolean),
     [meta],
   );
   const scheduledProjects = projects.filter((project) => project.scheduledAt)
@@ -579,6 +593,18 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
   }, [settings.officialApiConnected, settings.publishMode]);
 
   const updateMeta = (key: keyof ProjectMeta, value: string) => setMeta((current) => ({ ...current, [key]: value }));
+  const applyStyleVariant = (variant: StyleVariant) => {
+    setActiveStyle(variant.id);
+    setDraft((current) => ({
+      ...current,
+      title: variant.title,
+      coverTitle: variant.coverTitle,
+      coverSubtitle: variant.coverSubtitle,
+      coverStyle: normalizedCoverStyle(variant.coverStyle),
+      body: variant.body,
+      tags: variant.tags,
+    }));
+  };
   const handleFiles = (event: ChangeEvent<HTMLInputElement>) => {
     const incoming = Array.from(event.target.files || []);
     event.target.value = "";
@@ -617,15 +643,12 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
 
   async function handleGenerate(event: FormEvent) {
     event.preventDefault();
-    setPhase(files.length ? "uploading" : "analyzing");
-    setNotice(files.length ? "正在上传并建立项目资产档案…" : "正在重新分析示例项目…");
     if (!files.length) {
-      await new Promise((resolve) => setTimeout(resolve, 450));
-      setDraft(seededDraft);
-      setPhase("done");
-      setNotice("已依据 7 张实景图生成封面与原创文案");
+      setNotice("请先上传至少一张实景图，项目地址、面积和介绍都可以不填");
       return;
     }
+    setPhase(files.length ? "uploading" : "analyzing");
+    setNotice(files.length ? "正在上传并建立项目资产档案…" : "正在重新分析示例项目…");
     try {
       const images = await Promise.all(files.map(async (file) => ({
         name: file.name,
@@ -654,6 +677,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
       }
       const result = await generated.json() as { draft: Draft };
       setDraft({ ...result.draft, coverStyle: normalizedCoverStyle(result.draft.coverStyle) });
+      setActiveStyle(result.draft.styleVariants?.[0]?.id || "lifestyle");
       setPhase("done");
       setNotice("已完成封面与原创文案，并归档到项目资产库");
       await refreshProjects();
@@ -1026,11 +1050,12 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
 
   const creatorView = <div className="content-grid">
     <section className="creator-card">
-      <div className="section-heading"><div><span>PROJECT INTAKE</span><h2>交给秘书一个新项目</h2></div><span className="counter">{files.length ? `${files.length} / ${MAX_PROJECT_IMAGES} 张实景图` : "最多 10 张实景图"}</span></div>
+      <div className="section-heading"><div><span>IMAGE TO STORY</span><h2>上传实景，自动开始创作</h2><p>AI 会先识别空间、材质、光线与氛围，再生成 3 种风格的文案和封面。</p></div><span className="counter">{files.length ? `${files.length} / ${MAX_PROJECT_IMAGES} 张实景图` : "最多 10 张实景图"}</span></div>
       <form onSubmit={handleGenerate}>
-        <label className="upload-zone"><input type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={handleFiles}/><div className="upload-icon">＋</div><strong>{files.length ? "继续添加项目实景图" : "上传项目实景图"}</strong><span>可分批人工添加，最多 10 张；点击缩略图选择封面</span></label>
+        <label className="upload-zone"><input type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={handleFiles}/><div className="upload-icon">＋</div><strong>{files.length ? "继续添加项目实景图" : "上传项目实景图即可生成"}</strong><span>支持 JPG、PNG、WEBP；地址、面积和项目介绍都可以不填</span></label>
         <div className="thumb-strip">{previews.slice(0, MAX_PROJECT_IMAGES).map((image, index) => <div className="thumb-wrap" key={`${image}-${index}`}><button type="button" className={index === (draft.coverIndex ?? 0) ? "thumb selected" : "thumb"} onClick={() => setDraft((current) => ({ ...current, coverIndex: index }))} aria-label={`选择第 ${index + 1} 张作为封面`}><img src={image} alt=""/></button>{files.length > 0 && <button type="button" className="remove-thumb" onClick={() => removeFile(index)} aria-label={`删除第 ${index + 1} 张图片`}>×</button>}<span>{index + 1}</span></div>)}</div>
-        <div className="form-grid">
+        <button type="button" className="optional-meta-toggle" onClick={() => setShowOptionalMeta((value) => !value)}><span>＋ 项目信息</span><small>选填，不影响图片自动识别</small><b>{showOptionalMeta ? "收起" : "展开"}</b></button>
+        {showOptionalMeta && <div className="form-grid optional-meta-form">
           <label className="wide"><span>项目名称</span><input value={meta.name} onChange={(event) => updateMeta("name", event.target.value)}/></label>
           <label><span>所在地</span><input value={meta.location} onChange={(event) => updateMeta("location", event.target.value)}/></label>
           <label><span>项目面积</span><input value={meta.area} onChange={(event) => updateMeta("area", event.target.value)}/></label>
@@ -1038,8 +1063,8 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
           <label><span>空间类型</span><input value={meta.projectType} onChange={(event) => updateMeta("projectType", event.target.value)}/></label>
           <label><span>目标客户</span><input value={meta.audience} onChange={(event) => updateMeta("audience", event.target.value)}/></label>
           <label className="wide"><span>已知设计信息</span><textarea value={meta.brief} onChange={(event) => updateMeta("brief", event.target.value)}/></label>
-        </div>
-        <button className="primary-action" disabled={phase === "uploading" || phase === "analyzing"}><span>{phase === "analyzing" ? "正在分析…" : "保存项目并生成封面与文案"}</span><span>→</span></button>
+        </div>}
+        <button className="primary-action" disabled={!files.length || phase === "uploading" || phase === "analyzing"}><span>{phase === "analyzing" ? "正在识别图片并生成 3 套方案…" : "自动识别并生成 3 种风格"}</span><span>✦</span></button>
         <p className="notice">{notice}</p>
       </form>
     </section>
@@ -1059,6 +1084,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
       </div>
     </section>
     <section className="editorial-card editor-mode">
+      {!!draft.styleVariants?.length && <div className="style-variant-picker"><div><span>03</span><strong>选择内容风格</strong><small>同一组实景，不同表达方向</small></div>{draft.styleVariants.map((variant) => <button key={variant.id} className={activeStyle === variant.id ? "active" : ""} onClick={() => applyStyleVariant(variant)}><b>{variant.name}</b><small>{variant.description}</small><em>{activeStyle === variant.id ? "✓" : "→"}</em></button>)}</div>}
       <div className="editorial-title"><span>EDITABLE COPY</span><label><small>已选择的笔记标题</small><textarea value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}/></label><div className="fact-row">{facts.map((fact) => <span key={fact}>{fact}</span>)}</div></div>
       <div className="copy-column">
         <div className="title-options"><small>3 个标题方案 · 点击选择</small>{draft.titleOptions.map((title, index) => <button className={draft.title === title ? "active" : ""} key={`${title}-${index}`} onClick={() => setDraft((current) => ({ ...current, title }))}><span>0{index + 1}</span>{title}<em>{draft.title === title ? "已选择" : "选择"}</em></button>)}</div>
@@ -1079,7 +1105,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
             <label className="range-control"><small>遮罩强度 · {normalizedCoverStyle(draft.coverStyle).overlayOpacity}%</small><input type="range" min="0" max="90" value={normalizedCoverStyle(draft.coverStyle).overlayOpacity} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), overlayOpacity: Number(event.target.value) } }))}/></label>
           </div>
         </div>
-        <label><small>正文</small><textarea className="body-editor" value={draft.body} onChange={(event) => setDraft((current) => ({ ...current, body: event.target.value }))}/></label>
+        <label><small>正文 · 已自动加入适量小表情，可继续修改</small><textarea className="body-editor" value={draft.body} onChange={(event) => setDraft((current) => ({ ...current, body: event.target.value }))}/></label>
         <label><small>话题标签（用逗号或空格分隔）</small><input value={draft.tags.join("，")} onChange={(event) => setDraft((current) => ({ ...current, tags: event.target.value.split(/[，,\s#]+/).filter(Boolean).slice(0, 12) }))}/></label>
         <div className="editor-actions"><button onClick={() => void saveProject("drafted")}>保存到资产库</button><button className="approve-action" onClick={() => void saveProject("approved")}>确认并同步保存</button><button onClick={() => void approveAndSchedule()}>确认并加入三天队列</button></div>
         <p className="sync-state">{lastSyncedAt ? `✓ 已于 ${lastSyncedAt} 同步更新到项目资产库` : "确认后会同步更新封面、标题、正文与标签，并保存到项目资产库"}</p>
