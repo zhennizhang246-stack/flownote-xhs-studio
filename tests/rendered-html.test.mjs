@@ -94,6 +94,19 @@ test("accepts and analyzes at most ten project images", async () => {
   assert.match(generate, /slice\(0,10\)/);
 });
 
+test("deletes owned projects and generates space-specific creative strategies", async () => {
+  const project = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
+  const generate = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  assert.match(project, /export async function DELETE/);
+  assert.match(project, /eq\(projects\.ownerEmail, ownerEmail\)/);
+  assert.match(project, /db\.delete\(projectImages\)/);
+  assert.match(studio, /删除项目/);
+  assert.match(studio, /spaceTypes/);
+  assert.match(generate, /spaceDesignGuidance/);
+  assert.match(generate, /不能把住宅客厅、卧室、办公、酒店、商业和展厅写成同一套模板/);
+});
+
 test("generates and persists three selectable title options", async () => {
   const generate = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
   const project = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");

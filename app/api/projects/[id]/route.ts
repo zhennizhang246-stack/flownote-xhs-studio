@@ -1,6 +1,7 @@
+import { env } from "cloudflare:workers";
 import { and, eq } from "drizzle-orm";
 import { getDb } from "../../../../db";
-import { projects } from "../../../../db/schema";
+import { projectImages, projects } from "../../../../db/schema";
 import { apiError, requireAccountEmail } from "../../../../lib/account";
 
 type Draft = {
@@ -100,5 +101,34 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     return Response.json({ project: { ...updated, draft } });
   } catch (error) {
     return apiError(error, "项目更新失败");
+  }
+}
+
+type RuntimeEnv = { PROJECT_MEDIA?: R2Bucket };
+
+export async function DELETE(_request: Request, context: { params: Promise<{ id: string }> }) {
+  try {
+    const ownerEmail = await requireAccountEmail();
+    const { id } = await context.params;
+    const projectId = Number(id);
+    if (!Number.isInteger(projectId) || projectId < 1) return Response.json({ error: "项目编号无效" }, { status: 400 });
+
+    const db = getDb();
+    const [project] = await db.select().from(projects).where(and(eq(projects.id, projectId), eq(projects.ownerEmail, ownerEmail))).limit(1);
+    if (!project) return Response.json({ error: "项目不存在或无权删除" }, { status: 404 });
+
+    const images = await db.select().from(projectImages).where(eq(projectImages.projectId, projectId));
+    const media = (env as unknown as RuntimeEnv).PROJECT_MEDIA;
+    await db.delete(projectImages).where(eq(projectImages.projectId, projectId));
+    await db.delete(projects).where(and(eq(projects.id, projectId), eq(projects.ownerEmail, ownerEmail)));
+    if (media) {
+      await Promise.allSettled([
+        ...images.map((image) => media.delete(image.objectKey)),
+        media.delete(`projects/${projectId}/approved-cover.jpg`),
+      ]);
+    }
+    return Response.json({ deleted: true, projectId });
+  } catch (error) {
+    return apiError(error, "项目删除失败");
   }
 }

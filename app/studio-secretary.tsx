@@ -169,6 +169,7 @@ const navItems: Array<{ id: Tab; number: string; label: string }> = [
   { id: "service", number: "05", label: "笔记评论秘书" },
 ];
 const projectCategories = ["全部项目", "商业项目", "住宅项目", "办公项目", "酒店项目", "展厅陈列项目", "其他项目"];
+const spaceTypes = ["客厅", "餐厅", "厨房", "客餐厨一体", "卧室", "儿童房", "书房", "衣帽间", "卫浴空间", "玄关", "整屋住宅", "办公室", "设计工作室", "酒店大堂", "酒店客房", "民宿", "零售店铺", "餐饮空间", "咖啡空间", "商业展厅", "艺术展陈"];
 const MAX_PROJECT_IMAGES = 10;
 const toDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
   const reader = new FileReader();
@@ -699,6 +700,31 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
     await refreshProjects();
   }
 
+  async function deleteProject(project: ProjectRecord) {
+    if (!window.confirm(`确认永久删除“${project.name}”吗？项目图片、封面、文案和排期都会一并删除，且无法恢复。`)) return;
+    const response = await fetch(`/api/projects/${project.id}`, { method: "DELETE" });
+    const payload = await response.json() as { error?: string };
+    if (!response.ok) {
+      setNotice(payload.error || "项目删除失败");
+      return;
+    }
+    if (currentProjectId === project.id) {
+      setCurrentProjectId(null);
+      setFiles([]);
+      setPreviews(seededImages);
+      setMeta(initialMeta);
+      setDraft(seededDraft);
+      setPhase("ready");
+    }
+    setProjects((current) => current.filter((item) => item.id !== project.id));
+    setScheduleDrafts((current) => {
+      const next = { ...current };
+      delete next[project.id];
+      return next;
+    });
+    setNotice(`“${project.name}”已从项目资产库删除`);
+  }
+
   async function submitOfficialProject(projectId: number) {
     if (!settings.officialApiConnected) {
       setSettingsNotice("尚未获得小红书官方发布接口权限，当前不能自动提交");
@@ -1035,7 +1061,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
           <label><span>所在地</span><input value={meta.location} onChange={(event) => updateMeta("location", event.target.value)}/></label>
           <label><span>项目面积</span><input value={meta.area} onChange={(event) => updateMeta("area", event.target.value)}/></label>
           <label><span>资产库分区</span><select value={meta.category} onChange={(event) => updateMeta("category", event.target.value)}>{projectCategories.slice(1).map((category) => <option key={category}>{category}</option>)}</select></label>
-          <label><span>空间类型</span><input value={meta.projectType} onChange={(event) => updateMeta("projectType", event.target.value)}/></label>
+          <label><span>空间类型（决定文案与封面策略）</span><input list="space-type-options" value={meta.projectType} placeholder="选择或输入具体空间" onChange={(event) => updateMeta("projectType", event.target.value)}/><datalist id="space-type-options">{spaceTypes.map((space) => <option key={space} value={space}/>)}</datalist><small className="field-hint">例如客厅侧重采光与家庭互动，商业空间侧重品牌与顾客动线</small></label>
           <label><span>目标客户</span><input value={meta.audience} onChange={(event) => updateMeta("audience", event.target.value)}/></label>
           <label className="wide"><span>已知设计信息</span><textarea value={meta.brief} onChange={(event) => updateMeta("brief", event.target.value)}/></label>
         </div>
@@ -1095,7 +1121,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
       <article className="asset-card featured"><img src={seededImages[1]} alt="温州150平方米住宅"/><div><span className="state-pill">示例项目</span><h3>栖光木境</h3><p>浙江 · 温州　150m²　住宅空间</p><small>7 张实景图 · 已生成封面与文案</small></div></article>
       {visibleProjects.map((project) => <article className="asset-card" key={project.id}>
         {project.images?.[0] ? <img src={project.images[0].url} alt={project.name}/> : <div className="asset-placeholder">栖</div>}
-        <div><span className={`state-pill ${project.status}`}>{statusLabels[project.status] || project.status}</span><h3>{project.name}</h3><p>{project.location || "地点待补充"}　{project.area || "面积待补充"}</p><small>{project.images?.length || 0} 张实景图 · {project.scheduledAt ? new Date(project.scheduledAt).toLocaleString("zh-CN") : "尚未排期"}</small><div className="asset-actions"><button onClick={() => loadProject(project)}>打开编辑</button>{["approved", "scheduled"].includes(project.status) && <button onClick={() => void markPublished(project)}>标记已发布</button>}</div></div>
+        <div><span className={`state-pill ${project.status}`}>{statusLabels[project.status] || project.status}</span><h3>{project.name}</h3><p>{project.location || "地点待补充"}　{project.area || "面积待补充"}</p><small>{project.projectType || "空间类型待补充"} · {project.images?.length || 0} 张实景图 · {project.scheduledAt ? new Date(project.scheduledAt).toLocaleString("zh-CN") : "尚未排期"}</small><div className="asset-actions"><button onClick={() => loadProject(project)}>打开编辑</button>{["approved", "scheduled"].includes(project.status) && <button onClick={() => void markPublished(project)}>标记已发布</button>}<button className="danger-action" onClick={() => void deleteProject(project)}>删除项目</button></div></div>
       </article>)}
       {!visibleProjects.length && <div className="empty-state"><strong>{assetCategory}暂无项目</strong><p>在创作工作台上传图片并选择对应分区，项目会自动归档到这里。</p></div>}
     </div>
