@@ -123,6 +123,20 @@ test("generates an office traffic draft without external AI APIs", async () => {
   assert.match(project, /coverEyebrow/);
 });
 
+test("profiles uploaded office photos locally and varies the traffic strategy", async () => {
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  const generate = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
+  assert.match(studio, /analyzeProjectImages/);
+  assert.match(studio, /createImageBitmap/);
+  assert.match(studio, /明亮简约办公室/);
+  assert.match(studio, /温润自然办公室/);
+  assert.match(studio, /活力创意办公室/);
+  assert.match(studio, /品牌展示型办公室/);
+  assert.match(studio, /submissionMeta/);
+  assert.match(generate, /visualSeed/);
+  assert.match(generate, /spaceType.*strategy\.cover/);
+});
+
 test("regenerates existing projects from stored photos after syncing current design information", async () => {
   const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
   const project = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
