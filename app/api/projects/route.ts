@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     const runtime = env as unknown as RuntimeEnv; if (!runtime.PROJECT_MEDIA) throw new Error("项目图片存储暂不可用"); const db = getDb();
     const allowedCategories = new Set(["商业项目", "住宅项目", "办公项目", "酒店项目", "展厅陈列项目", "其他项目"]);
     const category = allowedCategories.has(payload.category || "") ? payload.category! : "住宅项目";
-    const [project] = await db.insert(projects).values({ ownerEmail, name: payload.name?.trim() || "未命名项目", location: payload.location?.trim() || "", area: payload.area?.trim() || "", projectType: payload.projectType?.trim() || "", category, audience: payload.audience?.trim() || "", brief: payload.brief?.trim() || "" }).returning();
+    const [project] = await db.insert(projects).values({ ownerEmail, name: payload.name?.trim() || "实景图识别项目", location: payload.location?.trim() || "", area: payload.area?.trim() || "", projectType: payload.projectType?.trim() || "", category, audience: payload.audience?.trim() || "", brief: payload.brief?.trim() || "" }).returning();
     for (let index = 0; index < images.length; index += 1) {
       const image = images[index]; const decoded = decodeDataUrl(image.data || ""); const safeName = (image.name || `image-${index + 1}.jpg`).replace(/[^0-9A-Za-z._-]/g, "-"); const objectKey = `projects/${project.id}/${crypto.randomUUID()}-${safeName}`;
       await runtime.PROJECT_MEDIA.put(objectKey, decoded.bytes, { httpMetadata: { contentType: decoded.contentType } });
