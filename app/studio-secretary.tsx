@@ -5,6 +5,7 @@ import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 type Draft = {
   title: string;
   titleOptions: string[];
+  coverEyebrow: string;
   coverTitle: string;
   coverSubtitle: string;
   coverStyle?: CoverStyle;
@@ -132,6 +133,7 @@ const seededDraft: Draft = {
     "原木与光，住进松弛的四季",
     "150m²自然系住宅的生活秩序",
   ],
+  coverEyebrow: "ORIGINAL DESIGN · INTERIOR",
   coverTitle: "住进自然里",
   coverSubtitle: "浙江温州 · 150m² 木质住宅",
   coverStyle: defaultCoverStyle,
@@ -392,7 +394,7 @@ function drawCoverPattern(context: CanvasRenderingContext2D, style: CoverStyle) 
   context.restore();
 }
 
-async function renderCoverDataUrl(source: string, title: string, subtitle: string, inputStyle?: Partial<CoverStyle>) {
+async function renderCoverDataUrl(source: string, eyebrow: string, title: string, subtitle: string, inputStyle?: Partial<CoverStyle>) {
   const style = normalizedCoverStyle(inputStyle);
   const image = await loadImage(source);
   const canvas = document.createElement("canvas");
@@ -409,6 +411,13 @@ async function renderCoverDataUrl(source: string, title: string, subtitle: strin
   context.fillRect(0, 0, canvas.width, canvas.height);
   context.globalAlpha = 1;
   drawCoverPattern(context, style);
+  context.textAlign = "left";
+  context.font = '700 26px Georgia, "Times New Roman", serif';
+  context.fillStyle = style.titleColor;
+  context.fillText((eyebrow || "ORIGINAL DESIGN · INTERIOR").toUpperCase().slice(0, 44), 82, 108);
+  context.globalAlpha = 0.72;
+  context.fillRect(82, 134, 916, 2);
+  context.globalAlpha = 1;
   context.textAlign = style.align;
   const anchorX = style.align === "center" ? canvas.width / 2 : 82;
   context.fillStyle = style.titleColor;
@@ -438,18 +447,44 @@ async function renderCoverDataUrl(source: string, title: string, subtitle: strin
 function localFallback(meta: ProjectMeta): Draft {
   const location = meta.location || "项目所在地待确认";
   const area = meta.area || "面积待确认";
+  const space = `${meta.projectType} ${meta.category}`;
+  const office = /办公|工作室/.test(space);
+  const commercial = /商业|店铺|零售|餐饮|咖啡/.test(space);
+  const hospitality = /酒店|民宿/.test(space);
+  const creative = office ? {
+    eyebrow: "ORIGINAL DESIGN · WORKPLACE",
+    titles: [`${meta.name || "办公项目"}｜让灵感正在发生✨`, "紫与绿，重新定义办公氛围💜", "办公空间也可以有情绪价值"],
+    cover: "让灵感正在发生",
+    body: `这不是一间只追求效率的办公室，而是一处让创意自然发生的场所✨\n\n${meta.brief || "我们从品牌色彩、团队交流与真实工作动线出发重新组织空间。"}\n\n从实景图可以看到，色彩不只是装饰，而是在不同功能区之间建立识别；开放交流与相对专注的区域彼此衔接，让走动、停留和协作更自然。\n\n好看的办公空间，更应该真正支持每天在这里工作的人。`,
+    tags: ["办公空间设计", "办公室设计", "品牌空间", "室内设计", "实景案例", "设计工作室"],
+  } : commercial ? {
+    eyebrow: "ORIGINAL DESIGN · RETAIL",
+    titles: [`${meta.name || "商业空间"}｜把品牌体验写进空间✨`, "从进店第一眼，建立品牌记忆", "好逛、好看，也更愿意停留"],
+    cover: "让品牌被看见",
+    body: `商业空间的第一任务，是让顾客愿意走进来，并记住它✨\n\n${meta.brief || "我们从品牌识别、顾客路径、陈列与停留体验组织空间。"}\n\n实景中的色彩、灯光与核心场景共同形成视觉记忆点；动线则把进入、浏览、体验与交流自然串联。\n\n设计最终服务的，是品牌表达与真实经营。`,
+    tags: ["商业空间设计", "店铺设计", "品牌空间", "室内设计", "实景案例", "空间设计"],
+  } : hospitality ? {
+    eyebrow: "ORIGINAL DESIGN · HOSPITALITY",
+    titles: [`${meta.name || "酒店项目"}｜从抵达开始松弛下来✨`, "把在地感藏进每一次停留", "一间让人愿意慢下来的客房"],
+    cover: "从抵达开始松弛",
+    body: `酒店空间的体验，从推门抵达的那一刻就开始了✨\n\n${meta.brief || "我们从客人的抵达、停留、休息与服务动线重新梳理空间。"}\n\n画面中的光线、材质和尺度共同建立安静而有辨识度的氛围，让功能被自然地收进体验之中。\n\n好的旅居空间，会让短暂停留也拥有清晰记忆。`,
+    tags: ["酒店设计", "民宿设计", "旅居空间", "室内设计", "实景案例", "空间体验"],
+  } : {
+    eyebrow: "ORIGINAL DESIGN · INTERIOR",
+    titles: [`${location}${area}，把自然搬进日常的家🌿`, "从光线与材质开始设计一个家", "克制留白，让居住回到松弛日常"],
+    cover: "让家自然生长",
+    body: `这个项目从真实的居住感受出发，而不是先定义一种风格🌿\n\n${meta.brief || "我们从光线、材质、动线与收纳重新梳理空间。"}\n\n画面里的材质、自然光和克制留白共同构成温和的空间秩序。功能被收进日常动线里，人在其中可以更松弛地停留、交流和生活。\n\n如果你也在寻找适合自己的居住方式，欢迎带着户型与需求来聊聊。`,
+    tags: ["室内设计", "住宅设计", "实景案例", "全案设计", "自然系住宅", "设计工作室"],
+  };
   return {
-    title: `${location}${area}，让自然成为家的底色`,
-    titleOptions: [
-      `${location}${area}，让自然成为家的底色`,
-      "从光线与材质开始设计一个家",
-      "克制留白，让居住回到松弛日常",
-    ],
-    coverTitle: "让家自然生长",
+    title: creative.titles[0],
+    titleOptions: creative.titles,
+    coverEyebrow: creative.eyebrow,
+    coverTitle: creative.cover,
     coverSubtitle: `${location} · ${area} ${meta.projectType || "空间设计"}`,
     coverStyle: defaultCoverStyle,
-    body: `这个项目从真实的居住感受出发，而不是先定义一种风格。\n\n${meta.brief || "我们从光线、材质、动线与收纳重新梳理空间。"}\n\n画面里的材质、自然光和克制留白共同构成温和的空间秩序。功能被收进日常动线里，人在其中可以更松弛地停留、交流和生活。\n\n如果你也在寻找适合自己的居住方式，欢迎带着户型与需求来聊聊。`,
-    tags: ["室内设计", "住宅设计", "实景案例", "全案设计", "自然系住宅", "设计工作室"],
+    body: creative.body,
+    tags: creative.tags,
     highlights: ["从上传图片提取视觉基调", "依据画面选择竖版封面", "正文避免虚构未知项目事实"],
     riskNotes: ["当前为本地视觉预览；连接 AI 后可完成多图语义分析"],
     coverIndex: 0,
@@ -772,7 +807,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
     }
     let coverDataUrl = "";
     try {
-      coverDataUrl = await renderCoverDataUrl(coverImage, draft.coverTitle, draft.coverSubtitle, draft.coverStyle);
+      coverDataUrl = await renderCoverDataUrl(coverImage, draft.coverEyebrow, draft.coverTitle, draft.coverSubtitle, draft.coverStyle);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "封面生成失败");
       return false;
@@ -830,7 +865,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
     }
     let coverDataUrl = "";
     try {
-      coverDataUrl = await renderCoverDataUrl(coverImage, draft.coverTitle, draft.coverSubtitle, draft.coverStyle);
+      coverDataUrl = await renderCoverDataUrl(coverImage, draft.coverEyebrow, draft.coverTitle, draft.coverSubtitle, draft.coverStyle);
     } catch (error) {
       publishWindow?.close();
       setNotice(error instanceof Error ? error.message : "封面生成失败，请重试");
@@ -1071,7 +1106,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
     </section>
     <section className="preview-panel">
       <div className="section-heading compact"><div><span>LIVE PREVIEW</span><h2>发布预览</h2></div><span className="mode-label">{draft.mode || "AI 分析"}</span></div>
-      <div className="phone-frame"><div className={`cover-preview pattern-${normalizedCoverStyle(draft.coverStyle).pattern}`} style={{ "--cover-pattern": normalizedCoverStyle(draft.coverStyle).patternColor } as React.CSSProperties}><img src={coverImage} alt="项目封面预览"/><div className="cover-shade" style={{ background: normalizedCoverStyle(draft.coverStyle).overlayColor, opacity: normalizedCoverStyle(draft.coverStyle).overlayOpacity / 100 }}/><div className={`cover-copy position-${normalizedCoverStyle(draft.coverStyle).position} align-${normalizedCoverStyle(draft.coverStyle).align}`} style={{ color: normalizedCoverStyle(draft.coverStyle).titleColor, fontFamily: coverFontStacks[normalizedCoverStyle(draft.coverStyle).fontFamily] }}><h3 style={{ fontSize: `${Math.round(normalizedCoverStyle(draft.coverStyle).titleSize / 2.2)}px` }}>{draft.coverTitle}</h3><p style={{ color: normalizedCoverStyle(draft.coverStyle).subtitleColor }}>{draft.coverSubtitle}</p></div><span className="page-count">01 / {previews.length}</span></div></div>
+      <div className="phone-frame"><div className={`cover-preview pattern-${normalizedCoverStyle(draft.coverStyle).pattern}`} style={{ "--cover-pattern": normalizedCoverStyle(draft.coverStyle).patternColor } as React.CSSProperties}><img src={coverImage} alt="项目封面预览"/><div className="cover-shade" style={{ background: normalizedCoverStyle(draft.coverStyle).overlayColor, opacity: normalizedCoverStyle(draft.coverStyle).overlayOpacity / 100 }}/><div className="cover-eyebrow" style={{ color: normalizedCoverStyle(draft.coverStyle).titleColor }}>{draft.coverEyebrow || "ORIGINAL DESIGN · INTERIOR"}</div><div className={`cover-copy position-${normalizedCoverStyle(draft.coverStyle).position} align-${normalizedCoverStyle(draft.coverStyle).align}`} style={{ color: normalizedCoverStyle(draft.coverStyle).titleColor, fontFamily: coverFontStacks[normalizedCoverStyle(draft.coverStyle).fontFamily] }}><h3 style={{ fontSize: `${Math.round(normalizedCoverStyle(draft.coverStyle).titleSize / 2.2)}px` }}>{draft.coverTitle}</h3><p style={{ color: normalizedCoverStyle(draft.coverStyle).subtitleColor }}>{draft.coverSubtitle}</p></div><span className="page-count">01 / {previews.length}</span></div></div>
       <div className={`bridge-status ${bridgeReady ? "connected" : ""}`}>
         <span>{bridgeReady ? "MJ 发布桥 1.3 已连接" : "未连接最新版 MJ 发布桥"}</span>
         <p>{bridgeReady ? "成品封面、项目图片、标题、正文与标签会保持统一；可选择人工发布或单篇确认后自动发布。" : "安装一次浏览器扩展，即可把已确认内容自动带入小红书官方图文发布页。"}</p>
@@ -1088,6 +1123,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
       <div className="editorial-title"><span>EDITABLE COPY</span><label><small>已选择的笔记标题</small><textarea value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}/></label><div className="fact-row">{facts.map((fact) => <span key={fact}>{fact}</span>)}</div></div>
       <div className="copy-column">
         <div className="title-options"><small>3 个标题方案 · 点击选择</small>{draft.titleOptions.map((title, index) => <button className={draft.title === title ? "active" : ""} key={`${title}-${index}`} onClick={() => setDraft((current) => ({ ...current, title }))}><span>0{index + 1}</span>{title}<em>{draft.title === title ? "已选择" : "选择"}</em></button>)}</div>
+        <label><small>封面英文栏目</small><input value={draft.coverEyebrow} maxLength={44} onChange={(event) => setDraft((current) => ({ ...current, coverEyebrow: event.target.value.toUpperCase() }))}/></label>
         <label><small>封面主标题</small><input value={draft.coverTitle} onChange={(event) => setDraft((current) => ({ ...current, coverTitle: event.target.value }))}/></label>
         <label><small>封面副标题</small><input value={draft.coverSubtitle} onChange={(event) => setDraft((current) => ({ ...current, coverSubtitle: event.target.value }))}/></label>
         <div className="cover-designer">

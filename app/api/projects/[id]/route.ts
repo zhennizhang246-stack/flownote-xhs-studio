@@ -7,6 +7,7 @@ import { apiError, requireAccountEmail } from "../../../../lib/account";
 type Draft = {
   title: string;
   titleOptions?: string[];
+  coverEyebrow?: string;
   coverTitle: string;
   coverSubtitle: string;
   coverStyle?: {
@@ -46,6 +47,7 @@ function cleanDraft(value: unknown): Draft {
   const draft = {
     title: cleanText(input.title, 80),
     titleOptions: cleanList(input.titleOptions, 3, 80),
+    coverEyebrow: cleanText(input.coverEyebrow, 44).toUpperCase() || "ORIGINAL DESIGN · INTERIOR",
     coverTitle: cleanText(input.coverTitle, 30),
     coverSubtitle: cleanText(input.coverSubtitle, 60),
     coverStyle: {

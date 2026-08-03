@@ -115,6 +115,19 @@ test("generates and persists three selectable title options", async () => {
   assert.match(project, /titleOptions/);
 });
 
+test("generates a complete photo-driven draft with an English cover eyebrow and restrained emoji", async () => {
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  const generate = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
+  const project = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
+  assert.match(studio, /ORIGINAL DESIGN · INTERIOR/);
+  assert.match(studio, /封面英文栏目/);
+  assert.match(studio, /renderCoverDataUrl\(coverImage, draft\.coverEyebrow/);
+  assert.match(generate, /coverEyebrow/);
+  assert.match(generate, /标题或正文可自然使用2至4个/);
+  assert.match(generate, /researchReferences\.title/);
+  assert.match(project, /coverEyebrow/);
+});
+
 test("binds durable project storage", async () => {
   const hosting = JSON.parse(await readFile(new URL("../.openai/hosting.json", import.meta.url), "utf8"));
   const schema = await readFile(new URL("../db/schema.ts", import.meta.url), "utf8");
