@@ -33,7 +33,8 @@ test("ships the studio secretary product surface", async () => {
   assert.match(page, /封面样式编辑/);
   assert.match(page, /建筑网格/);
   assert.match(page, /标题颜色/);
-  assert.match(page, /原笔记链接、标题与可见正文已收藏/);
+  assert.match(page, /原笔记完整网址、标题与可见正文已收藏/);
+  assert.match(page, /href=\{reference\.sourceUrl\}/);
   assert.match(page, /直接打开原笔记网页/);
   assert.match(page, /同步右键收藏/);
   assert.match(page, /visibleResearchReferences/);
@@ -291,7 +292,8 @@ test("ships configurable scheduling and daily research APIs", async () => {
   assert.match(researchService, /isXiaohongshuNoteUrl/);
   assert.match(researchService, /collectBrowserResearch/);
   assert.match(researchService, /abstractReusablePattern/);
-  assert.match(researchService, /xsec_token/);
+  assert.match(researchService, /return url\.href\.slice/);
+  assert.match(researchService, /parseVisibleMetric\(b\.likesText/);
   assert.match(researchService, /noteIdentity/);
   assert.match(researchService, /db\.delete\(researchReferences\)/);
   assert.match(generate, /近期室内设计引流笔记/);
