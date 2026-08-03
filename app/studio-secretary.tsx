@@ -536,49 +536,61 @@ async function renderCoverDataUrl(source: string, eyebrow: string, title: string
   return canvas.toDataURL("image/jpeg", 0.92);
 }
 
-function localFallback(meta: ProjectMeta): Draft {
+function localFallback(meta: ProjectMeta, existingProjects: ProjectRecord[] = []): Draft {
   const location = meta.location || "项目所在地待确认";
   const area = meta.area || "面积待确认";
+  const projectName = meta.name || `${location}${meta.projectType || "空间"}`;
   const space = `${meta.projectType} ${meta.category}`;
   const office = /办公|工作室/.test(space);
   const commercial = /商业|店铺|零售|餐饮|咖啡/.test(space);
   const hospitality = /酒店|民宿/.test(space);
   const creative = office ? {
     eyebrow: "ORIGINAL DESIGN · WORKPLACE",
-    titles: [`${meta.name || "办公项目"}｜让灵感正在发生✨`, "紫与绿，重新定义办公氛围💜", "办公空间也可以有情绪价值"],
-    cover: "让灵感正在发生",
-    body: `这不是一间只追求效率的办公室，而是一处让创意自然发生的场所✨\n\n${meta.brief || "我们从品牌色彩、团队交流与真实工作动线出发重新组织空间。"}\n\n从实景图可以看到，色彩不只是装饰，而是在不同功能区之间建立识别；开放交流与相对专注的区域彼此衔接，让走动、停留和协作更自然。\n\n好看的办公空间，更应该真正支持每天在这里工作的人。`,
+    titles: [`${projectName}｜让灵感正在发生✨`, `${projectName}的协作场景`, `${projectName}如何表达品牌气质`],
+    cover: `${projectName} · 灵感发生地`,
+    body: `${projectName}位于${location}，这次先从已知设计信息梳理它与日常工作的关系✨\n\n${meta.brief || "项目围绕品牌表达、团队交流与真实工作动线组织空间。"}\n\n当前为本地预览，画面中的具体材质、色彩、灯光和空间关系需在 AI 图像识别恢复后进一步核验；未确认的内容不会写成项目事实。\n\n对于这个项目，你更希望先了解品牌表达还是协作动线？`,
     tags: ["办公空间设计", "办公室设计", "品牌空间", "室内设计", "实景案例", "设计工作室"],
   } : commercial ? {
     eyebrow: "ORIGINAL DESIGN · RETAIL",
-    titles: [`${meta.name || "商业空间"}｜把品牌体验写进空间✨`, "从进店第一眼，建立品牌记忆", "好逛、好看，也更愿意停留"],
-    cover: "让品牌被看见",
-    body: `商业空间的第一任务，是让顾客愿意走进来，并记住它✨\n\n${meta.brief || "我们从品牌识别、顾客路径、陈列与停留体验组织空间。"}\n\n实景中的色彩、灯光与核心场景共同形成视觉记忆点；动线则把进入、浏览、体验与交流自然串联。\n\n设计最终服务的，是品牌表达与真实经营。`,
+    titles: [`${projectName}｜把体验写进空间✨`, `${projectName}的到店第一眼`, `${projectName}如何组织顾客路径`],
+    cover: `${projectName} · 品牌场景`,
+    body: `${projectName}位于${location}，本次先依据已知信息整理品牌与空间体验的关系✨\n\n${meta.brief || "项目围绕品牌识别、顾客路径、陈列与停留体验组织空间。"}\n\n当前为本地预览，照片中的材料、灯光、陈列和真实动线需在 AI 图像识别恢复后逐项核验，不把推测写成结论。\n\n你更想了解这个项目的品牌记忆点，还是顾客行走路径？`,
     tags: ["商业空间设计", "店铺设计", "品牌空间", "室内设计", "实景案例", "空间设计"],
   } : hospitality ? {
     eyebrow: "ORIGINAL DESIGN · HOSPITALITY",
-    titles: [`${meta.name || "酒店项目"}｜从抵达开始松弛下来✨`, "把在地感藏进每一次停留", "一间让人愿意慢下来的客房"],
-    cover: "从抵达开始松弛",
-    body: `酒店空间的体验，从推门抵达的那一刻就开始了✨\n\n${meta.brief || "我们从客人的抵达、停留、休息与服务动线重新梳理空间。"}\n\n画面中的光线、材质和尺度共同建立安静而有辨识度的氛围，让功能被自然地收进体验之中。\n\n好的旅居空间，会让短暂停留也拥有清晰记忆。`,
+    titles: [`${projectName}｜从抵达开始✨`, `${projectName}的停留节奏`, `${projectName}如何安放旅居体验`],
+    cover: `${projectName} · 抵达之后`,
+    body: `${projectName}位于${location}，本次从已知需求梳理抵达、停留和休息之间的关系✨\n\n${meta.brief || "项目围绕客人的抵达、停留、休息与服务动线重新组织空间。"}\n\n当前为本地预览，照片中的光线、材质、尺度和服务场景将在 AI 图像识别恢复后核验，避免把看不清的内容写进正文。\n\n对于这次旅居设计，你更关注抵达体验还是客房舒适度？`,
     tags: ["酒店设计", "民宿设计", "旅居空间", "室内设计", "实景案例", "空间体验"],
   } : {
     eyebrow: "ORIGINAL DESIGN · INTERIOR",
-    titles: [`${location}${area}，把自然搬进日常的家🌿`, "从光线与材质开始设计一个家", "克制留白，让居住回到松弛日常"],
-    cover: "让家自然生长",
-    body: `这个项目从真实的居住感受出发，而不是先定义一种风格🌿\n\n${meta.brief || "我们从光线、材质、动线与收纳重新梳理空间。"}\n\n画面里的材质、自然光和克制留白共同构成温和的空间秩序。功能被收进日常动线里，人在其中可以更松弛地停留、交流和生活。\n\n如果你也在寻找适合自己的居住方式，欢迎带着户型与需求来聊聊。`,
+    titles: [`${projectName}｜${area}的居住线索🌿`, `${projectName}从已知需求出发`, `${projectName}如何回应日常生活`],
+    cover: `${projectName} · 居住线索`,
+    body: `${projectName}位于${location}，面积为${area}。本次先从已知设计信息理解它的居住需求🌿\n\n${meta.brief || "项目围绕光线、材质、动线与收纳重新梳理空间。"}\n\n当前为本地预览，实景图中的具体空间、材料、光线和功能关系将在 AI 图像识别恢复后逐项核验；没有得到照片或资料支持的内容不会被写成事实。\n\n对于${projectName}，你最想先了解哪一种生活场景？`,
     tags: ["室内设计", "住宅设计", "实景案例", "全案设计", "自然系住宅", "设计工作室"],
   };
+  const used = new Set(existingProjects.flatMap((project) => [
+    project.draft?.title,
+    ...(project.draft?.titleOptions || []),
+    project.draft?.coverTitle,
+    project.draft?.coverSubtitle,
+    project.draft?.body,
+  ]).map((value) => String(value || "").replace(/\s+/g, "").trim()).filter(Boolean));
+  const unique = (value: string, index: number) => used.has(value.replace(/\s+/g, "").trim()) ? `${value} · ${projectName}${index + 1}` : value;
+  const titleOptions = creative.titles.map(unique);
+  const coverTitle = unique(creative.cover, 3);
+  const body = unique(creative.body, 4);
   return {
-    title: creative.titles[0],
-    titleOptions: creative.titles,
+    title: titleOptions[0],
+    titleOptions,
     coverEyebrow: creative.eyebrow,
-    coverTitle: creative.cover,
+    coverTitle,
     coverSubtitle: `${location} · ${area} ${meta.projectType || "空间设计"}`,
     coverStyle: defaultCoverStyle,
-    body: creative.body,
+    body,
     tags: creative.tags,
     highlights: ["从上传图片提取视觉基调", "依据画面选择竖版封面", "正文避免虚构未知项目事实"],
-    riskNotes: ["当前为本地视觉预览；连接 AI 后可完成多图语义分析"],
+    riskNotes: ["当前为本地差异化预览；AI 调用恢复后才能完成逐张实景图语义识别"],
     coverIndex: 0,
     mode: "本地视觉预览",
   };
@@ -782,7 +794,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
       setNotice("已依据项目原图与最新设计信息，完整更新标题、封面样式、正文和标签");
       await refreshProjects();
     } catch (error) {
-      setDraft(localFallback(meta));
+      setDraft(localFallback(meta, projects));
       setPhase("done");
       setNotice(`${error instanceof Error ? error.message : "AI 暂不可用"}，已生成本地预览`);
     }
