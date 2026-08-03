@@ -1341,13 +1341,13 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
   </div>;
 
   const researchView = <section className="dashboard-card">
-    <div className="section-heading"><div><span>INTERIOR DESIGN COPY LIBRARY</span><h2>室内设计小红书引流笔记收藏</h2><p>打开小红书原笔记后点击鼠标右键，选择“收藏到 MJ 引流笔记库”；返回平台同步，即可保存原链接、标题和可见正文。</p></div><button className="small-action" disabled={researching} onClick={() => void runResearch(true)}>{researching ? "正在同步收藏…" : "同步右键收藏"}</button></div>
+    <div className="section-heading"><div><span>INTERIOR DESIGN COPY LIBRARY</span><h2>室内设计小红书引流笔记收藏</h2><p>打开小红书原笔记后点击鼠标右键，选择“收藏到 MJ 引流笔记库”；平台保存完整原网址并按公开可见互动热度优先展示，整张卡片点击即可打开原笔记。</p></div><button className="small-action" disabled={researching} onClick={() => void runResearch(true)}>{researching ? "正在同步收藏…" : "同步右键收藏"}</button></div>
     <div className="research-summary"><div><strong>右键</strong><span>原笔记页面收藏</span></div><div><strong>原文</strong><span>链接、标题与正文</span></div><div><strong>原创</strong><span>学习结构，不复制原文</span></div></div>
     <p className="research-notice">{researchNotice || `最近收集日期：${visibleResearchReferences[0]?.researchDate || "请先右键收藏小红书原笔记"}`}</p>
     <div className="research-grid">
       {visibleResearchReferences.map((reference, index) => <a className="research-card" href={reference.sourceUrl} target="_blank" rel="noreferrer" key={reference.id}>
         <div className={`research-cover tone-${index % 3}`}><span>REFERENCE {String((index % 3) + 1).padStart(2, "0")}</span><strong>{reference.title}</strong><small>{reference.author || "公开来源"}</small></div>
-        <div className="research-analysis"><span className="generation-ready">✓ 原笔记链接、标题与可见正文已收藏</span><h3>标题引流方式</h3><p>{reference.coverAnalysis}</p><h3>原笔记可见正文</h3><p>{reference.copyAnalysis}</p><h3>咨询转化写法</h3><p>{reference.reusablePattern}</p></div>
+        <div className="research-analysis"><span className="generation-ready">✓ 原笔记完整网址、标题与可见正文已收藏</span>{reference.likes > 0 && <span className="generation-ready">公开可见点赞：{reference.likes.toLocaleString("zh-CN")}</span>}<h3>标题引流方式</h3><p>{reference.coverAnalysis}</p><h3>原笔记可见正文</h3><p>{reference.copyAnalysis}</p><h3>咨询转化写法</h3><p>{reference.reusablePattern}</p></div>
         <div className="source-row"><span>来源：{reference.author || "小红书公开作者"}</span><strong>直接打开原笔记网页 ↗</strong></div>
       </a>)}
       {!visibleResearchReferences.length && <div className="empty-state research-empty"><strong>还没有右键收藏笔记</strong><p>先打开一篇小红书室内设计原笔记，在页面空白处点击鼠标右键并选择“收藏到 MJ 引流笔记库”，然后回到这里同步。</p><button onClick={() => void runResearch(true)}>同步右键收藏</button></div>}
