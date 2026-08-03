@@ -142,6 +142,18 @@ test("regenerates existing projects from stored photos after syncing current des
   assert.match(generate, /所有事实都必须来自上传照片和已知设计信息/);
 });
 
+test("creates photo-only drafts when project metadata is omitted", async () => {
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  const projects = await readFile(new URL("../app/api/projects/route.ts", import.meta.url), "utf8");
+  const generate = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
+  assert.match(studio, /项目名称（选填）/);
+  assert.match(studio, /可留空，系统将仅根据实景图创作/);
+  assert.match(projects, /payload\.name\?\.trim\(\) \|\| "实景图识别项目"/);
+  assert.match(generate, /项目名称、所在地、面积、空间类型、目标客户和设计说明全部允许为空/);
+  assert.match(generate, /不得在成品中出现“未命名项目”“实景图识别项目”/);
+  assert.match(generate, /资产库分区只用于归档/);
+});
+
 test("moves cover decorations and controls English eyebrow opacity and line visibility", async () => {
   const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
   const project = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
