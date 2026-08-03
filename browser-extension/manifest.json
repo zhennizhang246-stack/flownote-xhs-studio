@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "MJ 小红书发布桥",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "同步发布内容并研究公开的小红书室内设计笔记。",
-  "permissions": ["storage", "tabs"],
+  "permissions": ["storage", "tabs", "alarms", "unlimitedStorage"],
   "host_permissions": [
     "https://xhs-studio-secretary.mj051225.chatgpt.site/*",
     "https://creator.xiaohongshu.com/*",

@@ -76,7 +76,7 @@ export async function PUT(request: Request) {
     const publishTime = String(payload.publishTime || defaults.publishTime);
     const researchTime = String(payload.researchTime || defaults.researchTime);
     const cadence = Math.min(30, Math.max(1, Number(payload.publishCadenceDays || defaults.publishCadenceDays)));
-    const requestedMode = payload.publishMode === "official_api" ? "official_api" : "manual";
+    const requestedMode = payload.publishMode === "official_api" ? "official_api" : payload.publishMode === "browser_bridge" ? "browser_bridge" : "manual";
     if (!timePattern.test(publishTime) || !timePattern.test(researchTime)) {
       return Response.json({ error: "时间格式无效" }, { status: 400 });
     }

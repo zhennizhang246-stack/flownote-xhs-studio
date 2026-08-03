@@ -11,7 +11,7 @@ test("ships the studio secretary product surface", async () => {
   assert.match(page, /每日 3 篇小红书高浏览参考收藏/);
   assert.match(page, /确认并预填小红书发布页/);
   assert.match(page, /确认本篇并自动发布/);
-  assert.match(page, /MJ 发布桥 1.4 已连接/);
+  assert.match(page, /MJ 发布桥 1.5 已连接/);
   assert.match(page, /秘书会重新打开小红书/);
   assert.match(page, /from=menu&target=image/);
   assert.match(page, /renderCoverDataUrl/);
@@ -254,6 +254,24 @@ test("removes scheduled projects from the calendar without deleting their assets
   assert.match(studio, /body: JSON\.stringify\(\{ scheduledAt: null \}\)/);
   assert.match(schedule, /scheduledAt === null/);
   assert.match(schedule, /scheduledAt: null, status: "approved"/);
+});
+
+test("schedules guarded Xiaohongshu publishing through the local browser bridge", async () => {
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  const settings = await readFile(new URL("../app/api/settings/route.ts", import.meta.url), "utf8");
+  const bridge = await readFile(new URL("../browser-extension/site-bridge.js", import.meta.url), "utf8");
+  const worker = await readFile(new URL("../browser-extension/service-worker.js", import.meta.url), "utf8");
+  const manifest = JSON.parse(await readFile(new URL("../browser-extension/manifest.json", import.meta.url), "utf8"));
+  assert.match(studio, /发布桥定时发布/);
+  assert.match(studio, /MJ_XHS_SCHEDULE_REQUEST/);
+  assert.match(studio, /MJ_XHS_CANCEL_SCHEDULE/);
+  assert.match(settings, /browser_bridge/);
+  assert.match(bridge, /MJ_XHS_SAVE_SCHEDULE/);
+  assert.match(worker, /chrome\.alarms\.create/);
+  assert.match(worker, /chrome\.alarms\.onAlarm/);
+  assert.match(worker, /publishAction: "auto_publish"/);
+  assert.match(worker, /5 \* 60_000/);
+  assert.ok(manifest.permissions.includes("alarms"));
 });
 
 test("ships configurable scheduling and daily research APIs", async () => {

@@ -146,3 +146,52 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     .catch((error) => sendResponse({ ok: false, error: error.message || "图片读取失败" }));
   return true;
 });
+
+const scheduleKey = (projectId) => `mjXhsSchedule:${projectId}`;
+const alarmName = (projectId) => `mj-xhs-publish:${projectId}`;
+
+chrome.runtime.onMessage.addListener((message) => {
+  if (message?.type === "MJ_XHS_SAVE_SCHEDULE") {
+    const projectId = Number(message.draft?.projectId);
+    const when = Date.parse(String(message.scheduledAt || ""));
+    if (!Number.isInteger(projectId) || !Number.isFinite(when) || when <= Date.now()) return false;
+    chrome.storage.local.set({ [scheduleKey(projectId)]: { draft: message.draft, scheduledAt: new Date(when).toISOString() } });
+    chrome.alarms.create(alarmName(projectId), { when });
+    return false;
+  }
+  if (message?.type === "MJ_XHS_CANCEL_SCHEDULE") {
+    const projectId = Number(message.projectId);
+    if (!Number.isInteger(projectId)) return false;
+    chrome.alarms.clear(alarmName(projectId));
+    chrome.storage.local.remove(scheduleKey(projectId));
+    return false;
+  }
+  return false;
+});
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (!alarm.name.startsWith("mj-xhs-publish:")) return;
+  const projectId = Number(alarm.name.split(":").pop());
+  chrome.storage.local.get(scheduleKey(projectId), (stored) => {
+    const scheduled = stored[scheduleKey(projectId)];
+    if (!scheduled?.draft) return;
+    const confirmedAt = new Date();
+    const draft = {
+      ...scheduled.draft,
+      publishAction: "auto_publish",
+      authorization: {
+        confirmedAt: confirmedAt.toISOString(),
+        expiresAt: new Date(confirmedAt.getTime() + 5 * 60_000).toISOString(),
+        nonce: crypto.randomUUID(),
+      },
+      createdAt: confirmedAt.toISOString(),
+    };
+    chrome.storage.local.set({ mjXhsDraft: draft }, () => {
+      chrome.tabs.create({
+        url: "https://creator.xiaohongshu.com/publish/publish?source=official&from=menu&target=image",
+        active: true,
+      });
+      chrome.storage.local.remove(scheduleKey(projectId));
+    });
+  });
+});

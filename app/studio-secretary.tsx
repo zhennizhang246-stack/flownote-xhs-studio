@@ -68,7 +68,7 @@ type AutomationSettings = {
   researchTime: string;
   dailyResearchEnabled: boolean;
   requireApproval: boolean;
-  publishMode: "manual" | "official_api";
+  publishMode: "manual" | "official_api" | "browser_bridge";
   officialApiConnected: boolean;
   timezone: string;
 };
@@ -691,7 +691,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
       if (event.source !== window || event.origin !== window.location.origin) return;
       const message = event.data as { source?: string; type?: string; version?: number };
       if (message?.source !== "mj-xhs-bridge") return;
-      if (message.version === 4 && (message.type === "MJ_XHS_BRIDGE_READY" || message.type === "MJ_XHS_DRAFT_STORED")) {
+      if (message.version === 4 && (["MJ_XHS_BRIDGE_READY", "MJ_XHS_DRAFT_STORED", "MJ_XHS_SCHEDULE_STORED"].includes(String(message.type)))) {
         setBridgeReady(true);
       }
     }
@@ -831,11 +831,45 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
     if (payload.settings) setSettings(payload.settings);
     setSettingsNotice(settings.publishMode === "official_api"
       ? `已启用官方 API 自动发布：每 ${settings.publishCadenceDays} 天 ${settings.publishTime} 执行`
+      : settings.publishMode === "browser_bridge"
+      ? `已启用发布桥定时发布：排期后由当前电脑的 Edge 到点打开小红书发布页`
       : `已保存人工发布模式：每 ${settings.publishCadenceDays} 天 ${settings.publishTime} 提醒发布`);
+  }
+
+  async function sendScheduleToBridge(project: ProjectRecord, scheduledAt: string) {
+    const projectDraft = project.id === currentProjectId
+      ? draft
+      : { ...seededDraft, ...project.draft, coverStyle: normalizedCoverStyle(project.draft?.coverStyle) } as Draft;
+    const coverIndex = Math.max(0, projectDraft.coverIndex ?? 0);
+    const sourceImage = project.images?.[coverIndex]?.url || project.images?.[0]?.url;
+    if (!sourceImage) throw new Error("项目没有可用于定时发布的封面图片");
+    const coverDataUrl = await renderCoverDataUrl(sourceImage, projectDraft.coverEyebrow, projectDraft.coverTitle, projectDraft.coverSubtitle, projectDraft.coverStyle);
+    const images = (project.images || []).filter((_, index) => index !== coverIndex).slice(0, 9).map((image) => ({
+      url: new URL(image.url, window.location.origin).href,
+      fileName: image.fileName,
+    }));
+    const payload: XhsBridgeDraft = {
+      version: 2,
+      projectId: project.id,
+      projectName: project.name,
+      title: projectDraft.title.trim(),
+      body: projectDraft.body.trim(),
+      tags: projectDraft.tags.map((tag) => tag.replace(/^#/, "").trim()).filter(Boolean),
+      coverDataUrl,
+      images,
+      publishAction: "prefill",
+      createdAt: new Date().toISOString(),
+    };
+    window.postMessage({ source: XHS_BRIDGE_SOURCE, type: "MJ_XHS_SCHEDULE_REQUEST", scheduledAt, payload }, window.location.origin);
   }
 
   async function scheduleProject(projectId: number) {
     const scheduledAt = scheduleDrafts[projectId] || nextSlot(settings);
+    const project = projects.find((item) => item.id === projectId);
+    if (settings.publishMode === "browser_bridge" && !bridgeReady) {
+      setNotice("发布桥定时发布需要先安装并连接 MJ 发布桥 1.5");
+      return;
+    }
     const response = await fetch(`/api/projects/${projectId}/schedule`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
@@ -846,7 +880,16 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
       setNotice(error.error || "排期保存失败");
       return;
     }
-    setNotice("项目已加入发布日历，发布前会保留人工确认");
+    if (settings.publishMode === "browser_bridge" && project) {
+      try {
+        await sendScheduleToBridge(project, new Date(scheduledAt).toISOString());
+        setNotice("项目已保存到发布桥定时队列；到点会打开小红书官方发布页并执行一次受限发布");
+      } catch (error) {
+        setNotice(error instanceof Error ? error.message : "发布桥定时任务保存失败");
+      }
+    } else {
+      setNotice("项目已加入发布日历，发布前会保留人工确认");
+    }
     await refreshProjects();
   }
 
@@ -863,6 +906,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
       return;
     }
     setScheduleDrafts((current) => ({ ...current, [project.id]: nextSlot(settings) }));
+    window.postMessage({ source: XHS_BRIDGE_SOURCE, type: "MJ_XHS_CANCEL_SCHEDULE", projectId: project.id }, window.location.origin);
     setNotice(`“${project.name}”已从发布日历移除，项目仍保存在资产库中`);
     await refreshProjects();
   }
@@ -1085,7 +1129,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
     setResearching(true);
     setResearchNotice("秘书正在打开小红书公开搜索页，筛选室内设计高热笔记…");
     try {
-      if (!bridgeReady) throw new Error("请安装或更新 MJ 发布桥 1.4，刷新平台后再开始今日研究");
+      if (!bridgeReady) throw new Error("请安装或更新 MJ 发布桥 1.5，刷新平台后再开始今日研究");
       const browserCandidates = await collectResearchFromBridge(force);
       setResearchNotice(`已从小红书读取 ${browserCandidates.length} 篇公开笔记，正在筛选并建立原创分析…`);
       const response = await fetch("/api/research", {
@@ -1246,7 +1290,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
       <div className="phone-frame"><div className="cover-preview final-artwork-preview"><img src={renderedCoverPreview || coverImage} alt="与小红书最终封面完全一致的发布预览"/></div></div>
       <p className="final-preview-note">1080 × 1440 小红书竖版封面 · 此处直接显示最终合成图片</p>
       <div className={`bridge-status ${bridgeReady ? "connected" : ""}`}>
-        <span>{bridgeReady ? "MJ 发布桥 1.4 已连接" : "未连接最新版 MJ 发布桥"}</span>
+        <span>{bridgeReady ? "MJ 发布桥 1.5 已连接" : "未连接最新版 MJ 发布桥"}</span>
         <p>{bridgeReady ? "成品封面、项目图片、标题、正文与标签会保持统一；可选择人工发布或单篇确认后自动发布。" : "安装一次浏览器扩展，即可把已确认内容自动带入小红书官方图文发布页。"}</p>
         {!bridgeReady && <a href={XHS_BRIDGE_EXTENSION_URL} download>下载或更新 MJ 发布桥扩展</a>}
       </div>
@@ -1322,6 +1366,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
         <div className="publish-mode-picker wide">
           <span>发布模式</span>
           <button className={settings.publishMode === "manual" ? "active" : ""} onClick={() => setSettings((current) => ({ ...current, publishMode: "manual" }))}><strong>人工立即发布</strong><small>确认后复制文案并打开小红书官方发布页</small><em>始终可用</em></button>
+          <button className={settings.publishMode === "browser_bridge" ? "active" : ""} disabled={!bridgeReady} onClick={() => setSettings((current) => ({ ...current, publishMode: "browser_bridge" }))}><strong>发布桥定时发布</strong><small>当前电脑到点自动打开官方发布页、预填并执行一次发布</small><em>{bridgeReady ? "发布桥 1.5 已连接" : "请安装发布桥 1.5"}</em></button>
           <button className={settings.publishMode === "official_api" ? "active" : ""} disabled={!settings.officialApiConnected} onClick={() => setSettings((current) => ({ ...current, publishMode: "official_api" }))}><strong>官方 API 自动发布</strong><small>仅使用小红书官方授权接口，到期后自动提交</small><em>{settings.officialApiConnected ? "已连接" : "等待官方授权"}</em></button>
         </div>
         <label><span>默认发布时间</span><input type="time" value={settings.publishTime} onChange={(event) => setSettings((current) => ({ ...current, publishTime: event.target.value }))}/></label>

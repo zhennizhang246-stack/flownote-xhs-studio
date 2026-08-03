@@ -70,6 +70,19 @@ window.addEventListener("message", (event) => {
     });
     return;
   }
+  if (message.type === "MJ_XHS_SCHEDULE_REQUEST") {
+    const draft = normalizeDraft(message.payload);
+    const scheduledAt = String(message.scheduledAt || "");
+    if (!draft || !Number.isFinite(Date.parse(scheduledAt))) return;
+    chrome.runtime.sendMessage({ type: "MJ_XHS_SAVE_SCHEDULE", draft, scheduledAt });
+    notifyPage("MJ_XHS_SCHEDULE_STORED");
+    return;
+  }
+  if (message.type === "MJ_XHS_CANCEL_SCHEDULE") {
+    chrome.runtime.sendMessage({ type: "MJ_XHS_CANCEL_SCHEDULE", projectId: Number(message.projectId) });
+    notifyPage("MJ_XHS_SCHEDULE_CANCELLED");
+    return;
+  }
   if (message.type !== "MJ_XHS_DRAFT") return;
   const draft = normalizeDraft(message.payload);
   if (!draft) return;
