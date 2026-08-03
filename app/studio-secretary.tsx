@@ -789,7 +789,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
       });
       if (!generated.ok) {
         const error = await generated.json() as { error?: string };
-        throw new Error(error.error || "AI 生成暂不可用");
+        throw new Error(error.error || "办公室流量策划暂不可用");
       }
       const result = await generated.json() as { draft: Draft; meta?: Partial<ProjectMeta> };
       setDraft({ ...result.draft, coverStyle: normalizedCoverStyle(result.draft.coverStyle) });
@@ -800,7 +800,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
     } catch (error) {
       setDraft(localFallback(meta, projects));
       setPhase("done");
-      setNotice(`${error instanceof Error ? error.message : "AI 暂不可用"}，已生成本地预览`);
+      setNotice(`${error instanceof Error ? error.message : "策划引擎暂不可用"}，已生成本地预览`);
     }
   }
 
@@ -1245,14 +1245,14 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
           <label><span>资产库分区</span><select value={meta.category} onChange={(event) => updateMeta("category", event.target.value)}>{projectCategories.slice(1).map((category) => <option key={category}>{category}</option>)}</select></label>
           <label><span>空间类型（决定文案与封面策略）</span><input list="space-type-options" value={meta.projectType} placeholder="选择或输入具体空间" onChange={(event) => updateMeta("projectType", event.target.value)}/><datalist id="space-type-options">{spaceTypes.map((space) => <option key={space} value={space}/>)}</datalist><small className="field-hint">例如客厅侧重采光与家庭互动，商业空间侧重品牌与顾客动线</small></label>
           <label><span>目标客户（选填）</span><input placeholder="可留空" value={meta.audience} onChange={(event) => updateMeta("audience", event.target.value)}/></label>
-          <label className="wide"><span>已知设计信息（选填）</span><textarea placeholder="可留空；AI 会从实景图识别空间、材质、色彩、采光与动线" value={meta.brief} onChange={(event) => updateMeta("brief", event.target.value)}/></label>
+          <label className="wide"><span>已知设计信息（选填）</span><textarea placeholder="可留空；填写办公动线、品牌表达或团队需求可让文案更准确" value={meta.brief} onChange={(event) => updateMeta("brief", event.target.value)}/></label>
         </div>
         <button className="primary-action" disabled={phase === "uploading" || phase === "analyzing"}><span>{phase === "analyzing" ? "正在同步更新全部内容…" : currentProjectId && !files.length ? "按原图与最新设计信息重新生成全部内容" : "保存项目并生成封面与文案"}</span><span>→</span></button>
         <p className="notice">{notice}</p>
       </form>
     </section>
     <section className="preview-panel">
-      <div className="section-heading compact"><div><span>LIVE PREVIEW</span><h2>发布预览</h2></div><span className="mode-label">{draft.mode || "AI 分析"}</span></div>
+      <div className="section-heading compact"><div><span>LIVE PREVIEW</span><h2>发布预览</h2></div><span className="mode-label">{draft.mode || "办公室流量策划"}</span></div>
       <div className="phone-frame"><div className="cover-preview final-artwork-preview"><img src={renderedCoverPreview || coverImage} alt="与小红书最终封面完全一致的发布预览"/></div></div>
       <p className="final-preview-note">1080 × 1440 小红书竖版封面 · 此处直接显示最终合成图片</p>
       <div className={`bridge-status ${bridgeReady ? "connected" : ""}`}>
