@@ -8,11 +8,11 @@ test("ships the studio secretary product surface", async () => {
   assert.match(page, /上传项目实景图/);
   assert.match(page, /项目资产库/);
   assert.match(page, /自动工作节奏/);
-  assert.match(page, /每日 3 篇小红书高浏览参考收藏/);
+  assert.match(page, /室内设计小红书引流笔记收集/);
   assert.match(page, /确认并预填小红书发布页/);
   assert.match(page, /确认本篇并自动发布/);
   assert.match(page, /MJ 发布桥 1.5 已连接/);
-  assert.match(page, /秘书会重新打开小红书/);
+  assert.match(page, /秘书正在打开小红书公开搜索页/);
   assert.match(page, /from=menu&target=image/);
   assert.match(page, /renderCoverDataUrl/);
   assert.match(page, /5 \* 60_000/);
@@ -33,9 +33,9 @@ test("ships the studio secretary product surface", async () => {
   assert.match(page, /封面样式编辑/);
   assert.match(page, /建筑网格/);
   assert.match(page, /标题颜色/);
-  assert.match(page, /正标题、正文结构与封面规律已收藏/);
-  assert.match(page, /直接打开当前可浏览的原笔记网页/);
-  assert.match(page, /重新采集今日 3 篇/);
+  assert.match(page, /笔记标题与正文引流结构已收集/);
+  assert.match(page, /直接打开原笔记网页/);
+  assert.match(page, /收集今日 3 篇/);
   assert.match(page, /visibleResearchReferences/);
   assert.match(page, /保存项目并生成封面与文案/);
   assert.match(page, /浙江 · 温州/);
@@ -291,7 +291,7 @@ test("ships configurable scheduling and daily research APIs", async () => {
   assert.match(researchService, /xsec_token/);
   assert.match(researchService, /noteIdentity/);
   assert.match(researchService, /db\.delete\(researchReferences\)/);
-  assert.match(generate, /近期研究规律/);
+  assert.match(generate, /近期室内设计引流笔记/);
   assert.match(generate, /不得复制标题、原句、段落或封面版式/);
 });
 
