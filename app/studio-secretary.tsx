@@ -533,6 +533,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState(seededImages);
   const [draft, setDraft] = useState<Draft>(seededDraft);
+  const [renderedCoverPreview, setRenderedCoverPreview] = useState("");
   const [phase, setPhase] = useState<"ready" | "uploading" | "analyzing" | "done">("ready");
   const [notice, setNotice] = useState("示例已就绪，可替换图片重新生成");
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
@@ -577,6 +578,19 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
       return false;
     }
   }).slice(0, 3);
+
+  useEffect(() => {
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void renderCoverDataUrl(coverImage, draft.coverEyebrow, draft.coverTitle, draft.coverSubtitle, draft.coverStyle)
+        .then((dataUrl) => { if (!cancelled) setRenderedCoverPreview(dataUrl); })
+        .catch(() => { if (!cancelled) setRenderedCoverPreview(""); });
+    }, 80);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [coverImage, draft.coverEyebrow, draft.coverTitle, draft.coverSubtitle, draft.coverStyle]);
 
   useEffect(() => {
     async function loadWorkspace() {
@@ -1153,7 +1167,8 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
     </section>
     <section className="preview-panel">
       <div className="section-heading compact"><div><span>LIVE PREVIEW</span><h2>发布预览</h2></div><span className="mode-label">{draft.mode || "AI 分析"}</span></div>
-      <div className="phone-frame"><div className={`cover-preview pattern-${normalizedCoverStyle(draft.coverStyle).pattern}`} style={{ "--cover-pattern": normalizedCoverStyle(draft.coverStyle).patternColor, "--cover-pattern-x": `${normalizedCoverStyle(draft.coverStyle).patternOffsetX * 1.8}px`, "--cover-pattern-y": `${normalizedCoverStyle(draft.coverStyle).patternOffsetY * 2.4}px` } as React.CSSProperties}><img src={coverImage} alt="项目封面预览"/><div className="cover-shade" style={{ background: normalizedCoverStyle(draft.coverStyle).overlayColor, opacity: normalizedCoverStyle(draft.coverStyle).overlayOpacity / 100 }}/><div className="cover-eyebrow" style={{ color: normalizedCoverStyle(draft.coverStyle).titleColor, left: `${normalizedCoverStyle(draft.coverStyle).eyebrowX}%`, top: `${normalizedCoverStyle(draft.coverStyle).eyebrowY}%`, right: "6%", opacity: normalizedCoverStyle(draft.coverStyle).eyebrowOpacity / 100, borderBottom: normalizedCoverStyle(draft.coverStyle).showEyebrowLine ? "1px solid currentColor" : "none" }}>{draft.coverEyebrow || "ORIGINAL DESIGN · INTERIOR"}</div><div className={`cover-copy position-${normalizedCoverStyle(draft.coverStyle).position} align-${normalizedCoverStyle(draft.coverStyle).align}`} style={{ color: normalizedCoverStyle(draft.coverStyle).titleColor, fontFamily: coverFontStacks[normalizedCoverStyle(draft.coverStyle).fontFamily] }}><h3 style={{ fontSize: `${Math.round(normalizedCoverStyle(draft.coverStyle).titleSize / 2.2)}px` }}>{draft.coverTitle}</h3><p style={{ color: normalizedCoverStyle(draft.coverStyle).subtitleColor, fontSize: `${Math.round(normalizedCoverStyle(draft.coverStyle).subtitleSize / 2.8)}px`, transform: `translate(${normalizedCoverStyle(draft.coverStyle).subtitleOffsetX * 1.4}px, ${normalizedCoverStyle(draft.coverStyle).subtitleOffsetY * 1.8}px)` }}>{draft.coverSubtitle}</p></div><span className="page-count">01 / {previews.length}</span></div></div>
+      <div className="phone-frame"><div className="cover-preview final-artwork-preview"><img src={renderedCoverPreview || coverImage} alt="与小红书最终封面完全一致的发布预览"/></div></div>
+      <p className="final-preview-note">1080 × 1440 小红书竖版封面 · 此处直接显示最终合成图片</p>
       <div className={`bridge-status ${bridgeReady ? "connected" : ""}`}>
         <span>{bridgeReady ? "MJ 发布桥 1.3 已连接" : "未连接最新版 MJ 发布桥"}</span>
         <p>{bridgeReady ? "成品封面、项目图片、标题、正文与标签会保持统一；可选择人工发布或单篇确认后自动发布。" : "安装一次浏览器扩展，即可把已确认内容自动带入小红书官方图文发布页。"}</p>

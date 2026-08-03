@@ -152,7 +152,7 @@ test("moves cover decorations and controls English eyebrow opacity and line visi
   assert.match(studio, /英文垂直位置/);
   assert.match(studio, /英文透明度/);
   assert.match(studio, /英文栏目横线/);
-  assert.match(studio, /showEyebrowLine \? "1px solid currentColor" : "none"/);
+  assert.match(studio, /if \(style\.showEyebrowLine\)/);
   assert.match(project, /patternOffsetX/);
   assert.match(project, /eyebrowOpacity/);
   assert.match(project, /showEyebrowLine/);
@@ -172,6 +172,15 @@ test("resizes and repositions the cover subtitle in preview and exported artwork
   assert.match(project, /subtitleOffsetX/);
   assert.match(project, /subtitleOffsetY/);
   assert.match(generate, /subtitleSize（18至54）/);
+});
+
+test("uses the final 1080 by 1440 rendered cover as the live Xiaohongshu preview", async () => {
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  assert.match(studio, /const \[renderedCoverPreview/);
+  assert.match(studio, /renderCoverDataUrl\(coverImage, draft\.coverEyebrow/);
+  assert.match(studio, /src=\{renderedCoverPreview \|\| coverImage\}/);
+  assert.match(studio, /1080 × 1440 小红书竖版封面/);
+  assert.match(studio, /与小红书最终封面完全一致的发布预览/);
 });
 
 test("binds durable project storage", async () => {
