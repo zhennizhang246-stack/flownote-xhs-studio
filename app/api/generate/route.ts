@@ -40,12 +40,13 @@ const officeStrategies = [
 ];
 
 function localOfficeDraft(project: OfficeProject, imageCount: number): GeneratedDraft {
-  const strategy = officeStrategies[Math.abs(project.id) % officeStrategies.length];
+  const visualSeed = `${project.projectType}${project.brief}`.split("").reduce((sum, char) => sum + char.charCodeAt(0), project.id);
+  const strategy = officeStrategies[Math.abs(visualSeed) % officeStrategies.length];
   const projectName = project.name && !/实景图识别项目|未命名项目/.test(project.name) ? project.name : strategy.name;
   const spaceType = project.projectType || "办公室设计";
   const designSummary = project.brief?.trim() || "围绕办公动线、专注与协作场景、客户接待和品牌表达组织内容；具体材质与空间细节以项目实景图和人工确认为准。";
   const titles = [
-    `${strategy.hook}✨`,
+    `${spaceType}，${strategy.cover}✨`,
     "办公室设计，先抓住这3点",
     `${spaceType}如何兼顾颜值与效率`,
   ].map((item) => item.slice(0, 20));
