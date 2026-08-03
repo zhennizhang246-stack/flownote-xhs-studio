@@ -221,6 +221,7 @@ export async function collectDailyResearch(env: ResearchRuntimeEnv, ownerEmail: 
 不得大段摘录或改写原文，不得建议复制原句或照搬封面。
   sourceUrl 必须是实际可访问的小红书笔记详情页（xiaohongshu.com/discovery/item 或 /explore），
   不得使用搜索页、聚合页、其他网站或虚构链接。
+必须优先收藏公开热度信号较高的笔记正标题、封面副标题规律、正文叙事结构与可见收藏数据；页面没有公开展示浏览量或收藏量时必须标记为待核实，绝不推算或编造。
 reusablePattern 必须是可用于未来原创项目的抽象方法。`;
 
   const response = await fetch("https://api.openai.com/v1/responses", {

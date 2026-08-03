@@ -122,7 +122,7 @@ type XhsBridgeDraft = {
   };
   createdAt: string;
 };
-type Tab = "creator" | "assets" | "calendar" | "research" | "service";
+type Tab = "creator" | "assets" | "calendar" | "research";
 
 const seededImages = Array.from({ length: 7 }, (_, i) => `/projects/warm-wood-home/0${i + 1}.jpg`);
 const defaultCoverStyle: CoverStyle = {
@@ -190,7 +190,6 @@ const navItems: Array<{ id: Tab; number: string; label: string }> = [
   { id: "assets", number: "02", label: "项目资产库" },
   { id: "calendar", number: "03", label: "发布日历" },
   { id: "research", number: "04", label: "流量参考" },
-  { id: "service", number: "05", label: "笔记评论秘书" },
 ];
 const projectCategories = ["全部项目", "商业项目", "住宅项目", "办公项目", "酒店项目", "展厅陈列项目", "其他项目"];
 const spaceTypes = ["客厅", "餐厅", "厨房", "客餐厨一体", "卧室", "儿童房", "书房", "衣帽间", "卫浴空间", "玄关", "整屋住宅", "办公室", "设计工作室", "酒店大堂", "酒店客房", "民宿", "零售店铺", "餐饮空间", "咖啡空间", "商业展厅", "艺术展陈"];
@@ -605,20 +604,17 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
   useEffect(() => {
     async function loadWorkspace() {
       try {
-        const [projectResponse, settingsResponse, researchResponse, serviceResponse] = await Promise.all([
+        const [projectResponse, settingsResponse, researchResponse] = await Promise.all([
           fetch("/api/projects"),
           fetch("/api/settings"),
           fetch("/api/research"),
-          fetch("/api/customer-service"),
         ]);
         const projectPayload = projectResponse.ok ? await projectResponse.json() as { projects: ProjectRecord[] } : { projects: [] };
         const settingsPayload = settingsResponse.ok ? await settingsResponse.json() as { settings: AutomationSettings } : { settings: defaultSettings };
         const researchPayload = researchResponse.ok ? await researchResponse.json() as { references: ResearchReference[] } : { references: [] };
-        const servicePayload = serviceResponse.ok ? await serviceResponse.json() as { messages: CustomerMessage[] } : { messages: [] };
         setProjects(projectPayload.projects);
         setSettings(settingsPayload.settings);
         setReferences(researchPayload.references);
-        setMessages(servicePayload.messages);
         setScheduleDrafts(Object.fromEntries(projectPayload.projects.map((project) => [
           project.id,
           project.scheduledAt ? dateTimeInput(new Date(project.scheduledAt)) : nextSlot(settingsPayload.settings),
@@ -803,6 +799,23 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
       return;
     }
     setNotice("项目已加入发布日历，发布前会保留人工确认");
+    await refreshProjects();
+  }
+
+  async function removeSchedule(project: ProjectRecord) {
+    if (!project.scheduledAt || !window.confirm(`确认从发布日历移除“${project.name}”吗？项目仍会保留在资产库中。`)) return;
+    const response = await fetch(`/api/projects/${project.id}/schedule`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ scheduledAt: null }),
+    });
+    const payload = await response.json() as { error?: string };
+    if (!response.ok) {
+      setNotice(payload.error || "取消排期失败");
+      return;
+    }
+    setScheduleDrafts((current) => ({ ...current, [project.id]: nextSlot(settings) }));
+    setNotice(`“${project.name}”已从发布日历移除，项目仍保存在资产库中`);
     await refreshProjects();
   }
 
@@ -1024,7 +1037,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
     setResearching(true);
     setResearchNotice("秘书正在打开小红书公开搜索页，筛选室内设计高热笔记…");
     try {
-      if (!bridgeReady) throw new Error("请安装或更新 MJ 发布桥 1.3，刷新平台后再开始今日研究");
+      if (!bridgeReady) throw new Error("请安装或更新 MJ 发布桥 1.4，刷新平台后再开始今日研究");
       const browserCandidates = await collectResearchFromBridge(force);
       setResearchNotice(`已从小红书读取 ${browserCandidates.length} 篇公开笔记，正在筛选并建立原创分析…`);
       const response = await fetch("/api/research", {
@@ -1185,7 +1198,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
       <div className="phone-frame"><div className="cover-preview final-artwork-preview"><img src={renderedCoverPreview || coverImage} alt="与小红书最终封面完全一致的发布预览"/></div></div>
       <p className="final-preview-note">1080 × 1440 小红书竖版封面 · 此处直接显示最终合成图片</p>
       <div className={`bridge-status ${bridgeReady ? "connected" : ""}`}>
-        <span>{bridgeReady ? "MJ 发布桥 1.3 已连接" : "未连接最新版 MJ 发布桥"}</span>
+        <span>{bridgeReady ? "MJ 发布桥 1.4 已连接" : "未连接最新版 MJ 发布桥"}</span>
         <p>{bridgeReady ? "成品封面、项目图片、标题、正文与标签会保持统一；可选择人工发布或单篇确认后自动发布。" : "安装一次浏览器扩展，即可把已确认内容自动带入小红书官方图文发布页。"}</p>
         {!bridgeReady && <a href={XHS_BRIDGE_EXTENSION_URL} download>下载或更新 MJ 发布桥扩展</a>}
       </div>
@@ -1276,7 +1289,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
         {projects.map((project) => <div className="queue-item" key={project.id}>
           <div className="queue-project">{project.images?.[0] ? <img src={project.images[0].url} alt=""/> : <span>{project.name.slice(0, 1)}</span>}<div><strong>{project.name}</strong><small>{project.location} · {project.area}</small></div></div>
           <input type="datetime-local" value={scheduleDrafts[project.id] || nextSlot(settings)} onChange={(event) => setScheduleDrafts((current) => ({ ...current, [project.id]: event.target.value }))}/>
-          <div className="queue-buttons"><button onClick={() => void scheduleProject(project.id)}>{project.scheduledAt ? "更新排期" : project.status === "approved" ? "加入日历" : "先确认"}</button>{settings.officialApiConnected && ["approved", "scheduled"].includes(project.status) && <button className="official-submit" onClick={() => void submitOfficialProject(project.id)}>官方接口提交</button>}</div>
+          <div className="queue-buttons"><button onClick={() => void scheduleProject(project.id)}>{project.scheduledAt ? "更新排期" : project.status === "approved" ? "加入日历" : "先确认"}</button>{project.scheduledAt && <button className="danger-action" onClick={() => void removeSchedule(project)}>删除排期</button>}{settings.officialApiConnected && ["approved", "scheduled"].includes(project.status) && <button className="official-submit" onClick={() => void submitOfficialProject(project.id)}>官方接口提交</button>}</div>
         </div>)}
         {!projects.length && <div className="empty-state"><strong>还没有可排期项目</strong><p>先在创作工作台上传项目实景图，项目会自动进入这里。</p></div>}
       </div>
@@ -1284,14 +1297,14 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
   </div>;
 
   const researchView = <section className="dashboard-card">
-    <div className="section-heading"><div><span>DAILY CONTENT INTELLIGENCE</span><h2>每日 3 篇小红书高热参考解析</h2><p>每张参考卡片都可直接跳转到小红书原笔记网页；秘书提炼后的结构、封面层级与受众洞察会自动用于后续项目生成升级。</p></div><button className="small-action" disabled={researching} onClick={() => void runResearch(true)}>{researching ? "正在小红书研究…" : "刷新今日 3 篇"}</button></div>
+    <div className="section-heading"><div><span>DAILY CONTENT INTELLIGENCE</span><h2>每日 3 篇小红书高浏览参考收藏</h2><p>收集公开热度信号较高的室内设计笔记，保存正标题、封面副标题规律、正文结构与收藏数据；点击卡片可查看原笔记。</p></div><button className="small-action" disabled={researching} onClick={() => void runResearch(true)}>{researching ? "正在小红书研究…" : "刷新今日 3 篇"}</button></div>
     <div className="research-summary"><div><strong>{settings.researchTime}</strong><span>每日自动收集</span></div><div><strong>3 篇</strong><span>室内设计高热参考</span></div><div><strong>原创</strong><span>只提炼规律，不复制原文</span></div></div>
     <p className="research-notice">{researchNotice || `最近可浏览研究日：${visibleResearchReferences[0]?.researchDate || "请刷新今日 3 篇"}`}</p>
     <div className="research-grid">
       {visibleResearchReferences.map((reference, index) => <a className="research-card" href={reference.sourceUrl} target="_blank" rel="noreferrer" key={reference.id}>
         <div className={`research-cover tone-${index % 3}`}><span>REFERENCE {String((index % 3) + 1).padStart(2, "0")}</span><strong>{reference.title}</strong><small>{reference.author || "公开来源"}</small></div>
-        <div className="metric-row"><span>赞 {reference.likes || "待核实"}</span><span>藏 {reference.saves || "待核实"}</span><span>评 {reference.comments || "待核实"}</span><em>{reference.metricConfidence === "verified" ? "已核实" : "估算信号"}</em></div>
-        <div className="research-analysis"><span className="generation-ready">✓ 已纳入后续生成策略</span><h3>文案结构</h3><p>{reference.copyAnalysis}</p><h3>封面规律</h3><p>{reference.coverAnalysis}</p><h3>可复用方法</h3><p>{reference.reusablePattern}</p></div>
+        <div className="metric-row"><span>赞 {reference.likes || "待核实"}</span><span>收藏 {reference.saves || "待核实"}</span><span>评 {reference.comments || "待核实"}</span><em>{reference.metricConfidence === "verified" ? "公开数据已核实" : "公开热度信号"}</em></div>
+        <div className="research-analysis"><span className="generation-ready">✓ 正标题、正文结构与封面规律已收藏</span><h3>正文结构收藏</h3><p>{reference.copyAnalysis}</p><h3>封面副标题规律</h3><p>{reference.coverAnalysis}</p><h3>后续生成方法</h3><p>{reference.reusablePattern}</p></div>
         <div className="source-row"><span>{reference.metricsNote}</span><strong>直接打开当前可浏览的原笔记网页 ↗</strong></div>
       </a>)}
       {!visibleResearchReferences.length && <div className="empty-state research-empty"><strong>需要重新采集可浏览笔记</strong><p>旧链接缺少小红书当前访问参数或已经失效。点击刷新后，秘书会重新打开小红书并替换为当前可直接浏览的原笔记链接。</p><button onClick={() => void runResearch(true)}>重新采集今日 3 篇</button></div>}
@@ -1345,7 +1358,6 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
       {activeTab === "assets" && assetView}
       {activeTab === "calendar" && calendarView}
       {activeTab === "research" && researchView}
-      {activeTab === "service" && serviceView}
     </section>
   </main>;
 }
