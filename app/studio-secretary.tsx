@@ -1287,7 +1287,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
           <label><span>目标客户（选填）</span><input placeholder="可留空" value={meta.audience} onChange={(event) => updateMeta("audience", event.target.value)}/></label>
           <label className="wide"><span>已知设计信息（选填）</span><textarea placeholder="可留空；填写办公动线、品牌表达或团队需求可让文案更准确" value={meta.brief} onChange={(event) => updateMeta("brief", event.target.value)}/></label>
         </div>
-        <button className="primary-action" disabled={phase === "uploading" || phase === "analyzing"}><span>{phase === "analyzing" ? "正在同步更新全部内容…" : currentProjectId && !files.length ? "按原图与最新设计信息重新生成全部内容" : "保存项目并生成封面与文案"}</span><span>→</span></button>
+        <button className="primary-action" disabled={phase === "uploading" || phase === "analyzing"}><span>{phase === "analyzing" ? "正在制作小红书流量爆款版…" : currentProjectId && !files.length ? "按照室内实景图制作小红书流量爆款版" : "上传实景图并制作小红书流量爆款版"}</span><span>→</span></button>
         <p className="notice">{notice}</p>
       </form>
     </section>
