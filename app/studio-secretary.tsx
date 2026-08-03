@@ -176,13 +176,13 @@ const seededDraft: Draft = {
   mode: "案例预览",
 };
 const initialMeta: ProjectMeta = {
-  name: "",
-  location: "",
-  area: "",
-  projectType: "",
-  category: "其他项目",
-  audience: "",
-  brief: "",
+  name: "栖光木境",
+  location: "浙江 · 温州",
+  area: "150m²",
+  projectType: "住宅空间",
+  category: "住宅项目",
+  audience: "重视自然、松弛感与收纳秩序的改善型家庭",
+  brief: "温润木质、自然光与绿意贯穿全屋；客餐厅一体，包含厨房、家政、卧室、衣帽间与卫浴。",
 };
 const defaultSettings: AutomationSettings = {
   publishTime: "12:00",
@@ -412,38 +412,6 @@ const loadImage = (source: string) => new Promise<HTMLImageElement>((resolve, re
   image.onerror = () => reject(new Error("封面底图读取失败"));
   image.src = source;
 });
-
-async function analyzeProjectImages(files: File[]) {
-  let red = 0, green = 0, blue = 0, luminance = 0, saturation = 0, contrast = 0, samples = 0;
-  for (const file of files.slice(0, MAX_PROJECT_IMAGES)) {
-    const bitmap = await createImageBitmap(file);
-    const canvas = document.createElement("canvas");
-    canvas.width = 32; canvas.height = 32;
-    const context = canvas.getContext("2d", { willReadFrequently: true });
-    if (!context) { bitmap.close(); continue; }
-    context.drawImage(bitmap, 0, 0, 32, 32); bitmap.close();
-    const pixels = context.getImageData(0, 0, 32, 32).data;
-    const lights: number[] = [];
-    for (let index = 0; index < pixels.length; index += 16) {
-      const r = pixels[index], g = pixels[index + 1], b = pixels[index + 2];
-      const max = Math.max(r, g, b), min = Math.min(r, g, b);
-      const light = (r * .2126 + g * .7152 + b * .0722) / 255;
-      red += r; green += g; blue += b; luminance += light;
-      saturation += max ? (max - min) / max : 0; lights.push(light); samples += 1;
-    }
-    const average = lights.reduce((sum, value) => sum + value, 0) / Math.max(lights.length, 1);
-    contrast += Math.sqrt(lights.reduce((sum, value) => sum + (value - average) ** 2, 0) / Math.max(lights.length, 1));
-  }
-  const divisor = Math.max(samples, 1), light = luminance / divisor, sat = saturation / divisor;
-  const warm = red / divisor > blue / divisor * 1.08;
-  const contrastValue = contrast / Math.max(files.length, 1);
-  if (light < .38) return { visualStyle: "沉浸质感", brief: "实景图整体明度偏低、明暗层次鲜明，适合从沉浸氛围、空间质感与重点照明的角度组织封面和正文。" };
-  if (sat > .34) return { visualStyle: "活力创意", brief: "实景图色彩识别度较高、视觉节奏活跃，适合突出场景活力、视觉记忆点与多元使用体验。" };
-  if (warm && sat < .3) return { visualStyle: "温润自然", brief: "实景图呈现偏暖且克制的综合色调，适合围绕自然感、舒适体验与温和的空间表达展开。" };
-  if (light > .68) return { visualStyle: "明亮简约", brief: "实景图整体明亮、色彩关系简洁，适合突出采光感、清晰秩序与轻盈的空间体验。" };
-  if (contrastValue > .22) return { visualStyle: "品牌展示", brief: "实景图明暗对比与视觉焦点较强，适合强调空间识别度、第一印象与展示价值。" };
-  return { visualStyle: "秩序平衡", brief: "实景图色彩与明度较为平衡，适合从空间秩序、使用效率与日常体验展开。" };
-}
 
 function drawCoverPattern(context: CanvasRenderingContext2D, style: CoverStyle) {
   if (style.pattern === "none") return;
@@ -788,14 +756,6 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
     try {
       let projectId = currentProjectId;
       if (files.length) {
-        const visualMeta = await analyzeProjectImages(files);
-        const submissionMeta = {
-          ...meta,
-          projectType: meta.projectType.trim() || `${(meta.category || "其他项目").replace("项目", "空间")} · ${visualMeta.visualStyle}`,
-          brief: meta.brief.trim() || visualMeta.brief,
-          category: meta.category || "办公项目",
-        };
-        setMeta(submissionMeta);
         const images = await Promise.all(files.map(async (file) => ({
           name: file.name,
           type: file.type || "image/jpeg",
@@ -804,7 +764,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
         const saved = await fetch("/api/projects", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ ...submissionMeta, images }),
+          body: JSON.stringify({ ...meta, images }),
         });
         if (!saved.ok) throw new Error("项目资产暂时无法保存");
         const project = await saved.json() as { id: number };
@@ -829,7 +789,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
       });
       if (!generated.ok) {
         const error = await generated.json() as { error?: string };
-        throw new Error(error.error || "办公室流量策划暂不可用");
+        throw new Error(error.error || "AI 生成暂不可用");
       }
       const result = await generated.json() as { draft: Draft; meta?: Partial<ProjectMeta> };
       setDraft({ ...result.draft, coverStyle: normalizedCoverStyle(result.draft.coverStyle) });
@@ -840,7 +800,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
     } catch (error) {
       setDraft(localFallback(meta, projects));
       setPhase("done");
-      setNotice(`${error instanceof Error ? error.message : "策划引擎暂不可用"}，已生成本地预览`);
+      setNotice(`${error instanceof Error ? error.message : "AI 暂不可用"}，已生成本地预览`);
     }
   }
 
@@ -1285,14 +1245,14 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
           <label><span>资产库分区</span><select value={meta.category} onChange={(event) => updateMeta("category", event.target.value)}>{projectCategories.slice(1).map((category) => <option key={category}>{category}</option>)}</select></label>
           <label><span>空间类型（决定文案与封面策略）</span><input list="space-type-options" value={meta.projectType} placeholder="选择或输入具体空间" onChange={(event) => updateMeta("projectType", event.target.value)}/><datalist id="space-type-options">{spaceTypes.map((space) => <option key={space} value={space}/>)}</datalist><small className="field-hint">例如客厅侧重采光与家庭互动，商业空间侧重品牌与顾客动线</small></label>
           <label><span>目标客户（选填）</span><input placeholder="可留空" value={meta.audience} onChange={(event) => updateMeta("audience", event.target.value)}/></label>
-          <label className="wide"><span>已知设计信息（选填）</span><textarea placeholder="可留空；填写办公动线、品牌表达或团队需求可让文案更准确" value={meta.brief} onChange={(event) => updateMeta("brief", event.target.value)}/></label>
+          <label className="wide"><span>已知设计信息（选填）</span><textarea placeholder="可留空；AI 会从实景图识别空间、材质、色彩、采光与动线" value={meta.brief} onChange={(event) => updateMeta("brief", event.target.value)}/></label>
         </div>
-        <button className="primary-action" disabled={phase === "uploading" || phase === "analyzing"}><span>{phase === "analyzing" ? "正在制作小红书流量爆款版…" : currentProjectId && !files.length ? "按照室内实景图制作小红书流量爆款版" : "上传实景图并制作小红书流量爆款版"}</span><span>→</span></button>
+        <button className="primary-action" disabled={phase === "uploading" || phase === "analyzing"}><span>{phase === "analyzing" ? "正在同步更新全部内容…" : currentProjectId && !files.length ? "按原图与最新设计信息重新生成全部内容" : "保存项目并生成封面与文案"}</span><span>→</span></button>
         <p className="notice">{notice}</p>
       </form>
     </section>
     <section className="preview-panel">
-      <div className="section-heading compact"><div><span>LIVE PREVIEW</span><h2>发布预览</h2></div><span className="mode-label">{draft.mode || "办公室流量策划"}</span></div>
+      <div className="section-heading compact"><div><span>LIVE PREVIEW</span><h2>发布预览</h2></div><span className="mode-label">{draft.mode || "AI 分析"}</span></div>
       <div className="phone-frame"><div className="cover-preview final-artwork-preview"><img src={renderedCoverPreview || coverImage} alt="与小红书最终封面完全一致的发布预览"/></div></div>
       <p className="final-preview-note">1080 × 1440 小红书竖版封面 · 此处直接显示最终合成图片</p>
       <div className={`bridge-status ${bridgeReady ? "connected" : ""}`}>
