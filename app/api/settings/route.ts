@@ -9,7 +9,7 @@ const defaults = {
   publishTime: "12:00",
   publishCadenceDays: 3,
   researchTime: "09:00",
-  dailyResearchEnabled: true,
+  dailyResearchEnabled: false,
   requireApproval: true,
   publishMode: "manual",
 };
@@ -86,7 +86,7 @@ export async function PUT(request: Request) {
       publishTime,
       publishCadenceDays: cadence,
       researchTime,
-      dailyResearchEnabled: payload.dailyResearchEnabled !== false,
+      dailyResearchEnabled: false,
       requireApproval: payload.requireApproval !== false,
       publishMode: requestedMode,
       updatedAt: new Date().toISOString(),
