@@ -185,7 +185,7 @@ const defaultSettings: AutomationSettings = {
   publishTime: "12:00",
   publishCadenceDays: 3,
   researchTime: "09:00",
-  dailyResearchEnabled: true,
+  dailyResearchEnabled: false,
   requireApproval: true,
   publishMode: "manual",
   officialApiConnected: false,
@@ -667,16 +667,6 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
           project.id,
           project.scheduledAt ? dateTimeInput(new Date(project.scheduledAt)) : nextSlot(settingsPayload.settings),
         ])));
-        const nowTime = new Date().toLocaleTimeString("zh-CN", {
-          timeZone: "Asia/Shanghai",
-          hour: "2-digit",
-          minute: "2-digit",
-          hour12: false,
-        });
-        const missingToday = !researchPayload.references.some((reference) => reference.researchDate === localDate());
-        if (settingsPayload.settings.dailyResearchEnabled && missingToday && nowTime >= settingsPayload.settings.researchTime) {
-          void runResearch(false);
-        }
       } catch {
         setSettingsNotice("云端资料暂未加载，仍可使用当前创作预览");
       }
@@ -1331,7 +1321,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
         <label><span>默认发布时间</span><input type="time" value={settings.publishTime} onChange={(event) => setSettings((current) => ({ ...current, publishTime: event.target.value }))}/></label>
         <label><span>发布间隔</span><div className="number-control"><input type="number" min="1" max="30" value={settings.publishCadenceDays} onChange={(event) => setSettings((current) => ({ ...current, publishCadenceDays: Number(event.target.value) }))}/><em>天</em></div></label>
         <label><span>每日参考收集时间</span><input type="time" value={settings.researchTime} onChange={(event) => setSettings((current) => ({ ...current, researchTime: event.target.value }))}/></label>
-        <label className="toggle-row"><span>每日自动研究</span><input type="checkbox" checked={settings.dailyResearchEnabled} onChange={(event) => setSettings((current) => ({ ...current, dailyResearchEnabled: event.target.checked }))}/></label>
+        <label className="toggle-row"><span>自动发布小红书笔记项目</span><input type="checkbox" disabled={!bridgeReady} checked={settings.publishMode === "browser_bridge"} onChange={(event) => setSettings((current) => ({ ...current, publishMode: event.target.checked ? "browser_bridge" : "manual" }))}/></label>
         <label className="toggle-row wide"><span>发布前保留人工确认</span><input type="checkbox" checked={settings.requireApproval} onChange={(event) => setSettings((current) => ({ ...current, requireApproval: event.target.checked }))}/></label>
       </div>
       <button className="primary-action settings-save" onClick={() => void saveSettings()}><span>保存自动配置</span><span>→</span></button>
