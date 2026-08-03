@@ -3,7 +3,13 @@ import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { projectImages, projects, researchReferences } from "../../../db/schema";
 import { apiError, requireAccountEmail } from "../../../lib/account";
-type RuntimeEnv = { PROJECT_MEDIA?: R2Bucket; OPENAI_API_KEY?: string; OPENAI_MODEL?: string };
+type RuntimeEnv = {
+  PROJECT_MEDIA?: R2Bucket;
+  OPENAI_API_KEY?: string;
+  OPENAI_MODEL?: string;
+  DOUBAO_API_KEY?: string;
+  DOUBAO_MODEL?: string;
+};
 type GeneratedDraft = { title:string; titleOptions?:string[]; coverEyebrow?:string; coverTitle:string; coverSubtitle:string; coverStyle?:Record<string,unknown>; body:string; tags:string[]; highlights:string[]; riskNotes:string[]; coverIndex:number; mode:string };
 
 function spaceDesignGuidanceBase(projectType: string, category: string) {
@@ -70,16 +76,39 @@ async function requestDraft(runtime: RuntimeEnv, content: Array<Record<string, u
   const requestContent = avoid.length
     ? content.map((item, index) => index === 0 ? { ...item, text: `${String(item.text || "")}。上一次生成仍与已有项目重复，以下文字片段绝对禁止再次出现：${JSON.stringify(avoid)}。必须彻底改换标题角度、主副标题措辞、段落开头、叙事顺序和结尾表达。` } : item)
     : content;
-  const apiResponse=await fetch("https://api.openai.com/v1/responses",{method:"POST",headers:{authorization:`Bearer ${runtime.OPENAI_API_KEY}`,"content-type":"application/json"},body:JSON.stringify({model:runtime.OPENAI_MODEL||"gpt-5.6-luna",input:[{role:"user",content:requestContent}],max_output_tokens:2600})});
-  if(!apiResponse.ok){if(apiResponse.status===401) throw new Error("AI 密钥无效或已失效"); if(apiResponse.status===429) throw new Error("AI 调用额度或频率已达上限（429）"); throw new Error(`AI 服务暂不可用（${apiResponse.status}）`);}
-  const responsePayload=await apiResponse.json() as Record<string,unknown>;
-  return parseDraft(outputText(responsePayload));
+  const providers = [
+    runtime.OPENAI_API_KEY?.startsWith("sk-") ? {
+      name: "OpenAI",
+      endpoint: "https://api.openai.com/v1/responses",
+      key: runtime.OPENAI_API_KEY,
+      model: runtime.OPENAI_MODEL || "gpt-5.6-luna",
+    } : null,
+    runtime.DOUBAO_API_KEY ? {
+      name: "豆包",
+      endpoint: "https://ark.cn-beijing.volces.com/api/v3/responses",
+      key: runtime.DOUBAO_API_KEY,
+      model: runtime.DOUBAO_MODEL || "doubao-seed-2-0-lite-260215",
+    } : null,
+  ].filter(Boolean) as Array<{ name: string; endpoint: string; key: string; model: string }>;
+  if (!providers.length) throw new Error("尚未配置可用的 OpenAI 或豆包 API 密钥");
+  const failures: string[] = [];
+  for (const provider of providers) {
+    try {
+      const response=await fetch(provider.endpoint,{method:"POST",headers:{authorization:`Bearer ${provider.key}`,"content-type":"application/json"},body:JSON.stringify({model:provider.model,input:[{role:"user",content:requestContent}],max_output_tokens:2600})});
+      if(!response.ok){const detail=await response.text().catch(()=>""); failures.push(`${provider.name} ${response.status}${detail ? `：${detail.slice(0,180)}` : ""}`); continue;}
+      const payload=await response.json() as Record<string,unknown>;
+      return { draft: parseDraft(outputText(payload)), provider: provider.name };
+    } catch (error) {
+      failures.push(`${provider.name}：${error instanceof Error ? error.message : "调用失败"}`);
+    }
+  }
+  throw new Error(`AI 通道均不可用：${failures.join("；")}`);
 }
 export async function POST(request: Request) {
   try {
     const ownerEmail=await requireAccountEmail();
     const { projectId } = await request.json() as { projectId?: number }; if (!projectId) return Response.json({ error:"缺少项目编号" },{status:400});
-    const runtime=env as unknown as RuntimeEnv; if(!runtime.PROJECT_MEDIA) throw new Error("项目图片存储暂不可用"); if(!runtime.OPENAI_API_KEY?.startsWith("sk-")) return Response.json({error:"AI 密钥尚未连接"},{status:503});
+    const runtime=env as unknown as RuntimeEnv; if(!runtime.PROJECT_MEDIA) throw new Error("项目图片存储暂不可用"); if(!runtime.OPENAI_API_KEY?.startsWith("sk-")&&!runtime.DOUBAO_API_KEY) return Response.json({error:"尚未连接 OpenAI 或豆包 AI 密钥"},{status:503});
     const db=getDb(); const [project]=await db.select().from(projects).where(and(eq(projects.id,projectId),eq(projects.ownerEmail,ownerEmail))).limit(1); if(!project) return Response.json({error:"项目不存在"},{status:404});
     const images=await db.select().from(projectImages).where(eq(projectImages.projectId,projectId)); if(!images.length) return Response.json({error:"项目没有图片"},{status:400});
     const research=await db.select({title:researchReferences.title,copyAnalysis:researchReferences.copyAnalysis,coverAnalysis:researchReferences.coverAnalysis,audienceInsight:researchReferences.audienceInsight,reusablePattern:researchReferences.reusablePattern}).from(researchReferences).where(eq(researchReferences.ownerEmail,ownerEmail)).orderBy(desc(researchReferences.researchDate),desc(researchReferences.likes)).limit(3);
@@ -87,6 +116,6 @@ export async function POST(request: Request) {
     const existing=previousProjects.filter((item)=>item.id!==projectId).map((item)=>({name:item.name,...draftCopy(item.draftJson)}));
     const content:Array<Record<string,unknown>>=[{type:"input_text",text:"你是个人室内设计工作室的高级内容秘书。必须先逐张识别上传的项目实景图，再结合已知设计信息生成完整且只属于当前项目的小红书创作成品，包括3个笔记标题、封面英文栏目、封面主标题、封面副标题、封面样式、正文、话题标签、图片分析重点和发布风险提示。先识别每张图真实可见的空间类型、材质、色彩、灯光、动线、功能、构图、人物使用场景和画面情绪，再选择最适合封面的图片序号；已知设计信息用于解释画面，但与照片冲突时必须标为待确认，不能猜测。必须针对当前空间类型改变叙事重点、标题角度、封面选图和视觉样式，不能把住宅客厅、卧室、办公、酒店、商业和展厅写成同一套模板。当前空间专属策略："+spaceDesignGuidance(project.projectType,project.category)+"必须使用最近3篇室内设计引流笔记库中提炼的标题结构、正文节奏、客户需求洞察和自然咨询引导方法进行升级，但不得复制参考原文。当前账号已有项目的标题、封面主副标题与正文也全部视为禁用语料：新结果不得复用任何完整标题、封面文字、段落、句式开头或连续14个以上相同汉字，必须改变主题切口、叙事顺序、动词和结尾。标题或正文可自然使用2至4个与空间气质匹配的小表情，标题最多1个，禁止连续堆叠，话题标签中不要放表情。只借鉴抽象规律，不虚构地点、面积、客户身份、材料品牌或完工事实。生成3个彼此不同且与历史项目不同的小红书笔记标题，分别侧重空间情绪、照片中的设计亮点、实际使用价值；每个标题不超过20个汉字。正文必须至少写出三项能从当前照片或项目资料验证的专属设计细节，并在结尾用与当前空间相关的自然问题邀请读者交流需求。coverEyebrow 必须是简洁的大写英文，格式为 ORIGINAL DESIGN · 加空间类别，最多44个字符。titleOptions 必须正好包含3个互不重复标题，title 必须等于 titleOptions 第一项。根据当前项目照片重新推荐 coverStyle：fontFamily 只能是 serif/sans/kai；titleColor、subtitleColor、overlayColor、patternColor 使用6位十六进制颜色；overlayOpacity 为0-90；pattern 只能是 none/frame/grid/dots/corners/polka/textile/gradient/blue-white-dots；titleSize 为52-120；align 只能是 left/center；position 只能是 top/middle/bottom。只返回 JSON，字段为 title, titleOptions, coverEyebrow, coverTitle, coverSubtitle, coverStyle, body, tags, highlights, riskNotes, coverIndex。当前项目事实："+JSON.stringify(project)+"。已有项目禁用文字："+JSON.stringify(existing).slice(0,14000)+"。近期室内设计引流笔记（只学习结构，不复制文字）："+JSON.stringify(research)}];
     for(const image of images.sort((a,b)=>a.sortOrder-b.sortOrder).slice(0,10)){ const object=await runtime.PROJECT_MEDIA.get(image.objectKey); if(!object) continue; const bytes=new Uint8Array(await object.arrayBuffer()); let binary=""; for(let i=0;i<bytes.length;i+=0x8000) binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000)); content.push({type:"input_image",image_url:`data:${image.contentType};base64,${btoa(binary)}`,detail:"high"}); }
-    let draft=await requestDraft(runtime,content); let duplicates=duplicateFragments(draft,existing); if(duplicates.length){draft=await requestDraft(runtime,content,duplicates); duplicates=duplicateFragments(draft,existing);} if(duplicates.length) throw new Error("生成内容仍与已有项目重复，请补充更具体的设计信息后重试"); const options=(Array.isArray(draft.titleOptions)?draft.titleOptions:[]).map((item)=>String(item).trim()).filter(Boolean).slice(0,3); while(options.length<3) options.push(options.length===0?draft.title:`${draft.title}｜方案${options.length+1}`); if(new Set(options.map(normalizedCopy)).size!==3) throw new Error("三个标题方案重复，请重新生成"); draft.titleOptions=options; draft.title=options[0]; draft.coverEyebrow=String(draft.coverEyebrow||defaultCoverEyebrow(project.projectType,project.category)).toUpperCase().slice(0,44); draft.mode="AI 多图识别 · 历史项目去重"; draft.coverIndex=Math.min(images.length-1,Math.max(0,Number(draft.coverIndex||0))); await db.update(projects).set({status:"drafted",draftJson:JSON.stringify(draft)}).where(and(eq(projects.id,projectId),eq(projects.ownerEmail,ownerEmail))); return Response.json({draft});
+    let generated=await requestDraft(runtime,content); let draft=generated.draft; let provider=generated.provider; let duplicates=duplicateFragments(draft,existing); if(duplicates.length){generated=await requestDraft(runtime,content,duplicates); draft=generated.draft; provider=generated.provider; duplicates=duplicateFragments(draft,existing);} if(duplicates.length) throw new Error("生成内容仍与已有项目重复，请补充更具体的设计信息后重试"); const options=(Array.isArray(draft.titleOptions)?draft.titleOptions:[]).map((item)=>String(item).trim()).filter(Boolean).slice(0,3); while(options.length<3) options.push(options.length===0?draft.title:`${draft.title}｜方案${options.length+1}`); if(new Set(options.map(normalizedCopy)).size!==3) throw new Error("三个标题方案重复，请重新生成"); draft.titleOptions=options; draft.title=options[0]; draft.coverEyebrow=String(draft.coverEyebrow||defaultCoverEyebrow(project.projectType,project.category)).toUpperCase().slice(0,44); draft.mode=`${provider} 多图识别 · 历史项目去重`; draft.coverIndex=Math.min(images.length-1,Math.max(0,Number(draft.coverIndex||0))); await db.update(projects).set({status:"drafted",draftJson:JSON.stringify(draft)}).where(and(eq(projects.id,projectId),eq(projects.ownerEmail,ownerEmail))); return Response.json({draft});
   } catch(error){return apiError(error,"生成失败");}
 }
