@@ -23,8 +23,10 @@ type Draft = {
     position?: string;
     patternOffsetX?: number;
     patternOffsetY?: number;
+    patternScale?: number;
     eyebrowX?: number;
     eyebrowY?: number;
+    eyebrowSize?: number;
     eyebrowOpacity?: number;
     showEyebrowLine?: boolean;
     subtitleSize?: number;
@@ -72,8 +74,10 @@ function cleanDraft(value: unknown): Draft {
       position: oneOf(style.position, ["top", "middle", "bottom"] as const, "bottom"),
       patternOffsetX: Math.min(25, Math.max(-25, Number(style.patternOffsetX ?? 0))),
       patternOffsetY: Math.min(25, Math.max(-25, Number(style.patternOffsetY ?? 0))),
+      patternScale: Math.min(160, Math.max(50, Number(style.patternScale ?? 100))),
       eyebrowX: Math.min(50, Math.max(2, Number(style.eyebrowX ?? 7.6))),
       eyebrowY: Math.min(35, Math.max(2, Number(style.eyebrowY ?? 5.8))),
+      eyebrowSize: Math.min(48, Math.max(16, Number(style.eyebrowSize ?? 26))),
       eyebrowOpacity: Math.min(100, Math.max(10, Number(style.eyebrowOpacity ?? 100))),
       showEyebrowLine: typeof style.showEyebrowLine === "boolean" ? style.showEyebrowLine : true,
       subtitleSize: Math.min(54, Math.max(18, Number(style.subtitleSize ?? 28))),

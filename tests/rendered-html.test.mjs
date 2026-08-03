@@ -159,6 +159,21 @@ test("moves cover decorations and controls English eyebrow opacity and line visi
   assert.match(generate, /coverStyle 还必须生成 patternOffsetX/);
 });
 
+test("resizes cover decorations, English eyebrow, and subtitle in the final artwork", async () => {
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  const project = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
+  const generate = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
+  assert.match(studio, /图案大小 · \{normalizedCoverStyle\(draft\.coverStyle\)\.patternScale\}%/);
+  assert.match(studio, /英文字号 · \{normalizedCoverStyle\(draft\.coverStyle\)\.eyebrowSize\}/);
+  assert.match(studio, /副标题字号 · \{normalizedCoverStyle\(draft\.coverStyle\)\.subtitleSize\}/);
+  assert.match(studio, /context\.scale\(patternScale, patternScale\)/);
+  assert.match(studio, /700 \$\{style\.eyebrowSize\}px/);
+  assert.match(project, /patternScale: Math\.min\(160/);
+  assert.match(project, /eyebrowSize: Math\.min\(48/);
+  assert.match(generate, /patternScale（50至160）/);
+  assert.match(generate, /eyebrowSize（16至48）/);
+});
+
 test("resizes and repositions the cover subtitle in preview and exported artwork", async () => {
   const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
   const project = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");

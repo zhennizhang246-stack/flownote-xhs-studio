@@ -29,8 +29,10 @@ type CoverStyle = {
   position: "top" | "middle" | "bottom";
   patternOffsetX: number;
   patternOffsetY: number;
+  patternScale: number;
   eyebrowX: number;
   eyebrowY: number;
+  eyebrowSize: number;
   eyebrowOpacity: number;
   showEyebrowLine: boolean;
   subtitleSize: number;
@@ -136,8 +138,10 @@ const defaultCoverStyle: CoverStyle = {
   position: "bottom",
   patternOffsetX: 0,
   patternOffsetY: 0,
+  patternScale: 100,
   eyebrowX: 7.6,
   eyebrowY: 5.8,
+  eyebrowSize: 26,
   eyebrowOpacity: 100,
   showEyebrowLine: true,
   subtitleSize: 28,
@@ -250,8 +254,10 @@ function normalizedCoverStyle(value?: Partial<CoverStyle>): CoverStyle {
     titleSize: Math.min(120, Math.max(52, Number(value?.titleSize ?? defaultCoverStyle.titleSize))),
     patternOffsetX: Math.min(25, Math.max(-25, Number(value?.patternOffsetX ?? defaultCoverStyle.patternOffsetX))),
     patternOffsetY: Math.min(25, Math.max(-25, Number(value?.patternOffsetY ?? defaultCoverStyle.patternOffsetY))),
+    patternScale: Math.min(160, Math.max(50, Number(value?.patternScale ?? defaultCoverStyle.patternScale))),
     eyebrowX: Math.min(50, Math.max(2, Number(value?.eyebrowX ?? defaultCoverStyle.eyebrowX))),
     eyebrowY: Math.min(35, Math.max(2, Number(value?.eyebrowY ?? defaultCoverStyle.eyebrowY))),
+    eyebrowSize: Math.min(48, Math.max(16, Number(value?.eyebrowSize ?? defaultCoverStyle.eyebrowSize))),
     eyebrowOpacity: Math.min(100, Math.max(10, Number(value?.eyebrowOpacity ?? defaultCoverStyle.eyebrowOpacity))),
     showEyebrowLine: typeof value?.showEyebrowLine === "boolean" ? value.showEyebrowLine : defaultCoverStyle.showEyebrowLine,
     subtitleSize: Math.min(54, Math.max(18, Number(value?.subtitleSize ?? defaultCoverStyle.subtitleSize))),
@@ -391,6 +397,10 @@ function drawCoverPattern(context: CanvasRenderingContext2D, style: CoverStyle) 
   if (style.pattern === "none") return;
   context.save();
   context.translate(style.patternOffsetX / 100 * 1080, style.patternOffsetY / 100 * 1440);
+  const patternScale = style.patternScale / 100;
+  context.translate(540, 720);
+  context.scale(patternScale, patternScale);
+  context.translate(-540, -720);
   context.strokeStyle = style.patternColor;
   context.fillStyle = style.patternColor;
   context.globalAlpha = 0.55;
@@ -440,7 +450,7 @@ async function renderCoverDataUrl(source: string, eyebrow: string, title: string
   context.globalAlpha = 1;
   drawCoverPattern(context, style);
   context.textAlign = "left";
-  context.font = '700 26px Georgia, "Times New Roman", serif';
+  context.font = `700 ${style.eyebrowSize}px Georgia, "Times New Roman", serif`;
   context.fillStyle = style.titleColor;
   const eyebrowX = style.eyebrowX / 100 * canvas.width;
   const eyebrowY = style.eyebrowY / 100 * canvas.height;
@@ -448,7 +458,7 @@ async function renderCoverDataUrl(source: string, eyebrow: string, title: string
   context.fillText((eyebrow || "ORIGINAL DESIGN · INTERIOR").toUpperCase().slice(0, 44), eyebrowX, eyebrowY);
   if (style.showEyebrowLine) {
     context.globalAlpha = style.eyebrowOpacity / 100 * 0.72;
-    context.fillRect(eyebrowX, eyebrowY + 26, Math.max(180, canvas.width - eyebrowX - 82), 2);
+    context.fillRect(eyebrowX, eyebrowY + style.eyebrowSize, Math.max(180, canvas.width - eyebrowX - 82), 2);
   }
   context.globalAlpha = 1;
   context.textAlign = style.align;
@@ -1208,8 +1218,10 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
             <label className="range-control"><small>遮罩强度 · {normalizedCoverStyle(draft.coverStyle).overlayOpacity}%</small><input type="range" min="0" max="90" value={normalizedCoverStyle(draft.coverStyle).overlayOpacity} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), overlayOpacity: Number(event.target.value) } }))}/></label>
             <label className="range-control"><small>图案水平位置 · {normalizedCoverStyle(draft.coverStyle).patternOffsetX}</small><input type="range" min="-25" max="25" value={normalizedCoverStyle(draft.coverStyle).patternOffsetX} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), patternOffsetX: Number(event.target.value) } }))}/></label>
             <label className="range-control"><small>图案垂直位置 · {normalizedCoverStyle(draft.coverStyle).patternOffsetY}</small><input type="range" min="-25" max="25" value={normalizedCoverStyle(draft.coverStyle).patternOffsetY} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), patternOffsetY: Number(event.target.value) } }))}/></label>
+            <label className="range-control"><small>图案大小 · {normalizedCoverStyle(draft.coverStyle).patternScale}%</small><input type="range" min="50" max="160" value={normalizedCoverStyle(draft.coverStyle).patternScale} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), patternScale: Number(event.target.value) } }))}/></label>
             <label className="range-control"><small>英文水平位置 · {normalizedCoverStyle(draft.coverStyle).eyebrowX}%</small><input type="range" min="2" max="50" value={normalizedCoverStyle(draft.coverStyle).eyebrowX} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), eyebrowX: Number(event.target.value) } }))}/></label>
             <label className="range-control"><small>英文垂直位置 · {normalizedCoverStyle(draft.coverStyle).eyebrowY}%</small><input type="range" min="2" max="35" value={normalizedCoverStyle(draft.coverStyle).eyebrowY} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), eyebrowY: Number(event.target.value) } }))}/></label>
+            <label className="range-control"><small>英文字号 · {normalizedCoverStyle(draft.coverStyle).eyebrowSize}</small><input type="range" min="16" max="48" value={normalizedCoverStyle(draft.coverStyle).eyebrowSize} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), eyebrowSize: Number(event.target.value) } }))}/></label>
             <label className="range-control"><small>英文透明度 · {normalizedCoverStyle(draft.coverStyle).eyebrowOpacity}%</small><input type="range" min="10" max="100" value={normalizedCoverStyle(draft.coverStyle).eyebrowOpacity} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), eyebrowOpacity: Number(event.target.value) } }))}/></label>
             <label className="line-toggle"><small>英文栏目横线</small><span><input type="checkbox" checked={normalizedCoverStyle(draft.coverStyle).showEyebrowLine} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), showEyebrowLine: event.target.checked } }))}/> 显示横线</span></label>
             <label className="range-control"><small>副标题字号 · {normalizedCoverStyle(draft.coverStyle).subtitleSize}</small><input type="range" min="18" max="54" value={normalizedCoverStyle(draft.coverStyle).subtitleSize} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), subtitleSize: Number(event.target.value) } }))}/></label>
