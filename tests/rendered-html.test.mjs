@@ -262,6 +262,8 @@ test("schedules guarded Xiaohongshu publishing through the local browser bridge"
   const worker = await readFile(new URL("../browser-extension/service-worker.js", import.meta.url), "utf8");
   const manifest = JSON.parse(await readFile(new URL("../browser-extension/manifest.json", import.meta.url), "utf8"));
   assert.match(studio, /发布桥定时发布/);
+  assert.match(studio, /自动发布小红书笔记项目/);
+  assert.doesNotMatch(studio, /每日自动研究/);
   assert.match(studio, /MJ_XHS_SCHEDULE_REQUEST/);
   assert.match(studio, /MJ_XHS_CANCEL_SCHEDULE/);
   assert.match(settings, /browser_bridge/);
