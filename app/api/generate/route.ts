@@ -77,17 +77,17 @@ async function requestDraft(runtime: RuntimeEnv, content: Array<Record<string, u
     ? content.map((item, index) => index === 0 ? { ...item, text: `${String(item.text || "")}。上一次生成仍与已有项目重复，以下文字片段绝对禁止再次出现：${JSON.stringify(avoid)}。必须彻底改换标题角度、主副标题措辞、段落开头、叙事顺序和结尾表达。` } : item)
     : content;
   const providers = [
-    runtime.OPENAI_API_KEY?.startsWith("sk-") ? {
-      name: "OpenAI",
-      endpoint: "https://api.openai.com/v1/responses",
-      key: runtime.OPENAI_API_KEY,
-      model: runtime.OPENAI_MODEL || "gpt-5.6-luna",
-    } : null,
     runtime.DOUBAO_API_KEY ? {
       name: "豆包",
       endpoint: "https://ark.cn-beijing.volces.com/api/v3/responses",
       key: runtime.DOUBAO_API_KEY,
       model: runtime.DOUBAO_MODEL || "doubao-seed-2-0-lite-260215",
+    } : null,
+    runtime.OPENAI_API_KEY?.startsWith("sk-") ? {
+      name: "OpenAI",
+      endpoint: "https://api.openai.com/v1/responses",
+      key: runtime.OPENAI_API_KEY,
+      model: runtime.OPENAI_MODEL || "gpt-5.6-luna",
     } : null,
   ].filter(Boolean) as Array<{ name: string; endpoint: string; key: string; model: string }>;
   if (!providers.length) throw new Error("尚未配置可用的 OpenAI 或豆包 API 密钥");
