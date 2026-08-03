@@ -142,6 +142,23 @@ test("regenerates existing projects from stored photos after syncing current des
   assert.match(generate, /所有事实都必须来自上传照片和已知设计信息/);
 });
 
+test("moves cover decorations and controls English eyebrow opacity and line visibility", async () => {
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  const project = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
+  const generate = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
+  assert.match(studio, /图案水平位置/);
+  assert.match(studio, /图案垂直位置/);
+  assert.match(studio, /英文水平位置/);
+  assert.match(studio, /英文垂直位置/);
+  assert.match(studio, /英文透明度/);
+  assert.match(studio, /英文栏目横线/);
+  assert.match(studio, /showEyebrowLine \? "1px solid currentColor" : "none"/);
+  assert.match(project, /patternOffsetX/);
+  assert.match(project, /eyebrowOpacity/);
+  assert.match(project, /showEyebrowLine/);
+  assert.match(generate, /coverStyle 还必须生成 patternOffsetX/);
+});
+
 test("binds durable project storage", async () => {
   const hosting = JSON.parse(await readFile(new URL("../.openai/hosting.json", import.meta.url), "utf8"));
   const schema = await readFile(new URL("../db/schema.ts", import.meta.url), "utf8");

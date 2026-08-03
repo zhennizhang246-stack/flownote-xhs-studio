@@ -27,6 +27,12 @@ type CoverStyle = {
   titleSize: number;
   align: "left" | "center";
   position: "top" | "middle" | "bottom";
+  patternOffsetX: number;
+  patternOffsetY: number;
+  eyebrowX: number;
+  eyebrowY: number;
+  eyebrowOpacity: number;
+  showEyebrowLine: boolean;
 };
 type ProjectMeta = {
   name: string;
@@ -125,6 +131,12 @@ const defaultCoverStyle: CoverStyle = {
   titleSize: 88,
   align: "left",
   position: "bottom",
+  patternOffsetX: 0,
+  patternOffsetY: 0,
+  eyebrowX: 7.6,
+  eyebrowY: 5.8,
+  eyebrowOpacity: 100,
+  showEyebrowLine: true,
 };
 const seededDraft: Draft = {
   title: "温州150m²，把自然搬进日常的家",
@@ -230,6 +242,12 @@ function normalizedCoverStyle(value?: Partial<CoverStyle>): CoverStyle {
     patternColor: color(value?.patternColor, defaultCoverStyle.patternColor),
     overlayOpacity: Math.min(90, Math.max(0, Number(value?.overlayOpacity ?? defaultCoverStyle.overlayOpacity))),
     titleSize: Math.min(120, Math.max(52, Number(value?.titleSize ?? defaultCoverStyle.titleSize))),
+    patternOffsetX: Math.min(25, Math.max(-25, Number(value?.patternOffsetX ?? defaultCoverStyle.patternOffsetX))),
+    patternOffsetY: Math.min(25, Math.max(-25, Number(value?.patternOffsetY ?? defaultCoverStyle.patternOffsetY))),
+    eyebrowX: Math.min(50, Math.max(2, Number(value?.eyebrowX ?? defaultCoverStyle.eyebrowX))),
+    eyebrowY: Math.min(35, Math.max(2, Number(value?.eyebrowY ?? defaultCoverStyle.eyebrowY))),
+    eyebrowOpacity: Math.min(100, Math.max(10, Number(value?.eyebrowOpacity ?? defaultCoverStyle.eyebrowOpacity))),
+    showEyebrowLine: typeof value?.showEyebrowLine === "boolean" ? value.showEyebrowLine : defaultCoverStyle.showEyebrowLine,
   };
 }
 
@@ -363,6 +381,7 @@ const loadImage = (source: string) => new Promise<HTMLImageElement>((resolve, re
 function drawCoverPattern(context: CanvasRenderingContext2D, style: CoverStyle) {
   if (style.pattern === "none") return;
   context.save();
+  context.translate(style.patternOffsetX / 100 * 1080, style.patternOffsetY / 100 * 1440);
   context.strokeStyle = style.patternColor;
   context.fillStyle = style.patternColor;
   context.globalAlpha = 0.55;
@@ -414,9 +433,14 @@ async function renderCoverDataUrl(source: string, eyebrow: string, title: string
   context.textAlign = "left";
   context.font = '700 26px Georgia, "Times New Roman", serif';
   context.fillStyle = style.titleColor;
-  context.fillText((eyebrow || "ORIGINAL DESIGN · INTERIOR").toUpperCase().slice(0, 44), 82, 108);
-  context.globalAlpha = 0.72;
-  context.fillRect(82, 134, 916, 2);
+  const eyebrowX = style.eyebrowX / 100 * canvas.width;
+  const eyebrowY = style.eyebrowY / 100 * canvas.height;
+  context.globalAlpha = style.eyebrowOpacity / 100;
+  context.fillText((eyebrow || "ORIGINAL DESIGN · INTERIOR").toUpperCase().slice(0, 44), eyebrowX, eyebrowY);
+  if (style.showEyebrowLine) {
+    context.globalAlpha = style.eyebrowOpacity / 100 * 0.72;
+    context.fillRect(eyebrowX, eyebrowY + 26, Math.max(180, canvas.width - eyebrowX - 82), 2);
+  }
   context.globalAlpha = 1;
   context.textAlign = style.align;
   const anchorX = style.align === "center" ? canvas.width / 2 : 82;
@@ -1118,7 +1142,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
     </section>
     <section className="preview-panel">
       <div className="section-heading compact"><div><span>LIVE PREVIEW</span><h2>发布预览</h2></div><span className="mode-label">{draft.mode || "AI 分析"}</span></div>
-      <div className="phone-frame"><div className={`cover-preview pattern-${normalizedCoverStyle(draft.coverStyle).pattern}`} style={{ "--cover-pattern": normalizedCoverStyle(draft.coverStyle).patternColor } as React.CSSProperties}><img src={coverImage} alt="项目封面预览"/><div className="cover-shade" style={{ background: normalizedCoverStyle(draft.coverStyle).overlayColor, opacity: normalizedCoverStyle(draft.coverStyle).overlayOpacity / 100 }}/><div className="cover-eyebrow" style={{ color: normalizedCoverStyle(draft.coverStyle).titleColor }}>{draft.coverEyebrow || "ORIGINAL DESIGN · INTERIOR"}</div><div className={`cover-copy position-${normalizedCoverStyle(draft.coverStyle).position} align-${normalizedCoverStyle(draft.coverStyle).align}`} style={{ color: normalizedCoverStyle(draft.coverStyle).titleColor, fontFamily: coverFontStacks[normalizedCoverStyle(draft.coverStyle).fontFamily] }}><h3 style={{ fontSize: `${Math.round(normalizedCoverStyle(draft.coverStyle).titleSize / 2.2)}px` }}>{draft.coverTitle}</h3><p style={{ color: normalizedCoverStyle(draft.coverStyle).subtitleColor }}>{draft.coverSubtitle}</p></div><span className="page-count">01 / {previews.length}</span></div></div>
+      <div className="phone-frame"><div className={`cover-preview pattern-${normalizedCoverStyle(draft.coverStyle).pattern}`} style={{ "--cover-pattern": normalizedCoverStyle(draft.coverStyle).patternColor, "--cover-pattern-x": `${normalizedCoverStyle(draft.coverStyle).patternOffsetX * 1.8}px`, "--cover-pattern-y": `${normalizedCoverStyle(draft.coverStyle).patternOffsetY * 2.4}px` } as React.CSSProperties}><img src={coverImage} alt="项目封面预览"/><div className="cover-shade" style={{ background: normalizedCoverStyle(draft.coverStyle).overlayColor, opacity: normalizedCoverStyle(draft.coverStyle).overlayOpacity / 100 }}/><div className="cover-eyebrow" style={{ color: normalizedCoverStyle(draft.coverStyle).titleColor, left: `${normalizedCoverStyle(draft.coverStyle).eyebrowX}%`, top: `${normalizedCoverStyle(draft.coverStyle).eyebrowY}%`, right: "6%", opacity: normalizedCoverStyle(draft.coverStyle).eyebrowOpacity / 100, borderBottom: normalizedCoverStyle(draft.coverStyle).showEyebrowLine ? "1px solid currentColor" : "none" }}>{draft.coverEyebrow || "ORIGINAL DESIGN · INTERIOR"}</div><div className={`cover-copy position-${normalizedCoverStyle(draft.coverStyle).position} align-${normalizedCoverStyle(draft.coverStyle).align}`} style={{ color: normalizedCoverStyle(draft.coverStyle).titleColor, fontFamily: coverFontStacks[normalizedCoverStyle(draft.coverStyle).fontFamily] }}><h3 style={{ fontSize: `${Math.round(normalizedCoverStyle(draft.coverStyle).titleSize / 2.2)}px` }}>{draft.coverTitle}</h3><p style={{ color: normalizedCoverStyle(draft.coverStyle).subtitleColor }}>{draft.coverSubtitle}</p></div><span className="page-count">01 / {previews.length}</span></div></div>
       <div className={`bridge-status ${bridgeReady ? "connected" : ""}`}>
         <span>{bridgeReady ? "MJ 发布桥 1.3 已连接" : "未连接最新版 MJ 发布桥"}</span>
         <p>{bridgeReady ? "成品封面、项目图片、标题、正文与标签会保持统一；可选择人工发布或单篇确认后自动发布。" : "安装一次浏览器扩展，即可把已确认内容自动带入小红书官方图文发布页。"}</p>
@@ -1151,6 +1175,12 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
             <label className="color-control"><small>遮罩颜色</small><input type="color" value={normalizedCoverStyle(draft.coverStyle).overlayColor} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), overlayColor: event.target.value } }))}/></label>
             <label className="range-control"><small>标题字号 · {normalizedCoverStyle(draft.coverStyle).titleSize}</small><input type="range" min="52" max="120" value={normalizedCoverStyle(draft.coverStyle).titleSize} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), titleSize: Number(event.target.value) } }))}/></label>
             <label className="range-control"><small>遮罩强度 · {normalizedCoverStyle(draft.coverStyle).overlayOpacity}%</small><input type="range" min="0" max="90" value={normalizedCoverStyle(draft.coverStyle).overlayOpacity} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), overlayOpacity: Number(event.target.value) } }))}/></label>
+            <label className="range-control"><small>图案水平位置 · {normalizedCoverStyle(draft.coverStyle).patternOffsetX}</small><input type="range" min="-25" max="25" value={normalizedCoverStyle(draft.coverStyle).patternOffsetX} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), patternOffsetX: Number(event.target.value) } }))}/></label>
+            <label className="range-control"><small>图案垂直位置 · {normalizedCoverStyle(draft.coverStyle).patternOffsetY}</small><input type="range" min="-25" max="25" value={normalizedCoverStyle(draft.coverStyle).patternOffsetY} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), patternOffsetY: Number(event.target.value) } }))}/></label>
+            <label className="range-control"><small>英文水平位置 · {normalizedCoverStyle(draft.coverStyle).eyebrowX}%</small><input type="range" min="2" max="50" value={normalizedCoverStyle(draft.coverStyle).eyebrowX} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), eyebrowX: Number(event.target.value) } }))}/></label>
+            <label className="range-control"><small>英文垂直位置 · {normalizedCoverStyle(draft.coverStyle).eyebrowY}%</small><input type="range" min="2" max="35" value={normalizedCoverStyle(draft.coverStyle).eyebrowY} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), eyebrowY: Number(event.target.value) } }))}/></label>
+            <label className="range-control"><small>英文透明度 · {normalizedCoverStyle(draft.coverStyle).eyebrowOpacity}%</small><input type="range" min="10" max="100" value={normalizedCoverStyle(draft.coverStyle).eyebrowOpacity} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), eyebrowOpacity: Number(event.target.value) } }))}/></label>
+            <label className="line-toggle"><small>英文栏目横线</small><span><input type="checkbox" checked={normalizedCoverStyle(draft.coverStyle).showEyebrowLine} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), showEyebrowLine: event.target.checked } }))}/> 显示横线</span></label>
           </div>
         </div>
         <label><small>正文</small><textarea className="body-editor" value={draft.body} onChange={(event) => setDraft((current) => ({ ...current, body: event.target.value }))}/></label>

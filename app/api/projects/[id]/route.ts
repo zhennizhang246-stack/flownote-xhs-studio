@@ -21,6 +21,12 @@ type Draft = {
     titleSize?: number;
     align?: string;
     position?: string;
+    patternOffsetX?: number;
+    patternOffsetY?: number;
+    eyebrowX?: number;
+    eyebrowY?: number;
+    eyebrowOpacity?: number;
+    showEyebrowLine?: boolean;
   };
   body: string;
   tags: string[];
@@ -61,6 +67,12 @@ function cleanDraft(value: unknown): Draft {
       titleSize: Math.min(120, Math.max(52, Number(style.titleSize ?? 88))),
       align: oneOf(style.align, ["left", "center"] as const, "left"),
       position: oneOf(style.position, ["top", "middle", "bottom"] as const, "bottom"),
+      patternOffsetX: Math.min(25, Math.max(-25, Number(style.patternOffsetX ?? 0))),
+      patternOffsetY: Math.min(25, Math.max(-25, Number(style.patternOffsetY ?? 0))),
+      eyebrowX: Math.min(50, Math.max(2, Number(style.eyebrowX ?? 7.6))),
+      eyebrowY: Math.min(35, Math.max(2, Number(style.eyebrowY ?? 5.8))),
+      eyebrowOpacity: Math.min(100, Math.max(10, Number(style.eyebrowOpacity ?? 100))),
+      showEyebrowLine: typeof style.showEyebrowLine === "boolean" ? style.showEyebrowLine : true,
     },
     body: cleanText(input.body, 3000),
     tags: cleanList(input.tags, 12, 24),
