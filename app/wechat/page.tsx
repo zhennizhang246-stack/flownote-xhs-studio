@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { siteContent } from "../../lib/site-content";
+import { ShareActions } from "./share-actions";
 
 export const metadata: Metadata = {
   title: `微信转发专页 · ${siteContent.shortTitle}`,
@@ -20,7 +21,7 @@ export default function WechatSharePage() {
           <span>栖</span>
           <strong>栖作</strong>
         </Link>
-        <span className="wechat-sync-badge">微信转发专页 · 与主站同步</span>
+        <span className="wechat-sync-badge">微信 / 朋友圈转发页 · 与主站同步</span>
       </header>
 
       <section className="wechat-hero">
@@ -28,10 +29,8 @@ export default function WechatSharePage() {
           <p className="wechat-kicker">XIAOHONGSHU CREATIVE SERVICE</p>
           <h1>让每一个室内设计项目，<br />都变成值得被看见的内容。</h1>
           <p className="wechat-lead">{siteContent.shareDescription}</p>
-          <div className="wechat-actions">
-            <Link className="wechat-primary" href="/">登录进入创作平台</Link>
-            <a className="wechat-secondary" href="#features">查看平台能力</a>
-          </div>
+          <ShareActions />
+          <div className="wechat-actions"><Link className="wechat-secondary" href="/">进入创作平台</Link><a className="wechat-secondary" href="#features">查看平台能力</a></div>
           <p className="wechat-account-note">{siteContent.accountNote}</p>
         </div>
 
@@ -68,7 +67,7 @@ export default function WechatSharePage() {
       <section className="wechat-privacy">
         <p>独立工作区</p>
         <h2>分享平台，不共享账号。</h2>
-        <span>{siteContent.accountNote}</span>
+        <span>{siteContent.accountNote} 转发页可直接浏览，不会展示作者工作区中的项目资料。</span>
         <Link href="/">使用自己的账号进入平台 →</Link>
       </section>
 
