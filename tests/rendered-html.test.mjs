@@ -145,7 +145,7 @@ test("moves cover decorations and controls English eyebrow opacity and line visi
   assert.match(project, /patternOffsetX/);
   assert.match(project, /eyebrowOpacity/);
   assert.match(project, /showEyebrowLine/);
-  assert.match(generate, /coverStyle 还必须生成 patternOffsetX/);
+  assert.match(generate, /coverStyle 还必须生成 titleOffsetX/);
 });
 
 test("resizes cover decorations, English eyebrow, and subtitle in the final artwork", async () => {
@@ -161,6 +161,19 @@ test("resizes cover decorations, English eyebrow, and subtitle in the final artw
   assert.match(project, /eyebrowSize: Math\.min\(48/);
   assert.match(generate, /patternScale（50至160）/);
   assert.match(generate, /eyebrowSize（16至48）/);
+});
+
+test("moves and resizes the cover main title and inserts emoji into body copy", async () => {
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  const project = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
+  assert.match(studio, /主标题水平位置/);
+  assert.match(studio, /主标题垂直位置/);
+  assert.match(studio, /主标题排版/);
+  assert.match(studio, /titleDirection === "vertical"/);
+  assert.match(studio, /Emoji 表情大全/);
+  assert.match(studio, /bodyEmojiGroups/);
+  assert.match(project, /titleOffsetX/);
+  assert.match(project, /titleDirection/);
 });
 
 test("resizes and repositions the cover subtitle in preview and exported artwork", async () => {

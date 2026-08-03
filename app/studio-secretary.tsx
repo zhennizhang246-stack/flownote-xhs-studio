@@ -25,6 +25,9 @@ type CoverStyle = {
   pattern: "none" | "frame" | "grid" | "dots" | "corners";
   patternColor: string;
   titleSize: number;
+  titleOffsetX: number;
+  titleOffsetY: number;
+  titleDirection: "horizontal" | "vertical";
   align: "left" | "center";
   position: "top" | "middle" | "bottom";
   patternOffsetX: number;
@@ -134,6 +137,9 @@ const defaultCoverStyle: CoverStyle = {
   pattern: "frame",
   patternColor: "#ffffff",
   titleSize: 88,
+  titleOffsetX: 0,
+  titleOffsetY: 0,
+  titleDirection: "horizontal",
   align: "left",
   position: "bottom",
   patternOffsetX: 0,
@@ -232,6 +238,14 @@ const coverFontStacks: Record<CoverStyle["fontFamily"], string> = {
   sans: 'system-ui, "Microsoft YaHei", sans-serif',
   kai: '"KaiTi", "STKaiti", serif',
 };
+const bodyEmojiGroups = [
+  "💛💚💙💜🧡🖤❤💔💖💝💘💞💓💕💗❣🌸🌺🌷🎀💟",
+  "🌵🌲🎄🌳🌴🌿🍀☘🌱🍃🎋🌾🎍🌼🏵🌻🌹💐🥀🍂🍁",
+  "💯♨✨🌟⭐💫🔆✏🔥🎁🥇🥈🥉🏅🏆💧💦💎💍🌀🔷❄🎐🌊☁🌈",
+  "❕❔❗❓⁉✖❌✔⭕💢➕➖➗✅❎⚠📍📢💬🎬🎈📷📝💡",
+  "🥳🌝👧🏻👦🏻👀👂👃👄💅👨👩👫🙋🙌🙏👏👌👍👎👋✌💪",
+  "🏠🏛🏖🌅🌄🌇🌆🌉🌌🌃☕🍰🍝🍿🥖🥨🍎🥞🍕🎨🖌📖",
+];
 
 function normalizedCoverStyle(value?: Partial<CoverStyle>): CoverStyle {
   const color = (candidate: unknown, fallback: string) => /^#[0-9a-f]{6}$/i.test(String(candidate || "")) ? String(candidate) : fallback;
@@ -239,18 +253,22 @@ function normalizedCoverStyle(value?: Partial<CoverStyle>): CoverStyle {
   const pattern = ["none", "frame", "grid", "dots", "corners"].includes(String(value?.pattern)) ? value?.pattern as CoverStyle["pattern"] : defaultCoverStyle.pattern;
   const align = ["left", "center"].includes(String(value?.align)) ? value?.align as CoverStyle["align"] : defaultCoverStyle.align;
   const position = ["top", "middle", "bottom"].includes(String(value?.position)) ? value?.position as CoverStyle["position"] : defaultCoverStyle.position;
+  const titleDirection = ["horizontal", "vertical"].includes(String(value?.titleDirection)) ? value?.titleDirection as CoverStyle["titleDirection"] : defaultCoverStyle.titleDirection;
   return {
     ...defaultCoverStyle,
     fontFamily,
     pattern,
     align,
     position,
+    titleDirection,
     titleColor: color(value?.titleColor, defaultCoverStyle.titleColor),
     subtitleColor: color(value?.subtitleColor, defaultCoverStyle.subtitleColor),
     overlayColor: color(value?.overlayColor, defaultCoverStyle.overlayColor),
     patternColor: color(value?.patternColor, defaultCoverStyle.patternColor),
     overlayOpacity: Math.min(90, Math.max(0, Number(value?.overlayOpacity ?? defaultCoverStyle.overlayOpacity))),
     titleSize: Math.min(120, Math.max(52, Number(value?.titleSize ?? defaultCoverStyle.titleSize))),
+    titleOffsetX: Math.min(35, Math.max(-35, Number(value?.titleOffsetX ?? defaultCoverStyle.titleOffsetX))),
+    titleOffsetY: Math.min(30, Math.max(-30, Number(value?.titleOffsetY ?? defaultCoverStyle.titleOffsetY))),
     patternOffsetX: Math.min(25, Math.max(-25, Number(value?.patternOffsetX ?? defaultCoverStyle.patternOffsetX))),
     patternOffsetY: Math.min(25, Math.max(-25, Number(value?.patternOffsetY ?? defaultCoverStyle.patternOffsetY))),
     patternScale: Math.min(160, Math.max(50, Number(value?.patternScale ?? defaultCoverStyle.patternScale))),
@@ -461,7 +479,7 @@ async function renderCoverDataUrl(source: string, eyebrow: string, title: string
   }
   context.globalAlpha = 1;
   context.textAlign = style.align;
-  const anchorX = style.align === "center" ? canvas.width / 2 : 82;
+  const anchorX = (style.align === "center" ? canvas.width / 2 : 82) + style.titleOffsetX / 100 * canvas.width;
   context.fillStyle = style.titleColor;
   context.font = `${style.titleSize}px ${coverFontStacks[style.fontFamily]}`;
   const chars = [...title.trim()];
@@ -477,13 +495,14 @@ async function renderCoverDataUrl(source: string, eyebrow: string, title: string
     }
   }
   if (line) lines.push(line);
-  const titleBase = style.position === "top" ? 270 : style.position === "middle" ? 720 : 1110;
+  const titleBase = (style.position === "top" ? 270 : style.position === "middle" ? 720 : 1110) + style.titleOffsetY / 100 * canvas.height;
   const lineHeight = style.titleSize * 1.15;
-  lines.slice(0, 3).forEach((text, index) => context.fillText(text, anchorX, titleBase + index * lineHeight));
+  const renderedLines = style.titleDirection === "vertical" ? chars.slice(0, 8) : lines.slice(0, 3);
+  renderedLines.forEach((text, index) => context.fillText(text, anchorX, titleBase + index * lineHeight));
   context.font = `${style.subtitleSize}px system-ui, "Microsoft YaHei", sans-serif`;
   context.fillStyle = style.subtitleColor;
   const subtitleX = anchorX + style.subtitleOffsetX / 100 * canvas.width;
-  const subtitleY = Math.min(1380, titleBase + Math.min(lines.length, 3) * lineHeight + 42 + style.subtitleOffsetY / 100 * canvas.height);
+  const subtitleY = Math.min(1380, titleBase + renderedLines.length * lineHeight + 42 + style.subtitleOffsetY / 100 * canvas.height);
   context.fillText(subtitle.trim(), subtitleX, subtitleY);
   return canvas.toDataURL("image/jpeg", 0.92);
 }
@@ -1223,11 +1242,14 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
             <label><small>装饰图案</small><select value={normalizedCoverStyle(draft.coverStyle).pattern} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), pattern: event.target.value as CoverStyle["pattern"] } }))}><option value="none">无图案</option><option value="frame">细线边框</option><option value="grid">建筑网格</option><option value="dots">圆点阵列</option><option value="corners">四角标记</option></select></label>
             <label><small>文字位置</small><select value={normalizedCoverStyle(draft.coverStyle).position} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), position: event.target.value as CoverStyle["position"] } }))}><option value="top">顶部</option><option value="middle">居中</option><option value="bottom">底部</option></select></label>
             <label><small>文字对齐</small><select value={normalizedCoverStyle(draft.coverStyle).align} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), align: event.target.value as CoverStyle["align"] } }))}><option value="left">左对齐</option><option value="center">居中</option></select></label>
+            <label><small>主标题排版</small><select value={normalizedCoverStyle(draft.coverStyle).titleDirection} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), titleDirection: event.target.value as CoverStyle["titleDirection"] } }))}><option value="horizontal">横向海报排版</option><option value="vertical">竖向中文排版</option></select></label>
             <label className="color-control"><small>标题颜色</small><input type="color" value={normalizedCoverStyle(draft.coverStyle).titleColor} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), titleColor: event.target.value } }))}/></label>
             <label className="color-control"><small>副标题颜色</small><input type="color" value={normalizedCoverStyle(draft.coverStyle).subtitleColor} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), subtitleColor: event.target.value } }))}/></label>
             <label className="color-control"><small>图案颜色</small><input type="color" value={normalizedCoverStyle(draft.coverStyle).patternColor} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), patternColor: event.target.value } }))}/></label>
             <label className="color-control"><small>遮罩颜色</small><input type="color" value={normalizedCoverStyle(draft.coverStyle).overlayColor} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), overlayColor: event.target.value } }))}/></label>
             <label className="range-control"><small>标题字号 · {normalizedCoverStyle(draft.coverStyle).titleSize}</small><input type="range" min="52" max="120" value={normalizedCoverStyle(draft.coverStyle).titleSize} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), titleSize: Number(event.target.value) } }))}/></label>
+            <label className="range-control"><small>主标题水平位置 · {normalizedCoverStyle(draft.coverStyle).titleOffsetX}</small><input type="range" min="-35" max="35" value={normalizedCoverStyle(draft.coverStyle).titleOffsetX} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), titleOffsetX: Number(event.target.value) } }))}/></label>
+            <label className="range-control"><small>主标题垂直位置 · {normalizedCoverStyle(draft.coverStyle).titleOffsetY}</small><input type="range" min="-30" max="30" value={normalizedCoverStyle(draft.coverStyle).titleOffsetY} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), titleOffsetY: Number(event.target.value) } }))}/></label>
             <label className="range-control"><small>遮罩强度 · {normalizedCoverStyle(draft.coverStyle).overlayOpacity}%</small><input type="range" min="0" max="90" value={normalizedCoverStyle(draft.coverStyle).overlayOpacity} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), overlayOpacity: Number(event.target.value) } }))}/></label>
             <label className="range-control"><small>图案水平位置 · {normalizedCoverStyle(draft.coverStyle).patternOffsetX}</small><input type="range" min="-25" max="25" value={normalizedCoverStyle(draft.coverStyle).patternOffsetX} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), patternOffsetX: Number(event.target.value) } }))}/></label>
             <label className="range-control"><small>图案垂直位置 · {normalizedCoverStyle(draft.coverStyle).patternOffsetY}</small><input type="range" min="-25" max="25" value={normalizedCoverStyle(draft.coverStyle).patternOffsetY} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), patternOffsetY: Number(event.target.value) } }))}/></label>
@@ -1242,7 +1264,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
             <label className="range-control"><small>副标题垂直位置 · {normalizedCoverStyle(draft.coverStyle).subtitleOffsetY}</small><input type="range" min="-20" max="25" value={normalizedCoverStyle(draft.coverStyle).subtitleOffsetY} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), subtitleOffsetY: Number(event.target.value) } }))}/></label>
           </div>
         </div>
-        <label><small>正文</small><textarea className="body-editor" value={draft.body} onChange={(event) => setDraft((current) => ({ ...current, body: event.target.value }))}/></label>
+        <div className="body-compose"><label><small>正文</small><textarea className="body-editor" value={draft.body} onChange={(event) => setDraft((current) => ({ ...current, body: event.target.value }))}/></label><details className="emoji-picker"><summary>Emoji 表情大全</summary><p>点击即可插入正文末尾</p><div>{bodyEmojiGroups.flatMap((group) => Array.from(group).filter((emoji) => emoji !== "️")).map((emoji, index) => <button type="button" key={`${emoji}-${index}`} onClick={() => setDraft((current) => ({ ...current, body: `${current.body}${emoji}` }))} aria-label={`插入 ${emoji}`}>{emoji}</button>)}</div></details></div>
         <label><small>话题标签（用逗号或空格分隔）</small><input value={draft.tags.join("，")} onChange={(event) => setDraft((current) => ({ ...current, tags: event.target.value.split(/[，,\s#]+/).filter(Boolean).slice(0, 12) }))}/></label>
         <div className="editor-actions"><button type="button" onClick={() => void saveProject("drafted")}>保存到资产库</button><button type="button" className="approve-action" onClick={() => void saveProject("approved")}>确认并同步保存</button><button type="button" onClick={() => void approveAndSchedule()}>确认并加入三天队列</button></div>
         <p className="sync-state">{lastSyncedAt ? `✓ 已于 ${lastSyncedAt} 同步更新到项目资产库` : "确认后会同步更新封面、标题、正文与标签，并保存到项目资产库"}</p>

@@ -19,6 +19,9 @@ type Draft = {
     pattern?: string;
     patternColor?: string;
     titleSize?: number;
+    titleOffsetX?: number;
+    titleOffsetY?: number;
+    titleDirection?: string;
     align?: string;
     position?: string;
     patternOffsetX?: number;
@@ -70,6 +73,9 @@ function cleanDraft(value: unknown): Draft {
       pattern: oneOf(style.pattern, ["none", "frame", "grid", "dots", "corners"] as const, "frame"),
       patternColor: color(style.patternColor, "#ffffff"),
       titleSize: Math.min(120, Math.max(52, Number(style.titleSize ?? 88))),
+      titleOffsetX: Math.min(35, Math.max(-35, Number(style.titleOffsetX ?? 0))),
+      titleOffsetY: Math.min(30, Math.max(-30, Number(style.titleOffsetY ?? 0))),
+      titleDirection: oneOf(style.titleDirection, ["horizontal", "vertical"] as const, "horizontal"),
       align: oneOf(style.align, ["left", "center"] as const, "left"),
       position: oneOf(style.position, ["top", "middle", "bottom"] as const, "bottom"),
       patternOffsetX: Math.min(25, Math.max(-25, Number(style.patternOffsetX ?? 0))),
