@@ -19,7 +19,7 @@ export async function GET() {
     }
     return Response.json({ references: await listResearch(env as unknown as ResearchRuntimeEnv, ownerEmail) });
   } catch (error) {
-    return apiError(error, "读取流量参考失败");
+    return apiError(error, "读取室内设计引流笔记失败");
   }
 }
 
@@ -36,6 +36,6 @@ export async function POST(request: Request) {
       : await collectDailyResearch(runtime, ownerEmail, payload.force === true);
     return Response.json({ references });
   } catch (error) {
-    return apiError(error, "每日研究失败");
+    return apiError(error, "引流笔记收集失败");
   }
 }
