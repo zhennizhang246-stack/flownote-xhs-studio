@@ -50,10 +50,10 @@ function buildDraft(project: Project, imageCount: number): Draft {
     projectName, detectedSpaceType:spaceType, designSummary, title:titles[0], titleOptions:titles,
     coverEyebrow:strategy.eyebrow, coverTitle:strategy.cover, coverSubtitle:strategy.subtitle,
     coverStyle:{fontFamily:"sans",titleColor:"#ffffff",subtitleColor:"#f1eee7",overlayColor:"#162019",overlayOpacity:52,pattern:"frame",patternColor:"#ffffff",titleSize:82,titleOffsetX:0,titleOffsetY:2,titleDirection:"horizontal",align:"left",position:"bottom",patternOffsetX:0,patternOffsetY:0,patternScale:100,eyebrowX:7.6,eyebrowY:5.8,eyebrowSize:24,eyebrowOpacity:92,showEyebrowLine:true,subtitleSize:26,subtitleOffsetX:0,subtitleOffsetY:0},
-    body:`${strategy.hook}。\n\n💧 打开率：封面只保留一个与${category}客户需求直接相关的利益点，让人第一眼知道这篇内容能解决什么。\n\n💧 内容价值：${strategy.value}\n\n💧 项目表达：${designSummary}\n\n💧 搜一搜布局：围绕“${locationKeyword}”“${areaKeyword}”“${spaceType}”等词自然展开，兼顾即时传播和长期搜索。\n\n${strategy.question}`,
-    tags, highlights:["项目分区决定客户痛点","图片视觉气质决定封面表达","正文提供可收藏的设计价值","长尾关键词自然进入标题正文和标签"],
+    body:`${strategy.hook}。\n\n这组实景最先留下的是空间的整体情绪：${designSummary}\n\n${strategy.value}\n\n比起只追求一眼惊艳，我们更在意空间进入真实使用之后，是否依然顺手、耐看，也能让身处其中的人感到舒服。设计不是把元素堆满，而是让每一个视觉重点和使用场景都有理由。\n\n如果你也在规划${category.replace("项目", "空间")}，可以先从“谁在使用、怎样行走、希望被记住什么”这三个问题开始。\n\n${strategy.question}`,
+    tags, highlights:[`核心关键词：${tags.slice(0,5).join("、")}`,"封面用一个情绪利益点提高打开率","正文采用可直接发布的场景化叙事","长尾关键词自然进入标题正文和标签"],
     riskNotes:["具体材质、面积、功能与客户信息需人工确认后发布","本地视觉分析不推测照片无法确认的事实"], coverIndex:imageCount>0?0:0,
-    mode:`${category}流量策划 · 本地视觉分析 · 无 API`,
+    mode:`${category} · 小红书流量爆款版 · 无 API`,
   };
 }
 
