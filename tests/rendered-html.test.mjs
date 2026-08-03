@@ -94,15 +94,15 @@ test("deletes owned projects and generates space-specific creative strategies", 
   assert.match(project, /db\.delete\(projectImages\)/);
   assert.match(studio, /删除项目/);
   assert.match(studio, /spaceTypes/);
-  assert.match(generate, /officeStrategies/);
-  assert.match(generate, /专注与协作场景/);
+  assert.match(generate, /strategyLibrary/);
+  assert.match(generate, /专注、协作、接待和休息/);
 });
 
 test("generates and persists three selectable title options", async () => {
   const generate = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
   const project = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
-  assert.match(generate, /titleOptions: titles/);
-  assert.match(generate, /办公室设计，先抓住这3点/);
+  assert.match(generate, /titleOptions:titles/);
+  assert.match(generate, /先看这3点/);
   assert.match(project, /titleOptions/);
 });
 
@@ -114,9 +114,9 @@ test("generates an office traffic draft without external AI APIs", async () => {
   assert.match(studio, /封面英文栏目/);
   assert.match(studio, /renderCoverDataUrl\(coverImage, draft\.coverEyebrow/);
   assert.match(generate, /coverEyebrow/);
-  assert.match(generate, /办公室流量策划引擎 · 无 API/);
+  assert.match(generate, /本地视觉分析 · 无 API/);
   assert.match(generate, /打开率/);
-  assert.match(generate, /使用价值/);
+  assert.match(generate, /内容价值/);
   assert.match(generate, /搜一搜布局/);
   assert.doesNotMatch(generate, /api\.openai\.com|ark\.cn-beijing\.volces\.com|DOUBAO_API_KEY|OPENAI_API_KEY/);
   assert.match(studio, /本地差异化预览/);
@@ -128,10 +128,10 @@ test("profiles uploaded office photos locally and varies the traffic strategy", 
   const generate = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
   assert.match(studio, /analyzeProjectImages/);
   assert.match(studio, /createImageBitmap/);
-  assert.match(studio, /明亮简约办公室/);
-  assert.match(studio, /温润自然办公室/);
-  assert.match(studio, /活力创意办公室/);
-  assert.match(studio, /品牌展示型办公室/);
+  assert.match(studio, /明亮简约/);
+  assert.match(studio, /温润自然/);
+  assert.match(studio, /活力创意/);
+  assert.match(studio, /品牌展示/);
   assert.match(studio, /submissionMeta/);
   assert.match(generate, /visualSeed/);
   assert.match(generate, /spaceType.*strategy\.cover/);
@@ -159,6 +159,7 @@ test("creates photo-only drafts when project metadata is omitted", async () => {
   assert.match(projects, /payload\.name\?\.trim\(\) \|\| "实景图识别项目"/);
   assert.match(generate, /实景图识别项目\|未命名项目/);
   assert.match(generate, /共序办公空间/);
+  for (const category of ["商业项目", "住宅项目", "办公项目", "酒店项目", "展厅陈列项目", "其他项目"]) assert.match(generate, new RegExp(category));
   assert.match(generate, /detectedSpaceType/);
   assert.match(generate, /designSummary/);
   assert.match(generate, /generatedMeta/);
@@ -179,7 +180,7 @@ test("moves cover decorations and controls English eyebrow opacity and line visi
   assert.match(project, /patternOffsetX/);
   assert.match(project, /eyebrowOpacity/);
   assert.match(project, /showEyebrowLine/);
-  assert.match(generate, /titleOffsetX: 0/);
+  assert.match(generate, /titleOffsetX:0/);
 });
 
 test("renders polka, textile, gradient, and blue-white dot cover decorations", async () => {
@@ -204,8 +205,8 @@ test("resizes cover decorations, English eyebrow, and subtitle in the final artw
   assert.match(studio, /700 \$\{style\.eyebrowSize\}px/);
   assert.match(project, /patternScale: Math\.min\(160/);
   assert.match(project, /eyebrowSize: Math\.min\(48/);
-  assert.match(generate, /patternScale: 100/);
-  assert.match(generate, /eyebrowSize: 24/);
+  assert.match(generate, /patternScale:100/);
+  assert.match(generate, /eyebrowSize:24/);
 });
 
 test("moves and resizes the cover main title and inserts emoji into body copy", async () => {
@@ -233,7 +234,7 @@ test("resizes and repositions the cover subtitle in preview and exported artwork
   assert.match(project, /subtitleSize/);
   assert.match(project, /subtitleOffsetX/);
   assert.match(project, /subtitleOffsetY/);
-  assert.match(generate, /subtitleSize: 26/);
+  assert.match(generate, /subtitleSize:26/);
 });
 
 test("uses the final 1080 by 1440 rendered cover as the live Xiaohongshu preview", async () => {
