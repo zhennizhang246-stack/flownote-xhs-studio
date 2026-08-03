@@ -8,11 +8,11 @@ test("ships the studio secretary product surface", async () => {
   assert.match(page, /上传项目实景图/);
   assert.match(page, /项目资产库/);
   assert.match(page, /自动工作节奏/);
-  assert.match(page, /室内设计小红书引流笔记收集/);
+  assert.match(page, /室内设计小红书引流笔记收藏/);
   assert.match(page, /确认并预填小红书发布页/);
   assert.match(page, /确认本篇并自动发布/);
-  assert.match(page, /MJ 发布桥 1.5 已连接/);
-  assert.match(page, /秘书正在打开小红书公开搜索页/);
+  assert.match(page, /MJ 发布桥 1.6 已连接/);
+  assert.match(page, /同步浏览器中右键收藏/);
   assert.match(page, /from=menu&target=image/);
   assert.match(page, /renderCoverDataUrl/);
   assert.match(page, /5 \* 60_000/);
@@ -33,9 +33,9 @@ test("ships the studio secretary product surface", async () => {
   assert.match(page, /封面样式编辑/);
   assert.match(page, /建筑网格/);
   assert.match(page, /标题颜色/);
-  assert.match(page, /笔记标题与正文引流结构已收集/);
+  assert.match(page, /原笔记链接、标题与可见正文已收藏/);
   assert.match(page, /直接打开原笔记网页/);
-  assert.match(page, /收集今日 3 篇/);
+  assert.match(page, /同步右键收藏/);
   assert.match(page, /visibleResearchReferences/);
   assert.match(page, /保存项目并生成封面与文案/);
   assert.match(page, /浙江 · 温州/);
@@ -62,6 +62,8 @@ test("ships a local bridge with manual prefill and single-use auto-publish autho
   assert.match(research, /collectCandidates/);
   assert.match(research, /安全验证/);
   assert.match(research, /MJ_XHS_RESEARCH_RESULTS/);
+  assert.ok(manifest.permissions.includes("contextMenus"));
+  assert.match(research, /MJ_XHS_COLLECT_CURRENT_NOTE/);
 });
 
 test("uses Node CI instead of applying Deno lint rules to the Node app", async () => {
@@ -273,6 +275,7 @@ test("schedules guarded Xiaohongshu publishing through the local browser bridge"
   assert.match(worker, /publishAction: "auto_publish"/);
   assert.match(worker, /5 \* 60_000/);
   assert.ok(manifest.permissions.includes("alarms"));
+  assert.match(worker, /收藏到 MJ 引流笔记库/);
 });
 
 test("ships configurable scheduling and daily research APIs", async () => {
