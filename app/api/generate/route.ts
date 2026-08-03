@@ -1,71 +1,121 @@
-import { and, eq } from "drizzle-orm";
+﻿import { env } from "cloudflare:workers";
+import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "../../../db";
-import { projectImages, projects } from "../../../db/schema";
+import { projectImages, projects, researchReferences } from "../../../db/schema";
 import { apiError, requireAccountEmail } from "../../../lib/account";
-
-type Project = { id:number; name:string; location:string; area:string; projectType:string; category:string; audience:string; brief:string };
-type Strategy = { name:string; hook:string; cover:string; subtitle:string; value:string; question:string; eyebrow:string; keywords:string[] };
-type Draft = { projectName:string; detectedSpaceType:string; designSummary:string; title:string; titleOptions:string[]; coverEyebrow:string; coverTitle:string; coverSubtitle:string; coverStyle:Record<string,unknown>; body:string; tags:string[]; highlights:string[]; riskNotes:string[]; coverIndex:number; mode:string };
-
-const strategyLibrary: Record<string, Strategy[]> = {
-  "商业项目": [
-    { name:"场景引力",hook:"商业空间真正的价值，是让人愿意走进来并停留下来",cover:"让顾客愿意停留",subtitle:"品牌记忆 × 顾客路径 × 到店体验",value:"从门头识别、顾客动线、核心消费场景与停留体验切入，说明设计如何帮助品牌被看见、被记住并产生转化。",question:"你的商业空间最想先提升进店率、停留时间还是品牌记忆？",eyebrow:"ORIGINAL DESIGN · RETAIL",keywords:["商业空间设计","店铺设计","品牌空间","门店设计","顾客动线"] },
-    { name:"品牌发生地",hook:"好看的店很多，能被顾客记住的空间却很少",cover:"空间就是品牌记忆",subtitle:"第一眼吸引 × 场景体验 × 商业转化",value:"围绕第一眼吸引力、拍照传播点、陈列秩序与消费路径，提炼可收藏的商业设计判断方法。",question:"顾客离店之后，你希望他记住空间里的哪一幕？",eyebrow:"ORIGINAL DESIGN · COMMERCIAL",keywords:["商业设计","零售空间设计","品牌门店","空间体验","设计公司"] },
-  ],
-  "住宅项目": [
-    { name:"日常栖居",hook:"住宅设计不是堆风格，而是让每天的生活更顺手",cover:"把生活放在设计之前",subtitle:"采光 × 动线 × 收纳 × 家庭互动",value:"从回家动线、家庭互动、采光、收纳与清洁维护切入，把设计语言转化为真实可感的居住价值。",question:"你最想通过设计解决家里的采光、收纳还是动线问题？",eyebrow:"ORIGINAL DESIGN · RESIDENCE",keywords:["住宅设计","全案设计","家装设计","改善型住宅","室内设计"] },
-    { name:"光影之家",hook:"好的家不急着表达，它会慢慢回应生活",cover:"让家回到生活本身",subtitle:"松弛感 × 空间秩序 × 长久耐看",value:"围绕空间松弛感、家人关系、物品秩序与长期居住体验，提供比风格标签更有价值的内容。",question:"对于理想的家，你更看重松弛感、秩序感还是陪伴感？",eyebrow:"ORIGINAL DESIGN · HOME",keywords:["住宅空间设计","原木风住宅","收纳设计","家庭动线","全屋设计"] },
-  ],
-  "办公项目": [
-    { name:"共序办公空间",hook:"办公室不只要好看，更要让协作自然发生",cover:"让协作自然发生",subtitle:"办公动线 × 品牌表达 × 使用效率",value:"从专注、协作、接待和休息四类真实工作场景出发，说明动线如何减少干扰、空间如何支持团队切换状态。",question:"你的团队更需要安静专注，还是高效协作？",eyebrow:"ORIGINAL DESIGN · WORKPLACE",keywords:["办公室设计","办公空间设计","办公空间改造","办公动线","设计公司"] },
-    { name:"品牌会客厅",hook:"客户走进办公室的第一分钟，已经开始认识品牌",cover:"空间就是品牌名片",subtitle:"第一印象 × 接待体验 × 团队文化",value:"围绕客户第一印象、员工体验、会议效率与企业文化，讲清办公室设计如何同时服务内部团队与外部品牌。",question:"你的办公室现在能让客户记住什么？",eyebrow:"ORIGINAL DESIGN · OFFICE",keywords:["办公室装修设计","企业展厅","办公空间","品牌办公","会议室设计"] },
-  ],
-  "酒店项目": [
-    { name:"抵达之后",hook:"酒店体验，从客人真正抵达之前就已经开始",cover:"设计一场值得记住的抵达",subtitle:"在地感 × 服务动线 × 停留体验",value:"从抵达、办理、停留、休息与服务动线展开，说明空间如何减少陌生感并形成可被记住的旅居体验。",question:"一家酒店最应该让客人记住的是抵达、客房还是公共空间？",eyebrow:"ORIGINAL DESIGN · HOSPITALITY",keywords:["酒店设计","酒店空间设计","精品酒店","民宿设计","旅居空间"] },
-    { name:"旅居片段",hook:"真正打动人的酒店，不只是睡一晚的房间",cover:"把旅程留在空间里",subtitle:"客房舒适 × 公区社交 × 情绪记忆",value:"围绕客房舒适度、公区社交、灯光情绪与运营维护，提供兼顾体验和经营的设计价值。",question:"你选择酒店时，更容易被客房细节还是公共空间吸引？",eyebrow:"ORIGINAL DESIGN · HOTEL",keywords:["酒店客房设计","酒店大堂设计","度假酒店","民宿空间","酒店改造"] },
-  ],
-  "展厅陈列项目": [
-    { name:"观看的路径",hook:"展厅不是把内容摆出来，而是设计观看发生的顺序",cover:"让观看有一条清晰路径",subtitle:"叙事顺序 × 视觉焦点 × 停留节奏",value:"从参观顺序、观看距离、信息层级、灯光焦点与停留节点展开，说明展陈如何帮助内容被理解和记住。",question:"你的展厅最需要解决的是信息太多、动线混乱还是缺少记忆点？",eyebrow:"ORIGINAL DESIGN · EXHIBITION",keywords:["展厅设计","展陈设计","企业展厅","陈列设计","展示空间"] },
-    { name:"叙事展场",hook:"好的展陈，让复杂内容在行走中自然被理解",cover:"把内容变成空间叙事",subtitle:"信息层级 × 展陈节奏 × 品牌表达",value:"围绕内容组织、主次关系、展项互动与品牌识别，输出可收藏的展厅策划和空间判断。",question:"参观者离开展厅时，你希望他带走哪一个核心信息？",eyebrow:"ORIGINAL DESIGN · DISPLAY",keywords:["展览设计","品牌展厅","商业陈列","展馆设计","空间叙事"] },
-  ],
-  "其他项目": [
-    { name:"空间新作",hook:"不先定义风格，先看空间真正要解决什么",cover:"让设计回应真实需求",subtitle:"使用场景 × 空间秩序 × 视觉记忆",value:"从使用者、行为路径、空间焦点和长期体验切入，避免空泛风格描述，建立专业且容易传播的设计表达。",question:"这个空间最需要被改善的使用体验是什么？",eyebrow:"ORIGINAL DESIGN · INTERIOR",keywords:["室内设计","空间设计","设计项目","空间改造","设计公司"] },
-    { name:"界面之间",hook:"空间的差异，不在标签，而在每一次真实使用",cover:"从真实使用开始设计",subtitle:"功能关系 × 场景体验 × 设计表达",value:"围绕功能关系、行走路径、视觉层次与使用体验，提炼照片和资料能够支持的专业价值。",question:"你更关注这个空间的功能效率，还是它带来的情绪体验？",eyebrow:"ORIGINAL DESIGN · SPACE",keywords:["空间设计案例","室内空间","设计灵感","空间美学","项目实景"] },
-  ],
+type RuntimeEnv = {
+  PROJECT_MEDIA?: R2Bucket;
+  OPENAI_API_KEY?: string;
+  OPENAI_MODEL?: string;
+  DOUBAO_API_KEY?: string;
+  DOUBAO_MODEL?: string;
 };
+type GeneratedDraft = { projectName?:string; detectedSpaceType?:string; designSummary?:string; title:string; titleOptions?:string[]; coverEyebrow?:string; coverTitle:string; coverSubtitle:string; coverStyle?:Record<string,unknown>; body:string; tags:string[]; highlights:string[]; riskNotes:string[]; coverIndex:number; mode:string };
 
-function buildDraft(project: Project, imageCount: number): Draft {
-  const category = strategyLibrary[project.category] ? project.category : "其他项目";
-  const visualSeed = `${project.projectType}${project.brief}`.split("").reduce((sum, char) => sum + char.charCodeAt(0), project.id);
-  const strategies = strategyLibrary[category];
-  const strategy = strategies[Math.abs(visualSeed) % strategies.length];
-  const projectName = project.name && !/实景图识别项目|未命名项目/.test(project.name) ? project.name : strategy.name;
-  const spaceType = project.projectType || category.replace("项目", "空间");
-  const designSummary = project.brief?.trim() || `${category}内容将围绕真实使用场景、空间秩序与视觉体验展开；具体材料、功能和面积以人工确认为准。`;
-  const locationKeyword = project.location ? `${project.location}${strategy.keywords[0]}` : strategy.keywords[0];
-  const areaKeyword = project.area ? `${project.area}${category.replace("项目", "空间")}` : strategy.keywords[1];
-  const titles = [`${spaceType}，${strategy.cover}✨`, strategy.hook, `${category.replace("项目", "设计")}先看这3点`].map((item)=>item.slice(0,20));
-  const tags = [...new Set([locationKeyword, areaKeyword, spaceType, ...strategy.keywords])].slice(0,9);
-  return {
-    projectName, detectedSpaceType:spaceType, designSummary, title:titles[0], titleOptions:titles,
-    coverEyebrow:strategy.eyebrow, coverTitle:strategy.cover, coverSubtitle:strategy.subtitle,
-    coverStyle:{fontFamily:"sans",titleColor:"#ffffff",subtitleColor:"#f1eee7",overlayColor:"#162019",overlayOpacity:52,pattern:"frame",patternColor:"#ffffff",titleSize:82,titleOffsetX:0,titleOffsetY:2,titleDirection:"horizontal",align:"left",position:"bottom",patternOffsetX:0,patternOffsetY:0,patternScale:100,eyebrowX:7.6,eyebrowY:5.8,eyebrowSize:24,eyebrowOpacity:92,showEyebrowLine:true,subtitleSize:26,subtitleOffsetX:0,subtitleOffsetY:0},
-    body:`${strategy.hook}。\n\n这组实景最先留下的是空间的整体情绪：${designSummary}\n\n${strategy.value}\n\n比起只追求一眼惊艳，我们更在意空间进入真实使用之后，是否依然顺手、耐看，也能让身处其中的人感到舒服。设计不是把元素堆满，而是让每一个视觉重点和使用场景都有理由。\n\n如果你也在规划${category.replace("项目", "空间")}，可以先从“谁在使用、怎样行走、希望被记住什么”这三个问题开始。\n\n${strategy.question}`,
-    tags, highlights:[`核心关键词：${tags.slice(0,5).join("、")}`,"封面用一个情绪利益点提高打开率","正文采用可直接发布的场景化叙事","长尾关键词自然进入标题正文和标签"],
-    riskNotes:["具体材质、面积、功能与客户信息需人工确认后发布","本地视觉分析不推测照片无法确认的事实"], coverIndex:imageCount>0?0:0,
-    mode:`${category} · 小红书流量爆款版 · 无 API`,
-  };
+function spaceDesignGuidanceBase(projectType: string, category: string) {
+  const value = `${projectType} ${category}`;
+  if (/卧室|主卧|儿童房/.test(value)) return "卧室：突出睡眠氛围、私密性、灯光层次、织物与安静收纳；封面优先床区和窗景，文字更少、更有情绪。";
+  if (/厨房|餐厅|餐厨/.test(value)) return "餐厨空间：突出操作动线、台面尺度、家人交流、储物与材质耐用性；封面优先中岛、餐桌或餐厨联动关系。";
+  if (/卫生间|卫浴/.test(value)) return "卫浴空间：突出干湿分区、采光、清洁维护、收纳与材质触感；封面优先完整空间关系，避免夸大面积。";
+  if (/衣帽间|收纳/.test(value)) return "衣帽与收纳：突出分类逻辑、使用顺序、柜体比例、照明与日常效率；封面优先展示完整柜体和梳妆关系。";
+  if (/办公|工作室/.test(value)) return "办公空间：突出品牌表达、协作效率、专注与交流场景、声光环境；封面优先前台、共享区或最能代表品牌的空间。";
+  if (/酒店|民宿/.test(value)) return "酒店空间：突出抵达体验、在地感、客房舒适度、灯光与服务动线；封面优先大堂、客房或标志性视角。";
+  if (/商业|店铺|零售|餐饮|咖啡/.test(value)) return "商业空间：突出品牌识别、顾客路径、停留体验、陈列和转化场景；封面优先门头、核心消费场景或视觉记忆点。";
+  if (/展厅|陈列|展览/.test(value)) return "展厅陈列：突出叙事顺序、展陈节奏、观看距离、灯光与视觉焦点；封面优先主展面或空间序列。";
+  if (/客厅|起居|住宅/.test(value)) return "住宅客厅：突出采光、家庭互动、动线、尺度与收纳；封面优先全景或客餐厅关系，语气温暖克制。";
+  return "综合室内空间：先依据实景图判断核心使用场景，再围绕真实功能、动线、材质、光线和用户收益形成差异化表达。";
 }
 
+function spaceDesignGuidance(projectType: string, category: string) {
+  return `${spaceDesignGuidanceBase(projectType, category)} 每次生成都必须把3个标题方案、封面英文栏目、封面主标题、封面副标题、封面样式全部参数、正文和话题标签作为一个整体重新创作，不得沿用旧草稿或示例项目中的原值。coverStyle 还必须生成 titleOffsetX（-35至35）、titleOffsetY（-30至30）、titleDirection（horizontal 或 vertical）、patternOffsetX、patternOffsetY（-25至25）、patternScale（50至160）、eyebrowX（2至50）、eyebrowY（2至35）、eyebrowSize（16至48）、eyebrowOpacity（10至100）、showEyebrowLine（布尔值）、subtitleSize（18至54）、subtitleOffsetX（-30至30）和 subtitleOffsetY（-20至25），让主标题、装饰图案、英文栏目和副标题具有适合画面的初始大小、位置与透明度。正文从两种结构中选择更适合当前项目的一种：A. 先用一段说明设计核心，再用3至5段“💧 小标题：照片可验证的设计细节”展开；B. 用有辨识度的项目标题开场，再以3至5段编辑式叙事描述空间概念、真实场景、材质、动线与体验，可在结尾加入一句简短英文概念。无论选择哪种结构，所有事实都必须来自上传照片和已知设计信息；看不清或未提供的内容不得猜测。`;
+}
+
+function defaultCoverEyebrow(projectType: string, category: string) {
+  const value = `${projectType} ${category}`;
+  if (/办公|工作室/.test(value)) return "ORIGINAL DESIGN · WORKPLACE";
+  if (/酒店|民宿/.test(value)) return "ORIGINAL DESIGN · HOSPITALITY";
+  if (/商业|店铺|零售|餐饮|咖啡/.test(value)) return "ORIGINAL DESIGN · RETAIL";
+  if (/展厅|陈列|展览/.test(value)) return "ORIGINAL DESIGN · EXHIBITION";
+  return "ORIGINAL DESIGN · INTERIOR";
+}
+function outputText(payload: Record<string, unknown>) { const output = Array.isArray(payload.output) ? payload.output : []; return output.flatMap((item) => { const content = item && typeof item === "object" && Array.isArray((item as {content?:unknown[]}).content) ? (item as {content:Array<{text?:string}>}).content : []; return content.map((part) => part.text || ""); }).join("\n"); }
+function parseDraft(text: string): GeneratedDraft { const start=text.indexOf("{"); const end=text.lastIndexOf("}"); if(start<0||end<=start) throw new Error("AI 未返回可解析的文案"); return JSON.parse(text.slice(start,end+1)) as GeneratedDraft; }
+
+function draftCopy(value: string) {
+  try {
+    const draft = JSON.parse(value || "{}") as Partial<GeneratedDraft>;
+    return {
+      titleOptions: Array.isArray(draft.titleOptions) ? draft.titleOptions.map(String).slice(0, 3) : [String(draft.title || "")],
+      coverTitle: String(draft.coverTitle || ""),
+      coverSubtitle: String(draft.coverSubtitle || ""),
+      body: String(draft.body || ""),
+    };
+  } catch {
+    return { titleOptions: [], coverTitle: "", coverSubtitle: "", body: "" };
+  }
+}
+
+function normalizedCopy(value: unknown) {
+  return String(value || "").replace(/[\s，。！？、；：,.!?;:'"“”‘’｜|·—_-]+/g, "").toLowerCase();
+}
+
+function duplicateFragments(draft: GeneratedDraft, existing: ReturnType<typeof draftCopy>[]) {
+  const priorShort = new Set(existing.flatMap((item) => [...item.titleOptions, item.coverTitle, item.coverSubtitle]).map(normalizedCopy).filter((item) => item.length >= 4));
+  const duplicates = [...(draft.titleOptions || []), draft.title, draft.coverTitle, draft.coverSubtitle]
+    .map(normalizedCopy).filter((item) => item.length >= 4 && priorShort.has(item));
+  const priorBodies = existing.map((item) => normalizedCopy(item.body)).filter(Boolean);
+  const sentences = String(draft.body || "").split(/[。！？\n]+/).map(normalizedCopy).filter((item) => item.length >= 14);
+  for (const sentence of sentences) {
+    const sample = sentence.slice(0, Math.min(24, sentence.length));
+    if (priorBodies.some((body) => body.includes(sample))) duplicates.push(sample);
+  }
+  return [...new Set(duplicates)].slice(0, 8);
+}
+
+async function requestDraft(runtime: RuntimeEnv, content: Array<Record<string, unknown>>, avoid: string[] = []) {
+  const requestContent = avoid.length
+    ? content.map((item, index) => index === 0 ? { ...item, text: `${String(item.text || "")}。上一次生成仍与已有项目重复，以下文字片段绝对禁止再次出现：${JSON.stringify(avoid)}。必须彻底改换标题角度、主副标题措辞、段落开头、叙事顺序和结尾表达。` } : item)
+    : content;
+  const providers = [
+    runtime.DOUBAO_API_KEY ? {
+      name: "豆包",
+      endpoint: "https://ark.cn-beijing.volces.com/api/v3/responses",
+      key: runtime.DOUBAO_API_KEY,
+      model: runtime.DOUBAO_MODEL || "doubao-seed-2-0-lite-260215",
+    } : null,
+    runtime.OPENAI_API_KEY?.startsWith("sk-") ? {
+      name: "OpenAI",
+      endpoint: "https://api.openai.com/v1/responses",
+      key: runtime.OPENAI_API_KEY,
+      model: runtime.OPENAI_MODEL || "gpt-5.6-luna",
+    } : null,
+  ].filter(Boolean) as Array<{ name: string; endpoint: string; key: string; model: string }>;
+  if (!providers.length) throw new Error("尚未配置可用的 OpenAI 或豆包 API 密钥");
+  const failures: string[] = [];
+  for (const provider of providers) {
+    try {
+      const response=await fetch(provider.endpoint,{method:"POST",headers:{authorization:`Bearer ${provider.key}`,"content-type":"application/json"},body:JSON.stringify({model:provider.model,input:[{role:"user",content:requestContent}],max_output_tokens:2600})});
+      if(!response.ok){const detail=await response.text().catch(()=>""); failures.push(`${provider.name} ${response.status}${detail ? `：${detail.slice(0,180)}` : ""}`); continue;}
+      const payload=await response.json() as Record<string,unknown>;
+      return { draft: parseDraft(outputText(payload)), provider: provider.name };
+    } catch (error) {
+      failures.push(`${provider.name}：${error instanceof Error ? error.message : "调用失败"}`);
+    }
+  }
+  throw new Error(`AI 通道均不可用：${failures.join("；")}`);
+}
 export async function POST(request: Request) {
   try {
-    const ownerEmail=await requireAccountEmail(); const {projectId}=await request.json() as {projectId?:number};
-    if(!projectId) return Response.json({error:"缺少项目编号"},{status:400}); const db=getDb();
-    const [project]=await db.select().from(projects).where(and(eq(projects.id,projectId),eq(projects.ownerEmail,ownerEmail))).limit(1);
-    if(!project) return Response.json({error:"项目不存在"},{status:404});
+    const ownerEmail=await requireAccountEmail();
+    const { projectId } = await request.json() as { projectId?: number }; if (!projectId) return Response.json({ error:"缺少项目编号" },{status:400});
+    const runtime=env as unknown as RuntimeEnv; if(!runtime.PROJECT_MEDIA) throw new Error("项目图片存储暂不可用"); if(!runtime.OPENAI_API_KEY?.startsWith("sk-")&&!runtime.DOUBAO_API_KEY) return Response.json({error:"尚未连接 OpenAI 或豆包 AI 密钥"},{status:503});
+    const db=getDb(); const [project]=await db.select().from(projects).where(and(eq(projects.id,projectId),eq(projects.ownerEmail,ownerEmail))).limit(1); if(!project) return Response.json({error:"项目不存在"},{status:404});
     const images=await db.select().from(projectImages).where(eq(projectImages.projectId,projectId)); if(!images.length) return Response.json({error:"项目没有图片"},{status:400});
-    const draft=buildDraft(project,images.length); const generatedMeta={name:draft.projectName,projectType:draft.detectedSpaceType,brief:draft.designSummary};
-    await db.update(projects).set({...generatedMeta,status:"drafted",draftJson:JSON.stringify(draft)}).where(and(eq(projects.id,projectId),eq(projects.ownerEmail,ownerEmail)));
-    return Response.json({draft,meta:generatedMeta});
-  } catch(error) { return apiError(error,"生成失败"); }
+    const research=await db.select({title:researchReferences.title,copyAnalysis:researchReferences.copyAnalysis,coverAnalysis:researchReferences.coverAnalysis,audienceInsight:researchReferences.audienceInsight,reusablePattern:researchReferences.reusablePattern}).from(researchReferences).where(eq(researchReferences.ownerEmail,ownerEmail)).orderBy(desc(researchReferences.researchDate),desc(researchReferences.likes)).limit(3);
+    const previousProjects=await db.select({id:projects.id,name:projects.name,draftJson:projects.draftJson}).from(projects).where(eq(projects.ownerEmail,ownerEmail)).orderBy(desc(projects.createdAt)).limit(30);
+    const existing=previousProjects.filter((item)=>item.id!==projectId).map((item)=>({name:item.name,...draftCopy(item.draftJson)}));
+    const content:Array<Record<string,unknown>>=[{type:"input_text",text:"你是个人室内设计工作室的高级内容秘书。必须先逐张识别上传的项目实景图，再结合用户实际填写的设计信息生成完整且只属于当前项目的小红书创作成品，包括自动项目名称、识别出的空间类型、设计信息摘要、3个笔记标题、封面英文栏目、封面主标题、封面副标题、封面样式、正文、话题标签、图片分析重点和发布风险提示。projectName 必须是根据照片气质原创的4至12字中文项目名称，不使用地址、面积和后台占位词；detectedSpaceType 必须是照片能够支持的具体室内空间类型；designSummary 必须用80至180字概括照片可验证的空间关系、色彩、材质观感、光线、动线与设计重点，不能写品牌、造价或无法确认的材料型号。项目名称、所在地、面积、空间类型、目标客户和设计说明全部允许为空；为空时必须完全依据照片中可验证的室内设计进行创作，不得要求用户补填，也不得在成品中出现“未命名项目”“实景图识别项目”“地点待确认”“面积待确认”等后台占位词。资产库分区只用于归档，不能代替照片判断空间类型。先识别每张图真实可见的空间类型、材质、色彩、灯光、动线、功能、构图、人物使用场景和画面情绪，再选择最适合封面的图片序号；用户填写的信息仅用于补充事实，自动项目名称、空间类型和设计摘要仍需随每次图片识别重新生成；与照片冲突的信息必须标为待确认，不能猜测。必须针对照片识别出的空间类型改变叙事重点、标题角度、封面选图和视觉样式，不能把住宅客厅、卧室、办公、酒店、商业和展厅写成同一套模板。当前空间专属策略："+spaceDesignGuidance(project.projectType || "由实景图判断", project.projectType ? project.category : "")+"必须使用最近3篇室内设计引流笔记库中提炼的标题结构、正文节奏、客户需求洞察和自然咨询引导方法进行升级，但不得复制参考原文。当前账号已有项目的标题、封面主副标题与正文也全部视为禁用语料：新结果不得复用任何完整标题、封面文字、段落、句式开头或连续14个以上相同汉字，必须改变主题切口、叙事顺序、动词和结尾。标题或正文可自然使用2至4个与空间气质匹配的小表情，标题最多1个，禁止连续堆叠，话题标签中不要放表情。只借鉴抽象规律，不虚构地点、面积、客户身份、材料品牌或完工事实。生成3个彼此不同且与历史项目不同的小红书笔记标题，分别侧重空间情绪、照片中的设计亮点、实际使用价值；每个标题不超过20个汉字。正文必须至少写出三项能从当前照片或项目资料验证的专属设计细节，并在结尾用与当前空间相关的自然问题邀请读者交流需求。coverEyebrow 必须是简洁的大写英文，格式为 ORIGINAL DESIGN · 加照片识别出的空间类别，最多44个字符。titleOptions 必须正好包含3个互不重复标题，title 必须等于 titleOptions 第一项。根据当前项目照片重新推荐 coverStyle：fontFamily 只能是 serif/sans/kai；titleColor、subtitleColor、overlayColor、patternColor 使用6位十六进制颜色；overlayOpacity 为0-90；pattern 只能是 none/frame/grid/dots/corners/polka/textile/gradient/blue-white-dots；titleSize 为52-120；align 只能是 left/center；position 只能是 top/middle/bottom。只返回 JSON，字段为 projectName, detectedSpaceType, designSummary, title, titleOptions, coverEyebrow, coverTitle, coverSubtitle, coverStyle, body, tags, highlights, riskNotes, coverIndex。当前项目事实："+JSON.stringify(project)+"。已有项目禁用文字："+JSON.stringify(existing).slice(0,14000)+"。近期室内设计引流笔记（只学习结构，不复制文字）："+JSON.stringify(research)}];
+    for(const image of images.sort((a,b)=>a.sortOrder-b.sortOrder).slice(0,10)){ const object=await runtime.PROJECT_MEDIA.get(image.objectKey); if(!object) continue; const bytes=new Uint8Array(await object.arrayBuffer()); let binary=""; for(let i=0;i<bytes.length;i+=0x8000) binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000)); content.push({type:"input_image",image_url:`data:${image.contentType};base64,${btoa(binary)}`,detail:"high"}); }
+    let generated=await requestDraft(runtime,content); let draft=generated.draft; let provider=generated.provider; let duplicates=duplicateFragments(draft,existing); if(duplicates.length){generated=await requestDraft(runtime,content,duplicates); draft=generated.draft; provider=generated.provider; duplicates=duplicateFragments(draft,existing);} if(duplicates.length) throw new Error("生成内容仍与已有项目重复，请补充更具体的设计信息后重试"); const options=(Array.isArray(draft.titleOptions)?draft.titleOptions:[]).map((item)=>String(item).trim()).filter(Boolean).slice(0,3); while(options.length<3) options.push(options.length===0?draft.title:`${draft.title}｜方案${options.length+1}`); if(new Set(options.map(normalizedCopy)).size!==3) throw new Error("三个标题方案重复，请重新生成"); draft.titleOptions=options; draft.title=options[0]; draft.projectName=String(draft.projectName||draft.coverTitle||"空间新作").trim().slice(0,40); draft.detectedSpaceType=String(draft.detectedSpaceType||project.projectType||"室内空间").trim().slice(0,60); draft.designSummary=String(draft.designSummary||draft.highlights?.join("；")||"").trim().slice(0,600); draft.coverEyebrow=String(draft.coverEyebrow||defaultCoverEyebrow(draft.detectedSpaceType,project.category)).toUpperCase().slice(0,44); draft.mode=`${provider} 多图识别 · 自动项目命名`; draft.coverIndex=Math.min(images.length-1,Math.max(0,Number(draft.coverIndex||0))); const generatedMeta={name:draft.projectName,projectType:draft.detectedSpaceType,brief:draft.designSummary}; await db.update(projects).set({...generatedMeta,status:"drafted",draftJson:JSON.stringify(draft)}).where(and(eq(projects.id,projectId),eq(projects.ownerEmail,ownerEmail))); return Response.json({draft,meta:generatedMeta});
+  } catch(error){return apiError(error,"生成失败");}
 }
