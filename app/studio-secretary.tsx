@@ -613,6 +613,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
   const [references, setReferences] = useState<ResearchReference[]>([]);
   const [currentProjectId, setCurrentProjectId] = useState<number | null>(null);
   const [scheduleDrafts, setScheduleDrafts] = useState<Record<number, string>>({});
+  const [selectedScheduleProjectId, setSelectedScheduleProjectId] = useState<number | null>(null);
   const [settingsNotice, setSettingsNotice] = useState("");
   const [researching, setResearching] = useState(false);
   const [researchNotice, setResearchNotice] = useState("");
@@ -1247,7 +1248,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
           <label><span>目标客户（选填）</span><input placeholder="可留空" value={meta.audience} onChange={(event) => updateMeta("audience", event.target.value)}/></label>
           <label className="wide"><span>已知设计信息（选填）</span><textarea placeholder="可留空；AI 会从实景图识别空间、材质、色彩、采光与动线" value={meta.brief} onChange={(event) => updateMeta("brief", event.target.value)}/></label>
         </div>
-        <button className="primary-action" disabled={phase === "uploading" || phase === "analyzing"}><span>{phase === "analyzing" ? "正在同步更新全部内容…" : currentProjectId && !files.length ? "按原图与最新设计信息重新生成全部内容" : "保存项目并生成封面与文案"}</span><span>→</span></button>
+        <button className="primary-action" disabled={phase === "uploading" || phase === "analyzing"}><span>{phase === "analyzing" ? "正在逐张识别图片并生成全部内容…" : "生成封面＋正文与标题"}</span><span>→</span></button>
         <p className="notice">{notice}</p>
       </form>
     </section>
@@ -1345,6 +1346,11 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
     </section>
     <section className="dashboard-card queue-card">
       <div className="section-heading"><div><span>PUBLISH QUEUE</span><h2>项目发布日历</h2><p>仅人工确认后的内容可排期；到期后进入官方发布交接流程。</p></div><span className="counter">{scheduledProjects.length} 个已排期</span></div>
+      <div className="quick-schedule">
+        <label><span>选择项目</span><select value={selectedScheduleProjectId ?? ""} onChange={(event) => setSelectedScheduleProjectId(event.target.value ? Number(event.target.value) : null)}><option value="">请选择已确认项目</option>{projects.filter((project) => ["approved", "scheduled"].includes(project.status)).map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
+        <label><span>发布日期与时间</span><input type="datetime-local" disabled={!selectedScheduleProjectId} value={selectedScheduleProjectId ? scheduleDrafts[selectedScheduleProjectId] || nextSlot(settings) : ""} onChange={(event) => selectedScheduleProjectId && setScheduleDrafts((current) => ({ ...current, [selectedScheduleProjectId]: event.target.value }))}/></label>
+        <button disabled={!selectedScheduleProjectId || (settings.publishMode === "browser_bridge" && !bridgeReady)} onClick={() => selectedScheduleProjectId && void scheduleProject(selectedScheduleProjectId)}>加入发布桥定时发布</button>
+      </div>
       <div className="queue-list">
         {projects.map((project) => <div className="queue-item" key={project.id}>
           <div className="queue-project">{project.images?.[0] ? <img src={project.images[0].url} alt=""/> : <span>{project.name.slice(0, 1)}</span>}<div><strong>{project.name}</strong><small>{project.location} · {project.area}</small></div></div>
