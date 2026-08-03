@@ -148,6 +148,17 @@ test("moves cover decorations and controls English eyebrow opacity and line visi
   assert.match(generate, /coverStyle 还必须生成 titleOffsetX/);
 });
 
+test("renders polka, textile, gradient, and blue-white dot cover decorations", async () => {
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  const project = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
+  for (const label of ["波点", "面料肌理", "柔和渐变", "蓝白波点"]) assert.match(studio, new RegExp(label));
+  for (const value of ["polka", "textile", "gradient", "blue-white-dots"]) {
+    assert.match(studio, new RegExp(`style\\.pattern === \\\"${value}\\\"`));
+    assert.match(project, new RegExp(value));
+  }
+  assert.match(studio, /createRadialGradient/);
+});
+
 test("resizes cover decorations, English eyebrow, and subtitle in the final artwork", async () => {
   const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
   const project = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");

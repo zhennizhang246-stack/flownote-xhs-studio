@@ -70,7 +70,7 @@ function cleanDraft(value: unknown): Draft {
       subtitleColor: color(style.subtitleColor, "#eee9df"),
       overlayColor: color(style.overlayColor, "#121713"),
       overlayOpacity: Math.min(90, Math.max(0, Number(style.overlayOpacity ?? 58))),
-      pattern: oneOf(style.pattern, ["none", "frame", "grid", "dots", "corners"] as const, "frame"),
+      pattern: oneOf(style.pattern, ["none", "frame", "grid", "dots", "corners", "polka", "textile", "gradient", "blue-white-dots"] as const, "frame"),
       patternColor: color(style.patternColor, "#ffffff"),
       titleSize: Math.min(120, Math.max(52, Number(style.titleSize ?? 88))),
       titleOffsetX: Math.min(35, Math.max(-35, Number(style.titleOffsetX ?? 0))),

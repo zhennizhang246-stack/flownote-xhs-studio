@@ -22,7 +22,7 @@ type CoverStyle = {
   subtitleColor: string;
   overlayColor: string;
   overlayOpacity: number;
-  pattern: "none" | "frame" | "grid" | "dots" | "corners";
+  pattern: "none" | "frame" | "grid" | "dots" | "corners" | "polka" | "textile" | "gradient" | "blue-white-dots";
   patternColor: string;
   titleSize: number;
   titleOffsetX: number;
@@ -250,7 +250,7 @@ const bodyEmojiGroups = [
 function normalizedCoverStyle(value?: Partial<CoverStyle>): CoverStyle {
   const color = (candidate: unknown, fallback: string) => /^#[0-9a-f]{6}$/i.test(String(candidate || "")) ? String(candidate) : fallback;
   const fontFamily = ["serif", "sans", "kai"].includes(String(value?.fontFamily)) ? value?.fontFamily as CoverStyle["fontFamily"] : defaultCoverStyle.fontFamily;
-  const pattern = ["none", "frame", "grid", "dots", "corners"].includes(String(value?.pattern)) ? value?.pattern as CoverStyle["pattern"] : defaultCoverStyle.pattern;
+  const pattern = ["none", "frame", "grid", "dots", "corners", "polka", "textile", "gradient", "blue-white-dots"].includes(String(value?.pattern)) ? value?.pattern as CoverStyle["pattern"] : defaultCoverStyle.pattern;
   const align = ["left", "center"].includes(String(value?.align)) ? value?.align as CoverStyle["align"] : defaultCoverStyle.align;
   const position = ["top", "middle", "bottom"].includes(String(value?.position)) ? value?.position as CoverStyle["position"] : defaultCoverStyle.position;
   const titleDirection = ["horizontal", "vertical"].includes(String(value?.titleDirection)) ? value?.titleDirection as CoverStyle["titleDirection"] : defaultCoverStyle.titleDirection;
@@ -444,6 +444,35 @@ function drawCoverPattern(context: CanvasRenderingContext2D, style: CoverStyle) 
     for (const [x, y, dx, dy] of [[62, 62, 1, 1], [1018, 62, -1, 1], [62, 1378, 1, -1], [1018, 1378, -1, -1]] as const) {
       context.beginPath();
       context.moveTo(x + dx * length, y); context.lineTo(x, y); context.lineTo(x, y + dy * length); context.stroke();
+    }
+  } else if (style.pattern === "polka") {
+    context.globalAlpha = 0.36;
+    for (let row = 0, y = 70; y < 1440; row += 1, y += 92) {
+      for (let x = 60 + (row % 2) * 46; x < 1080; x += 92) {
+        context.beginPath(); context.arc(x, y, 15, 0, Math.PI * 2); context.fill();
+      }
+    }
+  } else if (style.pattern === "textile") {
+    context.globalAlpha = 0.18;
+    context.lineWidth = 1.4;
+    for (let offset = -1440; offset < 1080; offset += 18) {
+      context.beginPath(); context.moveTo(offset, 0); context.lineTo(offset + 1440, 1440); context.stroke();
+      context.beginPath(); context.moveTo(offset + 1440, 0); context.lineTo(offset, 1440); context.stroke();
+    }
+  } else if (style.pattern === "gradient") {
+    context.globalAlpha = 0.48;
+    const gradient = context.createRadialGradient(250, 360, 30, 250, 360, 720);
+    gradient.addColorStop(0, style.patternColor);
+    gradient.addColorStop(1, "transparent");
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, 1080, 1440);
+  } else if (style.pattern === "blue-white-dots") {
+    context.globalAlpha = 0.5;
+    for (let row = 0, y = 64; y < 1440; row += 1, y += 76) {
+      for (let column = 0, x = 52 + (row % 2) * 38; x < 1080; column += 1, x += 76) {
+        context.fillStyle = (row + column) % 2 ? "#ffffff" : "#9fbfe6";
+        context.beginPath(); context.arc(x, y, 9, 0, Math.PI * 2); context.fill();
+      }
     }
   }
   context.restore();
@@ -1239,7 +1268,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
           <div className="cover-designer-heading"><div><small>COVER DESIGNER</small><strong>封面样式编辑</strong></div><button onClick={() => setDraft((current) => ({ ...current, coverStyle: defaultCoverStyle }))}>恢复默认</button></div>
           <div className="cover-control-grid">
             <label><small>标题字体</small><select value={normalizedCoverStyle(draft.coverStyle).fontFamily} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), fontFamily: event.target.value as CoverStyle["fontFamily"] } }))}><option value="serif">宋体 / 衬线</option><option value="sans">黑体 / 无衬线</option><option value="kai">楷体</option></select></label>
-            <label><small>装饰图案</small><select value={normalizedCoverStyle(draft.coverStyle).pattern} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), pattern: event.target.value as CoverStyle["pattern"] } }))}><option value="none">无图案</option><option value="frame">细线边框</option><option value="grid">建筑网格</option><option value="dots">圆点阵列</option><option value="corners">四角标记</option></select></label>
+            <label><small>装饰图案</small><select value={normalizedCoverStyle(draft.coverStyle).pattern} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), pattern: event.target.value as CoverStyle["pattern"] } }))}><option value="none">无图案</option><option value="frame">细线边框</option><option value="grid">建筑网格</option><option value="dots">圆点阵列</option><option value="corners">四角标记</option><option value="polka">波点</option><option value="textile">面料肌理</option><option value="gradient">柔和渐变</option><option value="blue-white-dots">蓝白波点</option></select></label>
             <label><small>文字位置</small><select value={normalizedCoverStyle(draft.coverStyle).position} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), position: event.target.value as CoverStyle["position"] } }))}><option value="top">顶部</option><option value="middle">居中</option><option value="bottom">底部</option></select></label>
             <label><small>文字对齐</small><select value={normalizedCoverStyle(draft.coverStyle).align} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), align: event.target.value as CoverStyle["align"] } }))}><option value="left">左对齐</option><option value="center">居中</option></select></label>
             <label><small>主标题排版</small><select value={normalizedCoverStyle(draft.coverStyle).titleDirection} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), titleDirection: event.target.value as CoverStyle["titleDirection"] } }))}><option value="horizontal">横向海报排版</option><option value="vertical">竖向中文排版</option></select></label>
