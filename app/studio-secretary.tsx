@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 type Draft = {
   projectName?: string;
@@ -25,7 +25,7 @@ type CoverStyle = {
   subtitleColor: string;
   overlayColor: string;
   overlayOpacity: number;
-  pattern: "none" | "frame" | "grid" | "dots" | "corners" | "polka" | "textile" | "gradient" | "blue-white-dots";
+  pattern: "none" | "frame" | "grid" | "dots" | "corners" | "polka" | "textile" | "gradient" | "blue-white-dots" | "ad-badge" | "ad-ribbon" | "editorial-bars" | "spotlight";
   patternColor: string;
   titleSize: number;
   titleOffsetX: number;
@@ -130,7 +130,6 @@ type XhsBridgeDraft = {
 };
 type Tab = "creator" | "assets" | "calendar" | "research";
 
-const seededImages = Array.from({ length: 7 }, (_, i) => `/projects/warm-wood-home/0${i + 1}.jpg`);
 const defaultCoverStyle: CoverStyle = {
   fontFamily: "serif",
   titleColor: "#ffffff",
@@ -157,32 +156,28 @@ const defaultCoverStyle: CoverStyle = {
   subtitleOffsetX: 0,
   subtitleOffsetY: 0,
 };
-const seededDraft: Draft = {
-  title: "温州150m²，把自然搬进日常的家",
-  titleOptions: [
-    "温州150m²，把自然搬进日常的家",
-    "原木与光，住进松弛的四季",
-    "150m²自然系住宅的生活秩序",
-  ],
-  coverEyebrow: "ORIGINAL DESIGN · INTERIOR",
-  coverTitle: "住进自然里",
-  coverSubtitle: "浙江温州 · 150m² 木质住宅",
+const emptyDraft: Draft = {
+  title: "",
+  titleOptions: ["", "", ""],
+  coverEyebrow: "",
+  coverTitle: "",
+  coverSubtitle: "",
   coverStyle: defaultCoverStyle,
-  body: "比起堆叠风格，我们更想让这个家拥有接近自然的呼吸感。\n\n从玄关开始，温润木色一路延伸到客餐厅、厨房与卧室。克制的材质关系让光影成为空间里真正的主角；绿植、框景与大面积留白，则把四季变化悄悄带进日常。\n\n开放的客餐厅让家人自然聚拢，厨房岛台承接备餐与交流，洗衣房和衣帽间把功能收进秩序里。设计没有刻意制造视觉喧哗，而是在每一次行走、停留与收纳中，留下松弛。\n\n好的住宅不急着表达，它会在住进去之后，慢慢回应生活。",
-  tags: ["温州室内设计", "原木风", "自然系住宅", "住宅设计", "全案设计", "实景案例"],
-  highlights: ["木质天花延续空间秩序", "客餐厅一体化社交动线", "自然框景与柔和照明", "完整家政与收纳系统"],
-  riskNotes: ["项目名称、客户需求和具体材料品牌待确认"],
-  coverIndex: 1,
-  mode: "案例预览",
+  body: "",
+  tags: [],
+  highlights: [],
+  riskNotes: [],
+  coverIndex: 0,
+  mode: "等待上传项目实景图",
 };
 const initialMeta: ProjectMeta = {
-  name: "栖光木境",
-  location: "浙江 · 温州",
-  area: "150m²",
-  projectType: "住宅空间",
-  category: "住宅项目",
-  audience: "重视自然、松弛感与收纳秩序的改善型家庭",
-  brief: "温润木质、自然光与绿意贯穿全屋；客餐厅一体，包含厨房、家政、卧室、衣帽间与卫浴。",
+  name: "",
+  location: "",
+  area: "",
+  projectType: "",
+  category: "其他项目",
+  audience: "",
+  brief: "",
 };
 const defaultSettings: AutomationSettings = {
   publishTime: "12:00",
@@ -253,7 +248,7 @@ const bodyEmojiGroups = [
 function normalizedCoverStyle(value?: Partial<CoverStyle>): CoverStyle {
   const color = (candidate: unknown, fallback: string) => /^#[0-9a-f]{6}$/i.test(String(candidate || "")) ? String(candidate) : fallback;
   const fontFamily = ["serif", "sans", "kai"].includes(String(value?.fontFamily)) ? value?.fontFamily as CoverStyle["fontFamily"] : defaultCoverStyle.fontFamily;
-  const pattern = ["none", "frame", "grid", "dots", "corners", "polka", "textile", "gradient", "blue-white-dots"].includes(String(value?.pattern)) ? value?.pattern as CoverStyle["pattern"] : defaultCoverStyle.pattern;
+  const pattern = ["none", "frame", "grid", "dots", "corners", "polka", "textile", "gradient", "blue-white-dots", "ad-badge", "ad-ribbon", "editorial-bars", "spotlight"].includes(String(value?.pattern)) ? value?.pattern as CoverStyle["pattern"] : defaultCoverStyle.pattern;
   const align = ["left", "center"].includes(String(value?.align)) ? value?.align as CoverStyle["align"] : defaultCoverStyle.align;
   const position = ["top", "middle", "bottom"].includes(String(value?.position)) ? value?.position as CoverStyle["position"] : defaultCoverStyle.position;
   const titleDirection = ["horizontal", "vertical"].includes(String(value?.titleDirection)) ? value?.titleDirection as CoverStyle["titleDirection"] : defaultCoverStyle.titleDirection;
@@ -477,6 +472,21 @@ function drawCoverPattern(context: CanvasRenderingContext2D, style: CoverStyle) 
         context.beginPath(); context.arc(x, y, 9, 0, Math.PI * 2); context.fill();
       }
     }
+  } else if (style.pattern === "ad-badge") {
+    context.globalAlpha = 0.9;
+    context.beginPath(); context.arc(870, 240, 118, 0, Math.PI * 2); context.fill();
+    context.strokeStyle = "#ffffff"; context.lineWidth = 5; context.beginPath(); context.arc(870, 240, 94, 0, Math.PI * 2); context.stroke();
+  } else if (style.pattern === "ad-ribbon") {
+    context.globalAlpha = 0.88;
+    context.beginPath(); context.moveTo(0, 150); context.lineTo(760, 0); context.lineTo(1080, 0); context.lineTo(1080, 155); context.lineTo(0, 310); context.closePath(); context.fill();
+  } else if (style.pattern === "editorial-bars") {
+    context.globalAlpha = 0.78;
+    context.fillRect(60, 96, 480, 18); context.fillRect(60, 126, 270, 8);
+    context.fillRect(760, 1280, 260, 18); context.fillRect(885, 1310, 135, 8);
+  } else if (style.pattern === "spotlight") {
+    const spotlight = context.createRadialGradient(810, 340, 20, 810, 340, 340);
+    spotlight.addColorStop(0, style.patternColor); spotlight.addColorStop(1, "transparent");
+    context.globalAlpha = 0.58; context.fillStyle = spotlight; context.fillRect(400, 0, 680, 760);
   }
   context.restore();
 }
@@ -603,8 +613,19 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
   const [activeTab, setActiveTab] = useState<Tab>("creator");
   const [meta, setMeta] = useState(initialMeta);
   const [files, setFiles] = useState<File[]>([]);
-  const [previews, setPreviews] = useState(seededImages);
-  const [draft, setDraft] = useState<Draft>(seededDraft);
+  const [previews, setPreviews] = useState<string[]>([]);
+  const [draft, setDraft] = useState<Draft>(emptyDraft);
+  const bodyTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const insertBodyEmoji = (emoji: string) => {
+    const textarea = bodyTextareaRef.current;
+    const start = textarea?.selectionStart ?? draft.body.length;
+    const end = textarea?.selectionEnd ?? start;
+    setDraft((current) => ({ ...current, body: `${current.body.slice(0, start)}${emoji}${current.body.slice(end)}` }));
+    requestAnimationFrame(() => {
+      textarea?.focus();
+      textarea?.setSelectionRange(start + emoji.length, start + emoji.length);
+    });
+  };
   const [renderedCoverPreview, setRenderedCoverPreview] = useState("");
   const [phase, setPhase] = useState<"ready" | "uploading" | "analyzing" | "done">("ready");
   const [notice, setNotice] = useState("示例已就绪，可替换图片重新生成");
@@ -627,7 +648,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
     typeof window === "undefined" ? "" : window.localStorage.getItem("mj-xhs-profile-url") || ""
   ));
 
-  const coverImage = previews[draft.coverIndex ?? 0] || seededImages[0];
+  const coverImage = previews[draft.coverIndex ?? 0] || "";
   const phaseLabel = {
     ready: "等待项目",
     uploading: "整理项目资产",
@@ -653,6 +674,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
   }).slice(0, 3);
 
   useEffect(() => {
+    if (!coverImage) { setRenderedCoverPreview(""); return; }
     let cancelled = false;
     const timer = window.setTimeout(() => {
       void renderCoverDataUrl(coverImage, draft.coverEyebrow, draft.coverTitle, draft.coverSubtitle, draft.coverStyle)
@@ -748,10 +770,9 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
     setPhase(files.length ? "uploading" : "analyzing");
     setNotice(files.length ? "正在上传并建立项目资产档案…" : currentProjectId ? "正在同步设计信息并重新分析项目原图…" : "正在重新分析示例项目…");
     if (!files.length && !currentProjectId) {
-      await new Promise((resolve) => setTimeout(resolve, 450));
-      setDraft(seededDraft);
-      setPhase("done");
-      setNotice("已依据 7 张实景图生成封面与原创文案");
+      setDraft(emptyDraft);
+      setPhase("ready");
+      setNotice("请先上传项目实景图，再生成封面、标题与正文");
       return;
     }
     try {
@@ -827,7 +848,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
   async function sendScheduleToBridge(project: ProjectRecord, scheduledAt: string) {
     const projectDraft = project.id === currentProjectId
       ? draft
-      : { ...seededDraft, ...project.draft, coverStyle: normalizedCoverStyle(project.draft?.coverStyle) } as Draft;
+      : { ...emptyDraft, ...project.draft, coverStyle: normalizedCoverStyle(project.draft?.coverStyle) } as Draft;
     const coverIndex = Math.max(0, projectDraft.coverIndex ?? 0);
     const sourceImage = project.images?.[coverIndex]?.url || project.images?.[0]?.url;
     if (!sourceImage) throw new Error("项目没有可用于定时发布的封面图片");
@@ -855,7 +876,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
     const scheduledAt = scheduleDrafts[projectId] || nextSlot(settings);
     const project = projects.find((item) => item.id === projectId);
     if (settings.publishMode === "browser_bridge" && !bridgeReady) {
-      setNotice("发布桥定时发布需要先安装并连接 MJ 发布桥 1.7");
+      setNotice("发布桥定时发布需要先安装并连接 MJ 发布桥 1.8");
       return;
     }
     const response = await fetch(`/api/projects/${projectId}/schedule`, {
@@ -910,9 +931,9 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
     if (currentProjectId === project.id) {
       setCurrentProjectId(null);
       setFiles([]);
-      setPreviews(seededImages);
+      setPreviews([]);
       setMeta(initialMeta);
-      setDraft(seededDraft);
+      setDraft(emptyDraft);
       setPhase("ready");
     }
     setProjects((current) => current.filter((item) => item.id !== project.id));
@@ -935,7 +956,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
       audience: project.audience,
       brief: project.brief,
     });
-    setDraft({ ...seededDraft, ...project.draft, coverStyle: normalizedCoverStyle(project.draft?.coverStyle), titleOptions: project.draft?.titleOptions?.length === 3 ? project.draft.titleOptions : [project.draft?.title || seededDraft.title, ...seededDraft.titleOptions.filter((title) => title !== project.draft?.title)].slice(0, 3), tags: project.draft?.tags || [], highlights: project.draft?.highlights || [], riskNotes: project.draft?.riskNotes || [] });
+    setDraft({ ...emptyDraft, ...project.draft, coverStyle: normalizedCoverStyle(project.draft?.coverStyle), titleOptions: project.draft?.titleOptions?.length === 3 ? project.draft.titleOptions : [project.draft?.title || "", "", ""], tags: project.draft?.tags || [], highlights: project.draft?.highlights || [], riskNotes: project.draft?.riskNotes || [] });
     setPreviews(project.images?.map((image) => image.url) || []);
     setFiles([]);
     setPhase("done");
@@ -1096,7 +1117,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
     setResearching(true);
     setResearchNotice("正在同步浏览器中右键收藏的小红书室内设计笔记…");
     try {
-      if (!bridgeReady) throw new Error("请安装或更新 MJ 发布桥 1.7，刷新平台后再同步右键收藏笔记");
+      if (!bridgeReady) throw new Error("请安装或更新 MJ 发布桥 1.8，刷新平台后再同步右键收藏笔记");
       const browserCandidates = await collectResearchFromBridge(force);
       setResearchNotice(`已读取 ${browserCandidates.length} 篇右键收藏笔记，正在整理标题与正文引流结构…`);
       const response = await fetch("/api/research", {
@@ -1125,7 +1146,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
 
   async function syncNoteComments() {
     if (!bridgeReady) {
-      setServiceNotice("请安装或更新 MJ 发布桥 1.7，刷新平台后再同步笔记评论");
+      setServiceNotice("请安装或更新 MJ 发布桥 1.8，刷新平台后再同步笔记评论");
       return;
     }
     if (!profileUrl) {
@@ -1151,7 +1172,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
 
   async function autoReplyPendingComments() {
     if (!bridgeReady) {
-      setServiceNotice("请先连接 MJ 发布桥 1.7");
+      setServiceNotice("请先连接 MJ 发布桥 1.8");
       return;
     }
     const actions = messages
@@ -1254,10 +1275,10 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
     </section>
     <section className="preview-panel">
       <div className="section-heading compact"><div><span>LIVE PREVIEW</span><h2>发布预览</h2></div><span className="mode-label">{draft.mode || "AI 分析"}</span></div>
-      <div className="phone-frame"><div className="cover-preview final-artwork-preview"><img src={renderedCoverPreview || coverImage} alt="与小红书最终封面完全一致的发布预览"/></div></div>
+      <div className="phone-frame"><div className="cover-preview final-artwork-preview">{coverImage ? <img src={renderedCoverPreview || coverImage} alt="与小红书最终封面完全一致的发布预览"/> : <div className="empty-cover-placeholder">上传项目实景图后生成封面</div>}</div></div>
       <p className="final-preview-note">1080 × 1440 小红书竖版封面 · 此处直接显示最终合成图片</p>
       <div className={`bridge-status ${bridgeReady ? "connected" : ""}`}>
-        <span>{bridgeReady ? "MJ 发布桥 1.7 已连接" : "未连接最新版 MJ 发布桥"}</span>
+        <span>{bridgeReady ? "MJ 发布桥 1.8 已连接" : "未连接最新版 MJ 发布桥"}</span>
         <p>{bridgeReady ? "成品封面、项目图片、标题、正文与标签会保持统一；可选择人工发布或单篇确认后自动发布。" : "安装一次浏览器扩展，即可把已确认内容自动带入小红书官方图文发布页。"}</p>
         {!bridgeReady && <a href={XHS_BRIDGE_EXTENSION_URL} download>下载或更新 MJ 发布桥扩展</a>}
       </div>
@@ -1279,7 +1300,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
           <div className="cover-designer-heading"><div><small>COVER DESIGNER</small><strong>封面样式编辑</strong></div><button onClick={() => setDraft((current) => ({ ...current, coverStyle: defaultCoverStyle }))}>恢复默认</button></div>
           <div className="cover-control-grid">
             <label><small>标题字体</small><select value={normalizedCoverStyle(draft.coverStyle).fontFamily} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), fontFamily: event.target.value as CoverStyle["fontFamily"] } }))}><option value="serif">宋体 / 衬线</option><option value="sans">黑体 / 无衬线</option><option value="kai">楷体</option></select></label>
-            <label><small>装饰图案</small><select value={normalizedCoverStyle(draft.coverStyle).pattern} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), pattern: event.target.value as CoverStyle["pattern"] } }))}><option value="none">无图案</option><option value="frame">细线边框</option><option value="grid">建筑网格</option><option value="dots">圆点阵列</option><option value="corners">四角标记</option><option value="polka">波点</option><option value="textile">面料肌理</option><option value="gradient">柔和渐变</option><option value="blue-white-dots">蓝白波点</option></select></label>
+            <label><small>广告封面装饰</small><select value={normalizedCoverStyle(draft.coverStyle).pattern} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), pattern: event.target.value as CoverStyle["pattern"] } }))}><option value="none">无图案</option><option value="ad-badge">广告圆形角标</option><option value="ad-ribbon">广告斜切色带</option><option value="editorial-bars">杂志编辑线条</option><option value="spotlight">广告聚光色块</option><option value="frame">细线边框</option><option value="grid">建筑网格</option><option value="dots">圆点阵列</option><option value="corners">四角标记</option><option value="polka">波点</option><option value="textile">面料肌理</option><option value="gradient">柔和渐变</option><option value="blue-white-dots">蓝白波点</option></select></label>
             <label><small>文字位置</small><select value={normalizedCoverStyle(draft.coverStyle).position} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), position: event.target.value as CoverStyle["position"] } }))}><option value="top">顶部</option><option value="middle">居中</option><option value="bottom">底部</option></select></label>
             <label><small>文字对齐</small><select value={normalizedCoverStyle(draft.coverStyle).align} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), align: event.target.value as CoverStyle["align"] } }))}><option value="left">左对齐</option><option value="center">居中</option></select></label>
             <label><small>主标题排版</small><select value={normalizedCoverStyle(draft.coverStyle).titleDirection} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), titleDirection: event.target.value as CoverStyle["titleDirection"] } }))}><option value="horizontal">横向海报排版</option><option value="vertical">竖向中文排版</option></select></label>
@@ -1304,7 +1325,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
             <label className="range-control"><small>副标题垂直位置 · {normalizedCoverStyle(draft.coverStyle).subtitleOffsetY}</small><input type="range" min="-20" max="25" value={normalizedCoverStyle(draft.coverStyle).subtitleOffsetY} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), subtitleOffsetY: Number(event.target.value) } }))}/></label>
           </div>
         </div>
-        <div className="body-compose"><label><small>正文</small><textarea className="body-editor" value={draft.body} onChange={(event) => setDraft((current) => ({ ...current, body: event.target.value }))}/></label><details className="emoji-picker"><summary>Emoji 表情大全</summary><p>点击即可插入正文末尾</p><div>{bodyEmojiGroups.flatMap((group) => Array.from(group).filter((emoji) => emoji !== "️")).map((emoji, index) => <button type="button" key={`${emoji}-${index}`} onClick={() => setDraft((current) => ({ ...current, body: `${current.body}${emoji}` }))} aria-label={`插入 ${emoji}`}>{emoji}</button>)}</div></details></div>
+        <div className="body-compose"><label><small>正文</small><textarea ref={bodyTextareaRef} className="body-editor" value={draft.body} onChange={(event) => setDraft((current) => ({ ...current, body: event.target.value }))}/></label><details className="emoji-picker"><summary>Emoji 表情大全</summary><p>先点击正文任意位置，再点击表情即可插入光标处</p><div>{bodyEmojiGroups.flatMap((group) => Array.from(group).filter((emoji) => emoji !== "️")).map((emoji, index) => <button type="button" key={`${emoji}-${index}`} onMouseDown={(event) => event.preventDefault()} onClick={() => insertBodyEmoji(emoji)} aria-label={`插入 ${emoji}`}>{emoji}</button>)}</div></details></div>
         <label><small>话题标签（用逗号或空格分隔）</small><input value={draft.tags.join("，")} onChange={(event) => setDraft((current) => ({ ...current, tags: event.target.value.split(/[，,\s#]+/).filter(Boolean).slice(0, 12) }))}/></label>
         <div className="editor-actions"><button type="button" onClick={() => void saveProject("drafted")}>保存到资产库</button><button type="button" className="approve-action" onClick={() => void saveProject("approved")}>确认并同步保存</button><button type="button" onClick={() => void approveAndSchedule()}>确认并加入三天队列</button></div>
         <p className="sync-state">{lastSyncedAt ? `✓ 已于 ${lastSyncedAt} 同步更新到项目资产库` : "确认后会同步更新封面、标题、正文与标签，并保存到项目资产库"}</p>
@@ -1317,7 +1338,6 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
     <div className="section-heading"><div><span>PROJECT ASSET LIBRARY</span><h2>项目资产库</h2><p>所有实景图、项目信息、生成文案与排期都按项目长期保存。</p></div><button className="small-action" onClick={() => setActiveTab("creator")}>＋ 新建项目</button></div>
     <div className="category-tabs">{projectCategories.map((category) => <button className={assetCategory === category ? "active" : ""} key={category} onClick={() => setAssetCategory(category)}>{category}<span>{category === "全部项目" ? projects.length : projects.filter((project) => project.category === category).length}</span></button>)}</div>
     <div className="asset-grid">
-      <article className="asset-card featured"><img src={seededImages[1]} alt="温州150平方米住宅"/><div><span className="state-pill">示例项目</span><h3>栖光木境</h3><p>浙江 · 温州　150m²　住宅空间</p><small>7 张实景图 · 已生成封面与文案</small></div></article>
       {visibleProjects.map((project) => <article className="asset-card" key={project.id}>
         {project.images?.[0] ? <img src={project.images[0].url} alt={project.name}/> : <div className="asset-placeholder">栖</div>}
         <div><span className={`state-pill ${project.status}`}>{statusLabels[project.status] || project.status}</span><h3>{project.name}</h3><p>{project.location || "地点待补充"}　{project.area || "面积待补充"}</p><small>{project.projectType || "空间类型待补充"} · {project.images?.length || 0} 张实景图 · {project.scheduledAt ? new Date(project.scheduledAt).toLocaleString("zh-CN") : "尚未排期"}</small><div className="asset-actions"><button onClick={() => loadProject(project)}>打开编辑</button>{["approved", "scheduled"].includes(project.status) && <button onClick={() => void markPublished(project)}>标记已发布</button>}<button className="danger-action" onClick={() => void deleteProject(project)}>删除项目</button></div></div>
@@ -1333,7 +1353,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
         <div className="publish-mode-picker wide">
           <span>发布模式</span>
           <button className={settings.publishMode === "manual" ? "active" : ""} onClick={() => setSettings((current) => ({ ...current, publishMode: "manual" }))}><strong>人工立即发布</strong><small>确认后复制文案并打开小红书官方发布页</small><em>始终可用</em></button>
-          <button className={settings.publishMode === "browser_bridge" ? "active" : ""} disabled={!bridgeReady} onClick={() => setSettings((current) => ({ ...current, publishMode: "browser_bridge" }))}><strong>发布桥定时发布</strong><small>当前电脑到点自动打开官方发布页、预填并执行一次发布</small><em>{bridgeReady ? "发布桥 1.7 已连接" : "请安装发布桥 1.7"}</em></button>
+          <button className={settings.publishMode === "browser_bridge" ? "active" : ""} disabled={!bridgeReady} onClick={() => setSettings((current) => ({ ...current, publishMode: "browser_bridge" }))}><strong>发布桥定时发布</strong><small>当前电脑到点自动打开官方发布页、预填并执行一次发布</small><em>{bridgeReady ? "发布桥 1.8 已连接" : "请安装发布桥 1.8"}</em></button>
         </div>
         <label><span>默认发布时间</span><input type="time" value={settings.publishTime} onChange={(event) => setSettings((current) => ({ ...current, publishTime: event.target.value }))}/></label>
         <label><span>发布间隔</span><div className="number-control"><input type="number" min="1" max="30" value={settings.publishCadenceDays} onChange={(event) => setSettings((current) => ({ ...current, publishCadenceDays: Number(event.target.value) }))}/><em>天</em></div></label>
