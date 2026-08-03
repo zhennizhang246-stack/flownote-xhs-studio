@@ -38,7 +38,7 @@ test("ships the studio secretary product surface", async () => {
   assert.match(page, /直接打开原笔记网页/);
   assert.match(page, /同步右键收藏/);
   assert.match(page, /visibleResearchReferences/);
-  assert.match(page, /保存项目并生成封面与文案/);
+  assert.match(page, /生成封面＋正文与标题/);
   assert.match(page, /浙江 · 温州/);
 });
 
@@ -126,6 +126,10 @@ test("generates a complete photo-driven draft with an English cover eyebrow and 
   assert.match(generate, /providers/);
   assert.match(studio, /本地差异化预览/);
   assert.match(project, /coverEyebrow/);
+  assert.match(studio, /生成封面＋正文与标题/);
+  assert.match(generate, /顶级室内设计互联网秘书/);
+  assert.match(generate, /风格、材质关系、色彩、光线、空间比例、动线/);
+  assert.match(generate, /主标题、副标题、3个笔记标题、正文、Emoji、话题标签/);
 });
 
 test("regenerates existing projects from stored photos after syncing current design information", async () => {
@@ -134,7 +138,7 @@ test("regenerates existing projects from stored photos after syncing current des
   const generate = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
   assert.match(studio, /currentProjectId \? "正在同步设计信息并重新分析项目原图/);
   assert.match(studio, /JSON\.stringify\(\{ meta \}\)/);
-  assert.match(studio, /按原图与最新设计信息重新生成全部内容/);
+  assert.match(studio, /正在逐张识别图片并生成全部内容/);
   assert.match(project, /payload\.meta/);
   assert.match(project, /projectType: cleanMeta/);
   assert.match(generate, /不得沿用旧草稿或示例项目中的原值/);
@@ -303,6 +307,16 @@ test("schedules guarded Xiaohongshu publishing through the local browser bridge"
   assert.match(worker, /5 \* 60_000/);
   assert.ok(manifest.permissions.includes("alarms"));
   assert.match(worker, /收藏到 MJ 引流笔记库/);
+});
+
+test("selects an approved project and date for bridge scheduling", async () => {
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  assert.match(studio, /selectedScheduleProjectId/);
+  assert.match(studio, /请选择已确认项目/);
+  assert.match(studio, /发布日期与时间/);
+  assert.match(studio, /加入发布桥定时发布/);
+  assert.match(styles, /quick-schedule/);
 });
 
 test("ships configurable scheduling and daily research APIs", async () => {
