@@ -38,7 +38,7 @@ test("ships the studio secretary product surface", async () => {
   assert.match(page, /直接打开原笔记网页/);
   assert.match(page, /同步右键收藏/);
   assert.match(page, /visibleResearchReferences/);
-  assert.match(page, /保存项目并生成封面与文案/);
+  assert.match(page, /上传实景图并制作小红书流量爆款版/);
   assert.match(page, /浙江 · 温州/);
 });
 
@@ -114,10 +114,11 @@ test("generates an office traffic draft without external AI APIs", async () => {
   assert.match(studio, /封面英文栏目/);
   assert.match(studio, /renderCoverDataUrl\(coverImage, draft\.coverEyebrow/);
   assert.match(generate, /coverEyebrow/);
-  assert.match(generate, /本地视觉分析 · 无 API/);
-  assert.match(generate, /打开率/);
-  assert.match(generate, /内容价值/);
-  assert.match(generate, /搜一搜布局/);
+  assert.match(generate, /小红书流量爆款版 · 无 API/);
+  assert.match(generate, /小红书流量爆款版/);
+  assert.match(generate, /空间进入真实使用之后/);
+  assert.match(generate, /谁在使用、怎样行走、希望被记住什么/);
+  assert.doesNotMatch(generate, /💧 打开率：|💧 内容价值：|💧 搜一搜布局：/);
   assert.doesNotMatch(generate, /api\.openai\.com|ark\.cn-beijing\.volces\.com|DOUBAO_API_KEY|OPENAI_API_KEY/);
   assert.match(studio, /本地差异化预览/);
   assert.match(project, /coverEyebrow/);
@@ -143,7 +144,7 @@ test("regenerates existing projects from stored photos after syncing current des
   const generate = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
   assert.match(studio, /currentProjectId \? "正在同步设计信息并重新分析项目原图/);
   assert.match(studio, /JSON\.stringify\(\{ meta \}\)/);
-  assert.match(studio, /按原图与最新设计信息重新生成全部内容/);
+  assert.match(studio, /按照室内实景图制作小红书流量爆款版/);
   assert.match(project, /payload\.meta/);
   assert.match(project, /projectType: cleanMeta/);
   assert.match(generate, /办公动线/);
@@ -329,7 +330,7 @@ test("ships configurable scheduling and daily research APIs", async () => {
   assert.match(researchService, /parseVisibleMetric\(b\.likesText/);
   assert.match(researchService, /noteIdentity/);
   assert.match(researchService, /db\.delete\(researchReferences\)/);
-  assert.match(generate, /搜一搜布局/);
+  assert.match(generate, /核心关键词/);
   assert.match(generate, /长尾关键词/);
 });
 
