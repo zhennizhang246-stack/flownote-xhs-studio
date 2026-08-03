@@ -68,12 +68,7 @@ function isXiaohongshuNoteUrl(value: string) {
 function canonicalXiaohongshuNoteUrl(value: string) {
   if (!isXiaohongshuNoteUrl(value)) return "";
   const url = new URL(value);
-  const canonical = new URL(`${url.origin}${url.pathname}`);
-  for (const key of ["xsec_token", "xsec_source", "source"]) {
-    const parameter = url.searchParams.get(key);
-    if (parameter) canonical.searchParams.set(key, parameter.slice(0, 1000));
-  }
-  return canonical.href.slice(0, 2000);
+  return url.href.slice(0, 2000);
 }
 
 function noteIdentity(value: string) {
@@ -123,7 +118,9 @@ export async function collectBrowserResearch(env: ResearchRuntimeEnv, ownerEmail
       cardText: String(candidate.cardText || "").replace(/\s+/g, " ").trim().slice(0, 1800),
     });
   }
-  const selected = [...unique.values()].slice(0, 10);
+  const selected = [...unique.values()]
+    .sort((a, b) => parseVisibleMetric(b.likesText || "") - parseVisibleMetric(a.likesText || ""))
+    .slice(0, 10);
   if (!selected.length) throw new Error("还没有可同步的右键收藏笔记，请先在小红书原笔记页面完成收藏");
 
   const db = drizzle(env.DB, { schema });
