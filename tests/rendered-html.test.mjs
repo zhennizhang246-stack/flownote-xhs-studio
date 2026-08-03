@@ -29,8 +29,7 @@ test("ships the studio secretary product surface", async () => {
   assert.match(page, /最多 10 张实景图/);
   assert.match(page, /可分批人工添加，最多 10 张/);
   assert.match(page, /人工立即发布/);
-  assert.match(page, /官方 API 自动发布/);
-  assert.match(page, /等待官方授权/);
+  assert.doesNotMatch(page, /官方 API 自动发布/);
   assert.match(page, /封面样式编辑/);
   assert.match(page, /建筑网格/);
   assert.match(page, /标题颜色/);
@@ -302,7 +301,7 @@ test("requires a human-approved draft before scheduling", async () => {
   assert.match(scheduleApi, /请先保存并人工确认封面与文案/);
 });
 
-test("persists designed covers and gates official publishing behind approved credentials", async () => {
+test("persists designed covers while keeping official API publishing out of the interface", async () => {
   const page = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
   const projectApi = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
   const coverApi = await readFile(new URL("../app/api/projects/[id]/cover/route.ts", import.meta.url), "utf8");
@@ -311,7 +310,7 @@ test("persists designed covers and gates official publishing behind approved cre
   const worker = await readFile(new URL("../worker/index.ts", import.meta.url), "utf8");
   assert.match(page, /normalizedCoverStyle/);
   assert.match(page, /drawCoverPattern/);
-  assert.match(page, /submitOfficialProject/);
+  assert.doesNotMatch(page, /submitOfficialProject/);
   assert.match(projectApi, /coverStyle/);
   assert.match(coverApi, /approved-cover\.jpg/);
   assert.match(publishApi, /publishProjectOfficial/);

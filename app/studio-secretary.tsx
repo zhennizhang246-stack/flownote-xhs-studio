@@ -68,7 +68,7 @@ type AutomationSettings = {
   researchTime: string;
   dailyResearchEnabled: boolean;
   requireApproval: boolean;
-  publishMode: "manual" | "official_api" | "browser_bridge";
+  publishMode: "manual" | "browser_bridge";
   officialApiConnected: boolean;
   timezone: string;
 };
@@ -700,23 +700,6 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
     return () => window.removeEventListener("message", receiveBridgeStatus);
   }, []);
 
-  useEffect(() => {
-    if (!settings.officialApiConnected || settings.publishMode !== "official_api") return;
-    const submitDue = async () => {
-      const response = await fetch("/api/publish/official", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ due: true }),
-      });
-      if (response.ok) await refreshProjects();
-    };
-    void submitDue();
-    const timer = window.setInterval(() => void submitDue(), 60_000);
-    return () => window.clearInterval(timer);
-    // refreshProjects is a stable function declaration for this client session.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings.officialApiConnected, settings.publishMode]);
-
   const updateMeta = (key: keyof ProjectMeta, value: string) => setMeta((current) => ({ ...current, [key]: value }));
   const handleFiles = (event: ChangeEvent<HTMLInputElement>) => {
     const incoming = Array.from(event.target.files || []);
@@ -829,9 +812,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
     }
     const payload = await response.json() as { settings?: AutomationSettings };
     if (payload.settings) setSettings(payload.settings);
-    setSettingsNotice(settings.publishMode === "official_api"
-      ? `已启用官方 API 自动发布：每 ${settings.publishCadenceDays} 天 ${settings.publishTime} 执行`
-      : settings.publishMode === "browser_bridge"
+    setSettingsNotice(settings.publishMode === "browser_bridge"
       ? `已启用发布桥定时发布：排期后由当前电脑的 Edge 到点打开小红书发布页`
       : `已保存人工发布模式：每 ${settings.publishCadenceDays} 天 ${settings.publishTime} 提醒发布`);
   }
@@ -934,27 +915,6 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
       return next;
     });
     setNotice(`“${project.name}”已从项目资产库删除`);
-  }
-
-  async function submitOfficialProject(projectId: number) {
-    if (!settings.officialApiConnected) {
-      setSettingsNotice("尚未获得小红书官方发布接口权限，当前不能自动提交");
-      return;
-    }
-    if (!window.confirm("确认通过已授权的小红书官方接口提交这篇笔记？")) return;
-    setSettingsNotice("正在向小红书官方接口提交项目笔记…");
-    const response = await fetch("/api/publish/official", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ projectId }),
-    });
-    const payload = await response.json() as { error?: string };
-    if (!response.ok) {
-      setSettingsNotice(payload.error || "官方接口提交失败");
-      return;
-    }
-    setSettingsNotice("项目笔记已由小红书官方接口接收并记录为已发布");
-    await refreshProjects();
   }
 
   function loadProject(project: ProjectRecord) {
@@ -1367,7 +1327,6 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
           <span>发布模式</span>
           <button className={settings.publishMode === "manual" ? "active" : ""} onClick={() => setSettings((current) => ({ ...current, publishMode: "manual" }))}><strong>人工立即发布</strong><small>确认后复制文案并打开小红书官方发布页</small><em>始终可用</em></button>
           <button className={settings.publishMode === "browser_bridge" ? "active" : ""} disabled={!bridgeReady} onClick={() => setSettings((current) => ({ ...current, publishMode: "browser_bridge" }))}><strong>发布桥定时发布</strong><small>当前电脑到点自动打开官方发布页、预填并执行一次发布</small><em>{bridgeReady ? "发布桥 1.5 已连接" : "请安装发布桥 1.5"}</em></button>
-          <button className={settings.publishMode === "official_api" ? "active" : ""} disabled={!settings.officialApiConnected} onClick={() => setSettings((current) => ({ ...current, publishMode: "official_api" }))}><strong>官方 API 自动发布</strong><small>仅使用小红书官方授权接口，到期后自动提交</small><em>{settings.officialApiConnected ? "已连接" : "等待官方授权"}</em></button>
         </div>
         <label><span>默认发布时间</span><input type="time" value={settings.publishTime} onChange={(event) => setSettings((current) => ({ ...current, publishTime: event.target.value }))}/></label>
         <label><span>发布间隔</span><div className="number-control"><input type="number" min="1" max="30" value={settings.publishCadenceDays} onChange={(event) => setSettings((current) => ({ ...current, publishCadenceDays: Number(event.target.value) }))}/><em>天</em></div></label>
@@ -1376,8 +1335,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
         <label className="toggle-row wide"><span>发布前保留人工确认</span><input type="checkbox" checked={settings.requireApproval} onChange={(event) => setSettings((current) => ({ ...current, requireApproval: event.target.checked }))}/></label>
       </div>
       <button className="primary-action settings-save" onClick={() => void saveSettings()}><span>保存自动配置</span><span>→</span></button>
-      <p className="notice">{settingsNotice || (settings.officialApiConnected ? "官方发布接口已连接，可选择自动发布；人工发布入口仍保留。" : "当前未获得小红书官方发布 API 授权，系统会准备发布包并提醒人工发布。")}</p>
-      {!settings.officialApiConnected && <a className="official-access-link" href="https://open.xiaohongshu.com/" target="_blank" rel="noreferrer">前往小红书开放平台申请或管理正式接口权限 ↗</a>}
+      <p className="notice">{settingsNotice || "可选择人工立即发布，或使用当前电脑上的 MJ 发布桥进行定时发布。"}</p>
     </section>
     <section className="dashboard-card queue-card">
       <div className="section-heading"><div><span>PUBLISH QUEUE</span><h2>项目发布日历</h2><p>仅人工确认后的内容可排期；到期后进入官方发布交接流程。</p></div><span className="counter">{scheduledProjects.length} 个已排期</span></div>
@@ -1385,7 +1343,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
         {projects.map((project) => <div className="queue-item" key={project.id}>
           <div className="queue-project">{project.images?.[0] ? <img src={project.images[0].url} alt=""/> : <span>{project.name.slice(0, 1)}</span>}<div><strong>{project.name}</strong><small>{project.location} · {project.area}</small></div></div>
           <input type="datetime-local" value={scheduleDrafts[project.id] || nextSlot(settings)} onChange={(event) => setScheduleDrafts((current) => ({ ...current, [project.id]: event.target.value }))}/>
-          <div className="queue-buttons"><button onClick={() => void scheduleProject(project.id)}>{project.scheduledAt ? "更新排期" : project.status === "approved" ? "加入日历" : "先确认"}</button>{project.scheduledAt && <button className="danger-action" onClick={() => void removeSchedule(project)}>删除排期</button>}{settings.officialApiConnected && ["approved", "scheduled"].includes(project.status) && <button className="official-submit" onClick={() => void submitOfficialProject(project.id)}>官方接口提交</button>}</div>
+          <div className="queue-buttons"><button onClick={() => void scheduleProject(project.id)}>{project.scheduledAt ? "更新排期" : project.status === "approved" ? "加入日历" : "先确认"}</button>{project.scheduledAt && <button className="danger-action" onClick={() => void removeSchedule(project)}>删除排期</button>}</div>
         </div>)}
         {!projects.length && <div className="empty-state"><strong>还没有可排期项目</strong><p>先在创作工作台上传项目实景图，项目会自动进入这里。</p></div>}
       </div>
