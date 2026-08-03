@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "MJ 小红书发布桥",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "同步发布内容，并通过右键菜单收藏小红书室内设计笔记。",
   "permissions": ["storage", "tabs", "alarms", "unlimitedStorage", "contextMenus"],
   "host_permissions": [
