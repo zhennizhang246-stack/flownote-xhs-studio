@@ -120,11 +120,11 @@ export async function collectBrowserResearch(env: ResearchRuntimeEnv, ownerEmail
       likesText: String(candidate.likesText || "").trim().slice(0, 30),
       coverUrl: String(candidate.coverUrl || "").slice(0, 2000),
       coverAlt: String(candidate.coverAlt || "").replace(/\s+/g, " ").trim().slice(0, 180),
-      cardText: String(candidate.cardText || "").replace(/\s+/g, " ").trim().slice(0, 800),
+      cardText: String(candidate.cardText || "").replace(/\s+/g, " ").trim().slice(0, 1800),
     });
   }
-  const selected = [...unique.values()].slice(0, 3);
-  if (selected.length !== 3) throw new Error("未从小红书公开搜索页读取到 3 篇可核验笔记，请确认已登录后重试");
+  const selected = [...unique.values()].slice(0, 10);
+  if (!selected.length) throw new Error("还没有可同步的右键收藏笔记，请先在小红书原笔记页面完成收藏");
 
   const db = drizzle(env.DB, { schema });
   if (force) {
@@ -146,7 +146,9 @@ export async function collectBrowserResearch(env: ResearchRuntimeEnv, ownerEmail
         ? `小红书搜索页采集时可见点赞约 ${candidate.likesText}；收藏与评论未在卡片中公开显示`
         : "已核验为小红书公开笔记；搜索卡片未稳定显示可解析的互动数",
       metricConfidence: "estimated",
-      copyAnalysis: `${abstractCopyPattern(candidate.title)}正文应以项目照片可验证的空间、材质、光线、动线或使用体验为依据，结尾用自然的问题邀请读者交流需求。`,
+      copyAnalysis: candidate.cardText
+        ? candidate.cardText
+        : `${abstractCopyPattern(candidate.title)}正文应以项目照片可验证的空间、材质、光线、动线或使用体验为依据，结尾用自然的问题邀请读者交流需求。`,
       coverAnalysis: "标题先明确空间类型或真实项目事实，再给出一种可感知的体验价值；避免夸张承诺和与项目无关的标题党表达。",
       audienceInsight: "面向正在寻找设计灵感、比较设计公司专业度，或准备启动住宅与商业空间项目的人群。",
       reusablePattern: `${abstractReusablePattern(candidate.title)}结尾可用“你更关注哪一处设计？”等低压力问题引导评论或咨询，不虚构优惠、客户评价与项目成果。`,
