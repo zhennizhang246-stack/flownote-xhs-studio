@@ -101,7 +101,7 @@ test("deletes owned projects and generates space-specific creative strategies", 
 test("generates and persists three selectable title options", async () => {
   const generate = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
   const project = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
-  assert.match(generate, /titleOptions 必须正好包含 3 个标题/);
+  assert.match(generate, /titleOptions 必须正好包含\s*3\s*个/);
   assert.match(generate, /draft\.titleOptions=options/);
   assert.match(project, /titleOptions/);
 });
@@ -116,6 +116,11 @@ test("generates a complete photo-driven draft with an English cover eyebrow and 
   assert.match(generate, /coverEyebrow/);
   assert.match(generate, /标题或正文可自然使用2至4个/);
   assert.match(generate, /researchReferences\.title/);
+  assert.match(generate, /已有项目禁用文字/);
+  assert.match(generate, /duplicateFragments/);
+  assert.match(generate, /连续14个以上相同汉字/);
+  assert.match(generate, /detail:"high"/);
+  assert.match(studio, /本地差异化预览/);
   assert.match(project, /coverEyebrow/);
 });
 
@@ -297,7 +302,7 @@ test("ships configurable scheduling and daily research APIs", async () => {
   assert.match(researchService, /noteIdentity/);
   assert.match(researchService, /db\.delete\(researchReferences\)/);
   assert.match(generate, /近期室内设计引流笔记/);
-  assert.match(generate, /不得复制标题、原句、段落或封面版式/);
+  assert.match(generate, /不得复制参考原文/);
 });
 
 test("requires a human-approved draft before scheduling", async () => {
