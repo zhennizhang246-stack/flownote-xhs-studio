@@ -183,6 +183,18 @@ test("uses the final 1080 by 1440 rendered cover as the live Xiaohongshu preview
   assert.match(studio, /与小红书最终封面完全一致的发布预览/);
 });
 
+test("keeps save, prefill, three-day queue, and guarded auto-publish actions clickable", async () => {
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  assert.match(studio, /const automaticAuthorized = autoPublish && bridgeReady/);
+  assert.doesNotMatch(studio, /className="auto-publish-action" disabled=/);
+  assert.match(studio, /publishAction: automaticAuthorized \? "auto_publish" : "prefill"/);
+  assert.match(studio, /本次已安全降级为人工确认发布/);
+  assert.match(studio, /await saveProject\("approved"\)/);
+  assert.match(studio, /await scheduleProject\(currentProjectId\)/);
+  assert.match(studio, /保存前请确认笔记标题、封面主标题和正文不为空/);
+  assert.match(studio, /同步1080×1440成品封面/);
+});
+
 test("binds durable project storage", async () => {
   const hosting = JSON.parse(await readFile(new URL("../.openai/hosting.json", import.meta.url), "utf8"));
   const schema = await readFile(new URL("../db/schema.ts", import.meta.url), "utf8");

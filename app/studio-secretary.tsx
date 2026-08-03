@@ -873,6 +873,10 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
       setNotice(error instanceof Error ? error.message : "封面生成失败");
       return false;
     }
+    if (!draft.title.trim() || !draft.coverTitle.trim() || !draft.body.trim()) {
+      setNotice("保存前请确认笔记标题、封面主标题和正文不为空");
+      return false;
+    }
     const [response, coverResponse] = await Promise.all([
       fetch(`/api/projects/${currentProjectId}`, {
       method: "PATCH",
@@ -902,11 +906,8 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
       setNotice("请先上传图片并生成正式项目，再进入发布流程");
       return;
     }
-    if (autoPublish && !bridgeReady) {
-      setNotice("自动发布需要先安装并连接 MJ 发布桥；你仍可使用人工预填发布");
-      return;
-    }
-    if (autoPublish && !window.confirm(`确认自动发布「${draft.title.trim()}」？\n\n平台会同步封面、图片、标题、正文与标签，并在 5 分钟内授权扩展点击一次小红书官方“发布”按钮。`)) {
+    const automaticAuthorized = autoPublish && bridgeReady;
+    if (automaticAuthorized && !window.confirm(`确认自动发布「${draft.title.trim()}」？\n\n平台会同步1080×1440成品封面、项目图片、标题、正文与标签，并在 5 分钟内授权扩展点击一次小红书官方“发布”按钮。`)) {
       setNotice("已取消本次自动发布，项目内容没有提交到小红书");
       return;
     }
@@ -950,8 +951,8 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
       tags: draft.tags.map((tag) => tag.replace(/^#/, "").trim()).filter(Boolean),
       coverDataUrl,
       images,
-      publishAction: autoPublish ? "auto_publish" : "prefill",
-      authorization: autoPublish ? {
+      publishAction: automaticAuthorized ? "auto_publish" : "prefill",
+      authorization: automaticAuthorized ? {
         confirmedAt: createdAt.toISOString(),
         expiresAt: new Date(createdAt.getTime() + 5 * 60_000).toISOString(),
         nonce: crypto.randomUUID(),
@@ -966,14 +967,18 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
     const copy = `${draft.title}\n\n${draft.body}\n\n${draft.tags.map((tag) => `#${tag.replace(/^#/, "")}`).join(" ")}`;
     try {
       await navigator.clipboard.writeText(copy);
-      setNotice(autoPublish
+      setNotice(automaticAuthorized
         ? "已同步成品封面、图片、标题与正文；MJ 发布桥将在页面准备完成后执行一次自动发布"
+        : autoPublish && !bridgeReady
+        ? "内容已保存并打开小红书官方发布页；发布桥尚未连接，本次已安全降级为人工确认发布"
         : bridgeReady
         ? "已把图片、标题与正文交给 MJ 发布桥；小红书发布页将自动预填，请检查后人工点击发布"
         : "已复制完整文案并打开小红书发布页；安装 MJ 发布桥后可自动预填图片、标题与正文");
     } catch {
-      setNotice(autoPublish
+      setNotice(automaticAuthorized
         ? "已把本次限时授权交给 MJ 发布桥，正在等待小红书页面完成预填并发布"
+        : autoPublish && !bridgeReady
+        ? "内容已保存并打开小红书官方发布页；请检查1080×1440封面后人工点击发布"
         : bridgeReady
         ? "已把确认内容交给 MJ 发布桥；请在小红书发布页检查后人工点击发布"
         : "已打开小红书发布页；当前未检测到 MJ 发布桥，请手动粘贴文案并上传图片");
@@ -1175,10 +1180,10 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
         {!bridgeReady && <a href={XHS_BRIDGE_EXTENSION_URL} download>下载或更新 MJ 发布桥扩展</a>}
       </div>
       <div className="publish-actions">
-        <button className="secondary-action" onClick={() => void publishNow()}>确认并预填小红书发布页</button>
-        <button className="auto-publish-action" disabled={!bridgeReady} onClick={() => void publishNow(true)}>确认本篇并自动发布</button>
-        <button className="queue-action" onClick={() => void approveAndSchedule()}>确认并加入三天队列</button>
-        <button className="icon-action" onClick={() => void saveProject("drafted")} aria-label="保存到项目资产库">保存到资产库</button>
+        <button type="button" className="secondary-action" onClick={() => void publishNow()}>确认并预填小红书发布页</button>
+        <button type="button" className="auto-publish-action" onClick={() => void publishNow(true)}>确认本篇并自动发布</button>
+        <button type="button" className="queue-action" onClick={() => void approveAndSchedule()}>确认并加入三天队列</button>
+        <button type="button" className="icon-action" onClick={() => void saveProject("drafted")} aria-label="保存到项目资产库">保存到资产库</button>
       </div>
     </section>
     <section className="editorial-card editor-mode">
@@ -1214,7 +1219,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
         </div>
         <label><small>正文</small><textarea className="body-editor" value={draft.body} onChange={(event) => setDraft((current) => ({ ...current, body: event.target.value }))}/></label>
         <label><small>话题标签（用逗号或空格分隔）</small><input value={draft.tags.join("，")} onChange={(event) => setDraft((current) => ({ ...current, tags: event.target.value.split(/[，,\s#]+/).filter(Boolean).slice(0, 12) }))}/></label>
-        <div className="editor-actions"><button onClick={() => void saveProject("drafted")}>保存到资产库</button><button className="approve-action" onClick={() => void saveProject("approved")}>确认并同步保存</button><button onClick={() => void approveAndSchedule()}>确认并加入三天队列</button></div>
+        <div className="editor-actions"><button type="button" onClick={() => void saveProject("drafted")}>保存到资产库</button><button type="button" className="approve-action" onClick={() => void saveProject("approved")}>确认并同步保存</button><button type="button" onClick={() => void approveAndSchedule()}>确认并加入三天队列</button></div>
         <p className="sync-state">{lastSyncedAt ? `✓ 已于 ${lastSyncedAt} 同步更新到项目资产库` : "确认后会同步更新封面、标题、正文与标签，并保存到项目资产库"}</p>
       </div>
       <div className="analysis-column"><div><span className="mini-heading">图片分析要点</span><ul>{draft.highlights.map((item) => <li key={item}>{item}</li>)}</ul></div><div className="risk-box"><span>发布前确认</span>{draft.riskNotes.map((note) => <p key={note}>{note}</p>)}</div></div>
