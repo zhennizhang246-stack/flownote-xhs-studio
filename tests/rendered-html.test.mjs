@@ -11,7 +11,7 @@ test("ships the studio secretary product surface", async () => {
   assert.match(page, /室内设计小红书引流笔记收藏/);
   assert.match(page, /确认并预填小红书发布页/);
   assert.match(page, /确认本篇并自动发布/);
-  assert.match(page, /MJ 发布桥 1.7 已连接/);
+  assert.match(page, /MJ 发布桥 1.8 已连接/);
   assert.match(page, /同步浏览器中右键收藏/);
   assert.match(page, /from=menu&target=image/);
   assert.match(page, /renderCoverDataUrl/);
@@ -39,7 +39,8 @@ test("ships the studio secretary product surface", async () => {
   assert.match(page, /同步右键收藏/);
   assert.match(page, /visibleResearchReferences/);
   assert.match(page, /生成封面＋正文与标题/);
-  assert.match(page, /浙江 · 温州/);
+  assert.match(page, /const emptyDraft/);
+  assert.doesNotMatch(page, /浙江 · 温州/);
 });
 
 test("ships a local bridge with manual prefill and single-use auto-publish authorization", async () => {
@@ -48,7 +49,7 @@ test("ships a local bridge with manual prefill and single-use auto-publish autho
   const prefill = await readFile(new URL("../browser-extension/xhs-prefill.js", import.meta.url), "utf8");
   const research = await readFile(new URL("../browser-extension/xhs-research.js", import.meta.url), "utf8");
   assert.equal(manifest.manifest_version, 3);
-  assert.equal(manifest.version, "1.7.0");
+  assert.equal(manifest.version, "1.8.0");
   assert.ok(manifest.content_scripts.some((entry) => entry.matches.includes("https://creator.xiaohongshu.com/publish/*")));
   assert.match(siteBridge, /MJ_XHS_DRAFT_STORED/);
   assert.match(prefill, /DataTransfer/);
@@ -216,8 +217,26 @@ test("moves and resizes the cover main title and inserts emoji into body copy", 
   assert.match(studio, /titleDirection === "vertical"/);
   assert.match(studio, /Emoji 表情大全/);
   assert.match(studio, /bodyEmojiGroups/);
+  assert.match(studio, /bodyTextareaRef/);
+  assert.match(studio, /selectionStart/);
+  assert.match(studio, /insertBodyEmoji/);
+  assert.match(studio, /插入光标处/);
   assert.match(project, /titleOffsetX/);
   assert.match(project, /titleDirection/);
+});
+
+test("starts with a blank creator and renders movable advertising cover graphics", async () => {
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  const project = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
+  assert.match(studio, /const emptyDraft/);
+  assert.match(studio, /useState<string\[\]>\(\[\]\)/);
+  assert.match(studio, /上传项目实景图后生成封面/);
+  assert.doesNotMatch(studio, /<span className="state-pill">示例项目<\/span>/);
+  for (const pattern of ["ad-badge", "ad-ribbon", "editorial-bars", "spotlight"]) {
+    assert.match(studio, new RegExp(`style\\.pattern === "${pattern}"`));
+    assert.match(project, new RegExp(pattern));
+  }
+  assert.match(studio, /广告封面装饰/);
 });
 
 test("resizes and repositions the cover subtitle in preview and exported artwork", async () => {
