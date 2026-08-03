@@ -1,3 +1,32 @@
+const COLLECT_NOTE_MENU_ID = "mj-xhs-collect-note";
+
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({
+      id: COLLECT_NOTE_MENU_ID,
+      title: "收藏到 MJ 引流笔记库",
+      contexts: ["page", "link", "selection"],
+      documentUrlPatterns: [
+        "https://www.xiaohongshu.com/explore/*",
+        "https://www.xiaohongshu.com/discovery/item/*",
+      ],
+    });
+  });
+});
+
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (info.menuItemId !== COLLECT_NOTE_MENU_ID || !tab?.id) return;
+  chrome.tabs.sendMessage(tab.id, { type: "MJ_XHS_COLLECT_CURRENT_NOTE" }, (response) => {
+    if (chrome.runtime.lastError || !response?.candidate?.sourceUrl) return;
+    chrome.storage.local.get("mjXhsCollectedNotes", (stored) => {
+      const current = Array.isArray(stored.mjXhsCollectedNotes) ? stored.mjXhsCollectedNotes : [];
+      const candidate = response.candidate;
+      const next = [candidate, ...current.filter((item) => item.sourceUrl !== candidate.sourceUrl)].slice(0, 30);
+      chrome.storage.local.set({ mjXhsCollectedNotes: next, mjXhsCollectedAt: new Date().toISOString() });
+    });
+  });
+});
+
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === "MJ_XHS_START_COMMENT_SYNC") {
     const requestId = String(message.requestId || "");
