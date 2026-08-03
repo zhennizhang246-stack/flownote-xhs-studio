@@ -195,7 +195,7 @@ const navItems: Array<{ id: Tab; number: string; label: string }> = [
   { id: "creator", number: "01", label: "创作工作台" },
   { id: "assets", number: "02", label: "项目资产库" },
   { id: "calendar", number: "03", label: "发布日历" },
-  { id: "research", number: "04", label: "流量参考" },
+  { id: "research", number: "04", label: "引流笔记库" },
 ];
 const projectCategories = ["全部项目", "商业项目", "住宅项目", "办公项目", "酒店项目", "展厅陈列项目", "其他项目"];
 const spaceTypes = ["客厅", "餐厅", "厨房", "客餐厨一体", "卧室", "儿童房", "书房", "衣帽间", "卫浴空间", "玄关", "整屋住宅", "办公室", "设计工作室", "酒店大堂", "酒店客房", "民宿", "零售店铺", "餐饮空间", "咖啡空间", "商业展厅", "艺术展陈"];
@@ -1077,23 +1077,23 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
   async function runResearch(force: boolean) {
     if (researching) return;
     setResearching(true);
-    setResearchNotice("秘书正在打开小红书公开搜索页，筛选室内设计高热笔记…");
+    setResearchNotice("秘书正在打开小红书公开搜索页，收集室内设计标题与正文引流写法…");
     try {
-      if (!bridgeReady) throw new Error("请安装或更新 MJ 发布桥 1.5，刷新平台后再开始今日研究");
+      if (!bridgeReady) throw new Error("请安装或更新 MJ 发布桥 1.5，刷新平台后再收集今日引流笔记");
       const browserCandidates = await collectResearchFromBridge(force);
-      setResearchNotice(`已从小红书读取 ${browserCandidates.length} 篇公开笔记，正在筛选并建立原创分析…`);
+      setResearchNotice(`已从小红书读取 ${browserCandidates.length} 篇室内设计公开笔记，正在整理标题与正文引流结构…`);
       const response = await fetch("/api/research", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ force, browserCandidates }),
       });
       const payload = await response.json() as { references?: ResearchReference[]; error?: string };
-      if (!response.ok) throw new Error(payload.error || "每日研究失败");
+      if (!response.ok) throw new Error(payload.error || "引流笔记收集失败");
       const latest = payload.references || [];
       setReferences((current) => [...latest, ...current.filter((item) => item.researchDate !== localDate())]);
-      setResearchNotice("今日 3 篇参考已完成：来源为小红书公开笔记，只提炼结构与视觉规律，不复制原文");
+      setResearchNotice("今日 3 篇室内设计引流笔记已收集：保存标题与正文结构，只学习表达方法，不复制原文");
     } catch (error) {
-      setResearchNotice(error instanceof Error ? error.message : "每日研究失败");
+      setResearchNotice(error instanceof Error ? error.message : "引流笔记收集失败");
     } finally {
       setResearching(false);
     }
@@ -1320,7 +1320,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
         </div>
         <label><span>默认发布时间</span><input type="time" value={settings.publishTime} onChange={(event) => setSettings((current) => ({ ...current, publishTime: event.target.value }))}/></label>
         <label><span>发布间隔</span><div className="number-control"><input type="number" min="1" max="30" value={settings.publishCadenceDays} onChange={(event) => setSettings((current) => ({ ...current, publishCadenceDays: Number(event.target.value) }))}/><em>天</em></div></label>
-        <label><span>每日参考收集时间</span><input type="time" value={settings.researchTime} onChange={(event) => setSettings((current) => ({ ...current, researchTime: event.target.value }))}/></label>
+        <label><span>引流笔记收集时间</span><input type="time" value={settings.researchTime} onChange={(event) => setSettings((current) => ({ ...current, researchTime: event.target.value }))}/></label>
         <label className="toggle-row"><span>自动发布小红书笔记项目</span><input type="checkbox" disabled={!bridgeReady} checked={settings.publishMode === "browser_bridge"} onChange={(event) => setSettings((current) => ({ ...current, publishMode: event.target.checked ? "browser_bridge" : "manual" }))}/></label>
         <label className="toggle-row wide"><span>发布前保留人工确认</span><input type="checkbox" checked={settings.requireApproval} onChange={(event) => setSettings((current) => ({ ...current, requireApproval: event.target.checked }))}/></label>
       </div>
@@ -1341,17 +1341,16 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
   </div>;
 
   const researchView = <section className="dashboard-card">
-    <div className="section-heading"><div><span>DAILY CONTENT INTELLIGENCE</span><h2>每日 3 篇小红书高浏览参考收藏</h2><p>收集公开热度信号较高的室内设计笔记，保存正标题、封面副标题规律、正文结构与收藏数据；点击卡片可查看原笔记。</p></div><button className="small-action" disabled={researching} onClick={() => void runResearch(true)}>{researching ? "正在小红书研究…" : "刷新今日 3 篇"}</button></div>
-    <div className="research-summary"><div><strong>{settings.researchTime}</strong><span>每日自动收集</span></div><div><strong>3 篇</strong><span>室内设计高热参考</span></div><div><strong>原创</strong><span>只提炼规律，不复制原文</span></div></div>
-    <p className="research-notice">{researchNotice || `最近可浏览研究日：${visibleResearchReferences[0]?.researchDate || "请刷新今日 3 篇"}`}</p>
+    <div className="section-heading"><div><span>INTERIOR DESIGN COPY LIBRARY</span><h2>室内设计小红书引流笔记收集</h2><p>每次收集 3 篇室内设计公开笔记，整理原笔记标题、正文开场、设计细节表达和咨询引导方式；点击卡片可直接核对原笔记。</p></div><button className="small-action" disabled={researching} onClick={() => void runResearch(true)}>{researching ? "正在收集引流笔记…" : "收集今日 3 篇"}</button></div>
+    <div className="research-summary"><div><strong>{settings.researchTime}</strong><span>预设收集时间</span></div><div><strong>3 篇</strong><span>室内设计引流笔记</span></div><div><strong>原创</strong><span>学习结构，不复制原文</span></div></div>
+    <p className="research-notice">{researchNotice || `最近收集日期：${visibleResearchReferences[0]?.researchDate || "请收集今日 3 篇"}`}</p>
     <div className="research-grid">
       {visibleResearchReferences.map((reference, index) => <a className="research-card" href={reference.sourceUrl} target="_blank" rel="noreferrer" key={reference.id}>
         <div className={`research-cover tone-${index % 3}`}><span>REFERENCE {String((index % 3) + 1).padStart(2, "0")}</span><strong>{reference.title}</strong><small>{reference.author || "公开来源"}</small></div>
-        <div className="metric-row"><span>赞 {reference.likes || "待核实"}</span><span>收藏 {reference.saves || "待核实"}</span><span>评 {reference.comments || "待核实"}</span><em>{reference.metricConfidence === "verified" ? "公开数据已核实" : "公开热度信号"}</em></div>
-        <div className="research-analysis"><span className="generation-ready">✓ 正标题、正文结构与封面规律已收藏</span><h3>正文结构收藏</h3><p>{reference.copyAnalysis}</p><h3>封面副标题规律</h3><p>{reference.coverAnalysis}</p><h3>后续生成方法</h3><p>{reference.reusablePattern}</p></div>
-        <div className="source-row"><span>{reference.metricsNote}</span><strong>直接打开当前可浏览的原笔记网页 ↗</strong></div>
+        <div className="research-analysis"><span className="generation-ready">✓ 笔记标题与正文引流结构已收集</span><h3>标题引流方式</h3><p>{reference.coverAnalysis}</p><h3>正文表达结构</h3><p>{reference.copyAnalysis}</p><h3>咨询转化写法</h3><p>{reference.reusablePattern}</p></div>
+        <div className="source-row"><span>来源：{reference.author || "小红书公开作者"}</span><strong>直接打开原笔记网页 ↗</strong></div>
       </a>)}
-      {!visibleResearchReferences.length && <div className="empty-state research-empty"><strong>需要重新采集可浏览笔记</strong><p>旧链接缺少小红书当前访问参数或已经失效。点击刷新后，秘书会重新打开小红书并替换为当前可直接浏览的原笔记链接。</p><button onClick={() => void runResearch(true)}>重新采集今日 3 篇</button></div>}
+      {!visibleResearchReferences.length && <div className="empty-state research-empty"><strong>还没有室内设计引流笔记</strong><p>点击收集后，秘书会从小红书公开页面整理 3 篇笔记的标题与正文表达，并保留可核对的原笔记链接。</p><button onClick={() => void runResearch(true)}>收集今日 3 篇</button></div>}
     </div>
   </section>;
 
