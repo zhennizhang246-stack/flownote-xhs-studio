@@ -180,7 +180,7 @@ const initialMeta: ProjectMeta = {
   location: "",
   area: "",
   projectType: "",
-  category: "办公项目",
+  category: "其他项目",
   audience: "",
   brief: "",
 };
@@ -437,12 +437,12 @@ async function analyzeProjectImages(files: File[]) {
   const divisor = Math.max(samples, 1), light = luminance / divisor, sat = saturation / divisor;
   const warm = red / divisor > blue / divisor * 1.08;
   const contrastValue = contrast / Math.max(files.length, 1);
-  if (light < .38) return { projectType: "沉浸质感办公室", brief: "实景图整体明度偏低、明暗层次鲜明，适合从沉浸氛围、品牌质感与重点照明的角度组织封面和正文。" };
-  if (sat > .34) return { projectType: "活力创意办公室", brief: "实景图色彩识别度较高、视觉节奏活跃，适合突出团队活力、品牌记忆点与多元协作场景。" };
-  if (warm && sat < .3) return { projectType: "温润自然办公室", brief: "实景图呈现偏暖且克制的综合色调，适合围绕自然感、舒适办公体验与温和的品牌表达展开。" };
-  if (light > .68) return { projectType: "明亮简约办公室", brief: "实景图整体明亮、色彩关系简洁，适合突出采光感、清晰秩序与轻盈高效的办公体验。" };
-  if (contrastValue > .22) return { projectType: "品牌展示型办公室", brief: "实景图明暗对比与视觉焦点较强，适合强调空间识别度、客户第一印象与品牌展示价值。" };
-  return { projectType: "秩序协作型办公室", brief: "实景图色彩与明度较为平衡，适合从空间秩序、团队协作、专注效率与日常使用体验展开。" };
+  if (light < .38) return { visualStyle: "沉浸质感", brief: "实景图整体明度偏低、明暗层次鲜明，适合从沉浸氛围、空间质感与重点照明的角度组织封面和正文。" };
+  if (sat > .34) return { visualStyle: "活力创意", brief: "实景图色彩识别度较高、视觉节奏活跃，适合突出场景活力、视觉记忆点与多元使用体验。" };
+  if (warm && sat < .3) return { visualStyle: "温润自然", brief: "实景图呈现偏暖且克制的综合色调，适合围绕自然感、舒适体验与温和的空间表达展开。" };
+  if (light > .68) return { visualStyle: "明亮简约", brief: "实景图整体明亮、色彩关系简洁，适合突出采光感、清晰秩序与轻盈的空间体验。" };
+  if (contrastValue > .22) return { visualStyle: "品牌展示", brief: "实景图明暗对比与视觉焦点较强，适合强调空间识别度、第一印象与展示价值。" };
+  return { visualStyle: "秩序平衡", brief: "实景图色彩与明度较为平衡，适合从空间秩序、使用效率与日常体验展开。" };
 }
 
 function drawCoverPattern(context: CanvasRenderingContext2D, style: CoverStyle) {
@@ -791,7 +791,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
         const visualMeta = await analyzeProjectImages(files);
         const submissionMeta = {
           ...meta,
-          projectType: meta.projectType.trim() || visualMeta.projectType,
+          projectType: meta.projectType.trim() || `${(meta.category || "其他项目").replace("项目", "空间")} · ${visualMeta.visualStyle}`,
           brief: meta.brief.trim() || visualMeta.brief,
           category: meta.category || "办公项目",
         };
