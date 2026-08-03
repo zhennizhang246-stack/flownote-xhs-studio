@@ -654,8 +654,8 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
   async function handleGenerate(event: FormEvent) {
     event.preventDefault();
     setPhase(files.length ? "uploading" : "analyzing");
-    setNotice(files.length ? "正在上传并建立项目资产档案…" : "正在重新分析示例项目…");
-    if (!files.length) {
+    setNotice(files.length ? "正在上传并建立项目资产档案…" : currentProjectId ? "正在同步设计信息并重新分析项目原图…" : "正在重新分析示例项目…");
+    if (!files.length && !currentProjectId) {
       await new Promise((resolve) => setTimeout(resolve, 450));
       setDraft(seededDraft);
       setPhase("done");
@@ -663,26 +663,38 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
       return;
     }
     try {
-      const images = await Promise.all(files.map(async (file) => ({
-        name: file.name,
-        type: file.type || "image/jpeg",
-        data: await toDataUrl(file),
-      })));
-      const saved = await fetch("/api/projects", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ...meta, images }),
-      });
-      if (!saved.ok) throw new Error("项目资产暂时无法保存");
-      const project = await saved.json() as { id: number };
-      setCurrentProjectId(project.id);
-      setScheduleDrafts((current) => ({ ...current, [project.id]: nextSlot(settings) }));
+      let projectId = currentProjectId;
+      if (files.length) {
+        const images = await Promise.all(files.map(async (file) => ({
+          name: file.name,
+          type: file.type || "image/jpeg",
+          data: await toDataUrl(file),
+        })));
+        const saved = await fetch("/api/projects", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ ...meta, images }),
+        });
+        if (!saved.ok) throw new Error("项目资产暂时无法保存");
+        const project = await saved.json() as { id: number };
+        projectId = project.id;
+        setCurrentProjectId(project.id);
+        setScheduleDrafts((current) => ({ ...current, [project.id]: nextSlot(settings) }));
+      } else if (projectId) {
+        const synced = await fetch(`/api/projects/${projectId}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ meta }),
+        });
+        if (!synced.ok) throw new Error("最新设计信息同步失败");
+      }
+      if (!projectId) throw new Error("请先选择项目或上传实景图");
       setPhase("analyzing");
-      setNotice("秘书正在识别空间、材质、灯光与画面重点…");
+      setNotice("秘书正在重新识别原图，并同步生成全部标题、封面、正文与标签…");
       const generated = await fetch("/api/generate", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ projectId: project.id }),
+        body: JSON.stringify({ projectId }),
       });
       if (!generated.ok) {
         const error = await generated.json() as { error?: string };
@@ -691,7 +703,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
       const result = await generated.json() as { draft: Draft };
       setDraft({ ...result.draft, coverStyle: normalizedCoverStyle(result.draft.coverStyle) });
       setPhase("done");
-      setNotice("已完成封面与原创文案，并归档到项目资产库");
+      setNotice("已依据项目原图与最新设计信息，完整更新标题、封面样式、正文和标签");
       await refreshProjects();
     } catch (error) {
       setDraft(localFallback(meta));
@@ -816,7 +828,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
       fetch(`/api/projects/${currentProjectId}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ draft: { ...draft, mode: "人工编辑" }, status, publishUrl }),
+      body: JSON.stringify({ meta, draft: { ...draft, mode: "人工编辑" }, status, publishUrl }),
       }),
       fetch(`/api/projects/${currentProjectId}/cover`, {
         method: "PUT",
@@ -1100,7 +1112,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
           <label><span>目标客户</span><input value={meta.audience} onChange={(event) => updateMeta("audience", event.target.value)}/></label>
           <label className="wide"><span>已知设计信息</span><textarea value={meta.brief} onChange={(event) => updateMeta("brief", event.target.value)}/></label>
         </div>
-        <button className="primary-action" disabled={phase === "uploading" || phase === "analyzing"}><span>{phase === "analyzing" ? "正在分析…" : "保存项目并生成封面与文案"}</span><span>→</span></button>
+        <button className="primary-action" disabled={phase === "uploading" || phase === "analyzing"}><span>{phase === "analyzing" ? "正在同步更新全部内容…" : currentProjectId && !files.length ? "按原图与最新设计信息重新生成全部内容" : "保存项目并生成封面与文案"}</span><span>→</span></button>
         <p className="notice">{notice}</p>
       </form>
     </section>

@@ -128,6 +128,20 @@ test("generates a complete photo-driven draft with an English cover eyebrow and 
   assert.match(project, /coverEyebrow/);
 });
 
+test("regenerates existing projects from stored photos after syncing current design information", async () => {
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  const project = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
+  const generate = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
+  assert.match(studio, /currentProjectId \? "正在同步设计信息并重新分析项目原图/);
+  assert.match(studio, /JSON\.stringify\(\{ meta \}\)/);
+  assert.match(studio, /按原图与最新设计信息重新生成全部内容/);
+  assert.match(project, /payload\.meta/);
+  assert.match(project, /projectType: cleanMeta/);
+  assert.match(generate, /不得沿用旧草稿或示例项目中的原值/);
+  assert.match(generate, /💧 小标题/);
+  assert.match(generate, /所有事实都必须来自上传照片和已知设计信息/);
+});
+
 test("binds durable project storage", async () => {
   const hosting = JSON.parse(await readFile(new URL("../.openai/hosting.json", import.meta.url), "utf8"));
   const schema = await readFile(new URL("../db/schema.ts", import.meta.url), "utf8");

@@ -81,17 +81,28 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const { id } = await context.params;
     const projectId = Number(id);
     if (!Number.isInteger(projectId) || projectId < 1) return Response.json({ error: "项目编号无效" }, { status: 400 });
-    const payload = await request.json() as { draft?: unknown; status?: string; publishUrl?: string };
-    if (!payload.status || !validStatuses.has(payload.status)) return Response.json({ error: "项目状态无效" }, { status: 400 });
+    const payload = await request.json() as { draft?: unknown; status?: string; publishUrl?: string; meta?: { name?: string; location?: string; area?: string; projectType?: string; category?: string; audience?: string; brief?: string } };
+    if (payload.status && !validStatuses.has(payload.status)) return Response.json({ error: "项目状态无效" }, { status: 400 });
+    if (!payload.status && !payload.draft && !payload.meta) return Response.json({ error: "没有需要更新的项目内容" }, { status: 400 });
 
     const db = getDb();
     const [existing] = await db.select().from(projects).where(and(eq(projects.id, projectId), eq(projects.ownerEmail, ownerEmail))).limit(1);
     if (!existing) return Response.json({ error: "项目不存在" }, { status: 404 });
 
-    const draft = payload.draft ? cleanDraft(payload.draft) : cleanDraft(JSON.parse(existing.draftJson || "{}"));
+    const draft = payload.draft ? cleanDraft(payload.draft) : JSON.parse(existing.draftJson || "{}");
     const now = new Date().toISOString();
-    const status = payload.status;
+    const status = payload.status || existing.status;
+    const cleanMeta = (value: unknown, fallback: string, max: number) => String(value ?? fallback).trim().slice(0, max);
+    const allowedCategories = new Set(["商业项目", "住宅项目", "办公项目", "酒店项目", "展厅陈列项目", "其他项目"]);
+    const meta = payload.meta;
     const [updated] = await db.update(projects).set({
+      name: cleanMeta(meta?.name, existing.name, 80) || existing.name,
+      location: cleanMeta(meta?.location, existing.location, 100),
+      area: cleanMeta(meta?.area, existing.area, 40),
+      projectType: cleanMeta(meta?.projectType, existing.projectType, 80),
+      category: meta?.category && allowedCategories.has(meta.category) ? meta.category : existing.category,
+      audience: cleanMeta(meta?.audience, existing.audience, 300),
+      brief: cleanMeta(meta?.brief, existing.brief, 1500),
       draftJson: JSON.stringify(draft),
       status,
       approvedAt: status === "approved" || status === "scheduled" || status === "published"

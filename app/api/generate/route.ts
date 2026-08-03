@@ -6,7 +6,7 @@ import { apiError, requireAccountEmail } from "../../../lib/account";
 type RuntimeEnv = { PROJECT_MEDIA?: R2Bucket; OPENAI_API_KEY?: string; OPENAI_MODEL?: string };
 type GeneratedDraft = { title:string; titleOptions?:string[]; coverEyebrow?:string; coverTitle:string; coverSubtitle:string; coverStyle?:Record<string,unknown>; body:string; tags:string[]; highlights:string[]; riskNotes:string[]; coverIndex:number; mode:string };
 
-function spaceDesignGuidance(projectType: string, category: string) {
+function spaceDesignGuidanceBase(projectType: string, category: string) {
   const value = `${projectType} ${category}`;
   if (/卧室|主卧|儿童房/.test(value)) return "卧室：突出睡眠氛围、私密性、灯光层次、织物与安静收纳；封面优先床区和窗景，文字更少、更有情绪。";
   if (/厨房|餐厅|餐厨/.test(value)) return "餐厨空间：突出操作动线、台面尺度、家人交流、储物与材质耐用性；封面优先中岛、餐桌或餐厨联动关系。";
@@ -18,6 +18,10 @@ function spaceDesignGuidance(projectType: string, category: string) {
   if (/展厅|陈列|展览/.test(value)) return "展厅陈列：突出叙事顺序、展陈节奏、观看距离、灯光与视觉焦点；封面优先主展面或空间序列。";
   if (/客厅|起居|住宅/.test(value)) return "住宅客厅：突出采光、家庭互动、动线、尺度与收纳；封面优先全景或客餐厅关系，语气温暖克制。";
   return "综合室内空间：先依据实景图判断核心使用场景，再围绕真实功能、动线、材质、光线和用户收益形成差异化表达。";
+}
+
+function spaceDesignGuidance(projectType: string, category: string) {
+  return `${spaceDesignGuidanceBase(projectType, category)} 每次生成都必须把3个标题方案、封面英文栏目、封面主标题、封面副标题、封面样式全部参数、正文和话题标签作为一个整体重新创作，不得沿用旧草稿或示例项目中的原值。正文从两种结构中选择更适合当前项目的一种：A. 先用一段说明设计核心，再用3至5段“💧 小标题：照片可验证的设计细节”展开；B. 用有辨识度的项目标题开场，再以3至5段编辑式叙事描述空间概念、真实场景、材质、动线与体验，可在结尾加入一句简短英文概念。无论选择哪种结构，所有事实都必须来自上传照片和已知设计信息；看不清或未提供的内容不得猜测。`;
 }
 
 function defaultCoverEyebrow(projectType: string, category: string) {
