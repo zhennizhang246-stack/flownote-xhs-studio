@@ -288,7 +288,7 @@ function collectResearchFromBridge(force: boolean) {
     const requestId = crypto.randomUUID();
     const timeout = window.setTimeout(() => {
       window.removeEventListener("message", receiveResult);
-      reject(new Error("等待小红书公开搜索结果超时，请确认搜索页已打开且账号已登录"));
+      reject(new Error("等待右键收藏笔记超时，请确认发布桥已重新加载"));
     }, 35_000);
     function receiveResult(event: MessageEvent) {
       if (event.source !== window || event.origin !== window.location.origin) return;
@@ -630,7 +630,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
   const visibleResearchReferences = references.filter((reference) => {
     try {
       const url = new URL(reference.sourceUrl);
-      return url.searchParams.has("xsec_token");
+      return url.hostname.endsWith("xiaohongshu.com") && /\/(?:explore|discovery\/item)\//.test(url.pathname);
     } catch {
       return false;
     }
@@ -838,7 +838,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
     const scheduledAt = scheduleDrafts[projectId] || nextSlot(settings);
     const project = projects.find((item) => item.id === projectId);
     if (settings.publishMode === "browser_bridge" && !bridgeReady) {
-      setNotice("发布桥定时发布需要先安装并连接 MJ 发布桥 1.5");
+      setNotice("发布桥定时发布需要先安装并连接 MJ 发布桥 1.6");
       return;
     }
     const response = await fetch(`/api/projects/${projectId}/schedule`, {
@@ -1077,11 +1077,11 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
   async function runResearch(force: boolean) {
     if (researching) return;
     setResearching(true);
-    setResearchNotice("秘书正在打开小红书公开搜索页，收集室内设计标题与正文引流写法…");
+    setResearchNotice("正在同步浏览器中右键收藏的小红书室内设计笔记…");
     try {
-      if (!bridgeReady) throw new Error("请安装或更新 MJ 发布桥 1.5，刷新平台后再收集今日引流笔记");
+      if (!bridgeReady) throw new Error("请安装或更新 MJ 发布桥 1.6，刷新平台后再同步右键收藏笔记");
       const browserCandidates = await collectResearchFromBridge(force);
-      setResearchNotice(`已从小红书读取 ${browserCandidates.length} 篇室内设计公开笔记，正在整理标题与正文引流结构…`);
+      setResearchNotice(`已读取 ${browserCandidates.length} 篇右键收藏笔记，正在整理标题与正文引流结构…`);
       const response = await fetch("/api/research", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -1091,7 +1091,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
       if (!response.ok) throw new Error(payload.error || "引流笔记收集失败");
       const latest = payload.references || [];
       setReferences((current) => [...latest, ...current.filter((item) => item.researchDate !== localDate())]);
-      setResearchNotice("今日 3 篇室内设计引流笔记已收集：保存标题与正文结构，只学习表达方法，不复制原文");
+      setResearchNotice(`已同步 ${latest.length} 篇室内设计引流笔记：保存原链接、标题与正文结构，不复制原文`);
     } catch (error) {
       setResearchNotice(error instanceof Error ? error.message : "引流笔记收集失败");
     } finally {
@@ -1240,7 +1240,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
       <div className="phone-frame"><div className="cover-preview final-artwork-preview"><img src={renderedCoverPreview || coverImage} alt="与小红书最终封面完全一致的发布预览"/></div></div>
       <p className="final-preview-note">1080 × 1440 小红书竖版封面 · 此处直接显示最终合成图片</p>
       <div className={`bridge-status ${bridgeReady ? "connected" : ""}`}>
-        <span>{bridgeReady ? "MJ 发布桥 1.5 已连接" : "未连接最新版 MJ 发布桥"}</span>
+        <span>{bridgeReady ? "MJ 发布桥 1.6 已连接" : "未连接最新版 MJ 发布桥"}</span>
         <p>{bridgeReady ? "成品封面、项目图片、标题、正文与标签会保持统一；可选择人工发布或单篇确认后自动发布。" : "安装一次浏览器扩展，即可把已确认内容自动带入小红书官方图文发布页。"}</p>
         {!bridgeReady && <a href={XHS_BRIDGE_EXTENSION_URL} download>下载或更新 MJ 发布桥扩展</a>}
       </div>
@@ -1316,7 +1316,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
         <div className="publish-mode-picker wide">
           <span>发布模式</span>
           <button className={settings.publishMode === "manual" ? "active" : ""} onClick={() => setSettings((current) => ({ ...current, publishMode: "manual" }))}><strong>人工立即发布</strong><small>确认后复制文案并打开小红书官方发布页</small><em>始终可用</em></button>
-          <button className={settings.publishMode === "browser_bridge" ? "active" : ""} disabled={!bridgeReady} onClick={() => setSettings((current) => ({ ...current, publishMode: "browser_bridge" }))}><strong>发布桥定时发布</strong><small>当前电脑到点自动打开官方发布页、预填并执行一次发布</small><em>{bridgeReady ? "发布桥 1.5 已连接" : "请安装发布桥 1.5"}</em></button>
+          <button className={settings.publishMode === "browser_bridge" ? "active" : ""} disabled={!bridgeReady} onClick={() => setSettings((current) => ({ ...current, publishMode: "browser_bridge" }))}><strong>发布桥定时发布</strong><small>当前电脑到点自动打开官方发布页、预填并执行一次发布</small><em>{bridgeReady ? "发布桥 1.6 已连接" : "请安装发布桥 1.6"}</em></button>
         </div>
         <label><span>默认发布时间</span><input type="time" value={settings.publishTime} onChange={(event) => setSettings((current) => ({ ...current, publishTime: event.target.value }))}/></label>
         <label><span>发布间隔</span><div className="number-control"><input type="number" min="1" max="30" value={settings.publishCadenceDays} onChange={(event) => setSettings((current) => ({ ...current, publishCadenceDays: Number(event.target.value) }))}/><em>天</em></div></label>
@@ -1341,16 +1341,16 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
   </div>;
 
   const researchView = <section className="dashboard-card">
-    <div className="section-heading"><div><span>INTERIOR DESIGN COPY LIBRARY</span><h2>室内设计小红书引流笔记收集</h2><p>每次收集 3 篇室内设计公开笔记，整理原笔记标题、正文开场、设计细节表达和咨询引导方式；点击卡片可直接核对原笔记。</p></div><button className="small-action" disabled={researching} onClick={() => void runResearch(true)}>{researching ? "正在收集引流笔记…" : "收集今日 3 篇"}</button></div>
-    <div className="research-summary"><div><strong>{settings.researchTime}</strong><span>预设收集时间</span></div><div><strong>3 篇</strong><span>室内设计引流笔记</span></div><div><strong>原创</strong><span>学习结构，不复制原文</span></div></div>
-    <p className="research-notice">{researchNotice || `最近收集日期：${visibleResearchReferences[0]?.researchDate || "请收集今日 3 篇"}`}</p>
+    <div className="section-heading"><div><span>INTERIOR DESIGN COPY LIBRARY</span><h2>室内设计小红书引流笔记收藏</h2><p>打开小红书原笔记后点击鼠标右键，选择“收藏到 MJ 引流笔记库”；返回平台同步，即可保存原链接、标题和可见正文。</p></div><button className="small-action" disabled={researching} onClick={() => void runResearch(true)}>{researching ? "正在同步收藏…" : "同步右键收藏"}</button></div>
+    <div className="research-summary"><div><strong>右键</strong><span>原笔记页面收藏</span></div><div><strong>原文</strong><span>链接、标题与正文</span></div><div><strong>原创</strong><span>学习结构，不复制原文</span></div></div>
+    <p className="research-notice">{researchNotice || `最近收集日期：${visibleResearchReferences[0]?.researchDate || "请先右键收藏小红书原笔记"}`}</p>
     <div className="research-grid">
       {visibleResearchReferences.map((reference, index) => <a className="research-card" href={reference.sourceUrl} target="_blank" rel="noreferrer" key={reference.id}>
         <div className={`research-cover tone-${index % 3}`}><span>REFERENCE {String((index % 3) + 1).padStart(2, "0")}</span><strong>{reference.title}</strong><small>{reference.author || "公开来源"}</small></div>
-        <div className="research-analysis"><span className="generation-ready">✓ 笔记标题与正文引流结构已收集</span><h3>标题引流方式</h3><p>{reference.coverAnalysis}</p><h3>正文表达结构</h3><p>{reference.copyAnalysis}</p><h3>咨询转化写法</h3><p>{reference.reusablePattern}</p></div>
+        <div className="research-analysis"><span className="generation-ready">✓ 原笔记链接、标题与可见正文已收藏</span><h3>标题引流方式</h3><p>{reference.coverAnalysis}</p><h3>原笔记可见正文</h3><p>{reference.copyAnalysis}</p><h3>咨询转化写法</h3><p>{reference.reusablePattern}</p></div>
         <div className="source-row"><span>来源：{reference.author || "小红书公开作者"}</span><strong>直接打开原笔记网页 ↗</strong></div>
       </a>)}
-      {!visibleResearchReferences.length && <div className="empty-state research-empty"><strong>还没有室内设计引流笔记</strong><p>点击收集后，秘书会从小红书公开页面整理 3 篇笔记的标题与正文表达，并保留可核对的原笔记链接。</p><button onClick={() => void runResearch(true)}>收集今日 3 篇</button></div>}
+      {!visibleResearchReferences.length && <div className="empty-state research-empty"><strong>还没有右键收藏笔记</strong><p>先打开一篇小红书室内设计原笔记，在页面空白处点击鼠标右键并选择“收藏到 MJ 引流笔记库”，然后回到这里同步。</p><button onClick={() => void runResearch(true)}>同步右键收藏</button></div>}
     </div>
   </section>;
 
