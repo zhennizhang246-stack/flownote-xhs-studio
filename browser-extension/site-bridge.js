@@ -46,10 +46,17 @@ window.addEventListener("message", (event) => {
     return;
   }
   if (message.type === "MJ_XHS_RESEARCH_REQUEST") {
-    chrome.runtime.sendMessage({
-      type: "MJ_XHS_START_RESEARCH",
-      requestId: String(message.requestId || ""),
-      force: message.force === true,
+    const requestId = String(message.requestId || "");
+    chrome.storage.local.get("mjXhsCollectedNotes", (stored) => {
+      const candidates = Array.isArray(stored.mjXhsCollectedNotes) ? stored.mjXhsCollectedNotes : [];
+      window.postMessage({
+        source: BRIDGE_SOURCE,
+        type: "MJ_XHS_RESEARCH_RESULT",
+        version: 4,
+        requestId,
+        candidates,
+        error: candidates.length ? "" : "还没有右键收藏笔记。请先打开小红书原笔记，右键选择“收藏到 MJ 引流笔记库”",
+      }, window.location.origin);
     });
     return;
   }
