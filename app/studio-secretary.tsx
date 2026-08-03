@@ -3,6 +3,9 @@
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 
 type Draft = {
+  projectName?: string;
+  detectedSpaceType?: string;
+  designSummary?: string;
   title: string;
   titleOptions: string[];
   coverEyebrow: string;
@@ -788,8 +791,9 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
         const error = await generated.json() as { error?: string };
         throw new Error(error.error || "AI 生成暂不可用");
       }
-      const result = await generated.json() as { draft: Draft };
+      const result = await generated.json() as { draft: Draft; meta?: Partial<ProjectMeta> };
       setDraft({ ...result.draft, coverStyle: normalizedCoverStyle(result.draft.coverStyle) });
+      if (result.meta) setMeta((current) => ({ ...current, ...result.meta }));
       setPhase("done");
       setNotice("已依据项目原图与最新设计信息，完整更新标题、封面样式、正文和标签");
       await refreshProjects();
