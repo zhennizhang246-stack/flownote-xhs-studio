@@ -81,12 +81,19 @@ function collectCurrentNote() {
       || document.querySelector('[class*="username"]')?.textContent,
     80,
   );
+  const engagementText = cleanText(
+    document.querySelector('[class*="like-wrapper"]')?.textContent
+      || document.querySelector('[class*="engage"] [class*="like"]')?.textContent
+      || document.querySelector('[class*="interact"] [class*="like"]')?.textContent,
+    80,
+  );
+  const likesMatch = engagementText.match(/(?:赞|点赞)?\s*(\d+(?:\.\d+)?\s*[万wWkK]?)/);
   if (!title || title.length < 3) return null;
   return {
     sourceUrl,
     title,
     author,
-    likesText: "",
+    likesText: cleanText(likesMatch?.[1], 30),
     coverUrl: meta("og:image"),
     coverAlt: title,
     cardText: body,
