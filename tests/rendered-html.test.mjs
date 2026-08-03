@@ -120,6 +120,10 @@ test("generates a complete photo-driven draft with an English cover eyebrow and 
   assert.match(generate, /duplicateFragments/);
   assert.match(generate, /连续14个以上相同汉字/);
   assert.match(generate, /detail:"high"/);
+  assert.match(generate, /DOUBAO_API_KEY/);
+  assert.match(generate, /ark\.cn-beijing\.volces\.com\/api\/v3\/responses/);
+  assert.match(generate, /doubao-seed-2-0-lite-260215/);
+  assert.match(generate, /providers/);
   assert.match(studio, /本地差异化预览/);
   assert.match(project, /coverEyebrow/);
 });
