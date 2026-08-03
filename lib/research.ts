@@ -123,9 +123,7 @@ export async function collectBrowserResearch(env: ResearchRuntimeEnv, ownerEmail
       cardText: String(candidate.cardText || "").replace(/\s+/g, " ").trim().slice(0, 800),
     });
   }
-  const selected = [...unique.values()]
-    .sort((a, b) => parseVisibleMetric(b.likesText || "") - parseVisibleMetric(a.likesText || ""))
-    .slice(0, 3);
+  const selected = [...unique.values()].slice(0, 3);
   if (selected.length !== 3) throw new Error("未从小红书公开搜索页读取到 3 篇可核验笔记，请确认已登录后重试");
 
   const db = drizzle(env.DB, { schema });
@@ -148,12 +146,10 @@ export async function collectBrowserResearch(env: ResearchRuntimeEnv, ownerEmail
         ? `小红书搜索页采集时可见点赞约 ${candidate.likesText}；收藏与评论未在卡片中公开显示`
         : "已核验为小红书公开笔记；搜索卡片未稳定显示可解析的互动数",
       metricConfidence: "estimated",
-      copyAnalysis: abstractCopyPattern(candidate.title),
-      coverAnalysis: candidate.coverAlt
-        ? "封面以室内实景为主体，并通过画面主体、留白和文字层级建立首屏识别；生成时应结合项目原图重新构图。"
-        : "公开卡片以项目空间实景建立视觉信任；生成时保持单一视觉中心、克制文字和清晰项目事实。",
+      copyAnalysis: `${abstractCopyPattern(candidate.title)}正文应以项目照片可验证的空间、材质、光线、动线或使用体验为依据，结尾用自然的问题邀请读者交流需求。`,
+      coverAnalysis: "标题先明确空间类型或真实项目事实，再给出一种可感知的体验价值；避免夸张承诺和与项目无关的标题党表达。",
       audienceInsight: "面向正在寻找设计灵感、比较设计公司专业度，或准备启动住宅与商业空间项目的人群。",
-      reusablePattern: abstractReusablePattern(candidate.title),
+      reusablePattern: `${abstractReusablePattern(candidate.title)}结尾可用“你更关注哪一处设计？”等低压力问题引导评论或咨询，不虚构优惠、客户评价与项目成果。`,
     };
     const values = { ownerEmail, researchDate: date, ...item };
     await db.insert(researchReferences).values(values).onConflictDoUpdate({
@@ -213,16 +209,15 @@ export async function collectDailyResearch(env: ResearchRuntimeEnv, ownerEmail: 
   const existing = await listResearch(env, ownerEmail, date);
   if (existing.length >= 3 && !force) return existing;
 
-  const prompt = `今天是 ${date}。你是室内设计工作室的内容研究员。
-使用联网搜索寻找小红书（xiaohongshu.com）公开可访问的室内设计、住宅实景、空间改造内容。
-筛选 3 篇具有高点赞或高收藏信号的内容，优先最近 90 天；若无法核实确切互动量，不得编造，
-将数值写为 0，并在 metricsNote 说明可见的热度信号与限制，metricConfidence 写 estimated。
-只分析选题、叙事结构、首屏信息层级、封面构图、字体位置、色彩和受众需求。
+  const prompt = `今天是 ${date}。你是室内设计工作室的小红书引流笔记整理秘书。
+使用联网搜索寻找小红书（xiaohongshu.com）公开可访问的室内设计、住宅实景、商业空间、办公、酒店与展陈项目笔记。
+收集 3 篇标题清楚、正文围绕真实空间设计展开，并具有自然咨询引导价值的笔记。互动数据不是筛选条件；若页面没有公开互动数据，将数值写为 0，metricConfidence 写 estimated。
+重点整理标题如何交代空间类型或项目事实、正文如何用材质、光线、动线、功能和使用体验建立专业信任，以及结尾如何自然引导评论或设计咨询。
 不得大段摘录或改写原文，不得建议复制原句或照搬封面。
   sourceUrl 必须是实际可访问的小红书笔记详情页（xiaohongshu.com/discovery/item 或 /explore），
   不得使用搜索页、聚合页、其他网站或虚构链接。
-必须优先收藏公开热度信号较高的笔记正标题、封面副标题规律、正文叙事结构与可见收藏数据；页面没有公开展示浏览量或收藏量时必须标记为待核实，绝不推算或编造。
-reusablePattern 必须是可用于未来原创项目的抽象方法。`;
+copyAnalysis 必须总结正文的开场、设计细节展开与结尾结构；coverAnalysis 必须总结标题的引流方式；audienceInsight 必须说明这类内容吸引的真实设计客户需求。
+reusablePattern 必须给出可用于未来原创项目的咨询转化方法，不得包含虚假优惠、夸张承诺或诱导性联系方式。`;
 
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
@@ -247,7 +242,7 @@ reusablePattern 必须是可用于未来原创项目的抽象方法。`;
   });
   if (!response.ok) {
     if (response.status === 401) throw new Error("OpenAI API 密钥无效或已失效");
-    throw new Error(`每日研究暂不可用（${response.status}）`);
+    throw new Error(`引流笔记收集暂不可用（${response.status}）`);
   }
 
   const payload = await response.json() as Record<string, unknown>;
