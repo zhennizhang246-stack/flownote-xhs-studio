@@ -152,6 +152,11 @@ test("creates photo-only drafts when project metadata is omitted", async () => {
   assert.match(generate, /项目名称、所在地、面积、空间类型、目标客户和设计说明全部允许为空/);
   assert.match(generate, /不得在成品中出现“未命名项目”“实景图识别项目”/);
   assert.match(generate, /资产库分区只用于归档/);
+  assert.match(generate, /projectName 必须是根据照片气质原创的4至12字中文项目名称/);
+  assert.match(generate, /detectedSpaceType/);
+  assert.match(generate, /designSummary/);
+  assert.match(generate, /generatedMeta/);
+  assert.match(studio, /result\.meta/);
 });
 
 test("moves cover decorations and controls English eyebrow opacity and line visibility", async () => {
