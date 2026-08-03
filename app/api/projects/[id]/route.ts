@@ -27,6 +27,9 @@ type Draft = {
     eyebrowY?: number;
     eyebrowOpacity?: number;
     showEyebrowLine?: boolean;
+    subtitleSize?: number;
+    subtitleOffsetX?: number;
+    subtitleOffsetY?: number;
   };
   body: string;
   tags: string[];
@@ -73,6 +76,9 @@ function cleanDraft(value: unknown): Draft {
       eyebrowY: Math.min(35, Math.max(2, Number(style.eyebrowY ?? 5.8))),
       eyebrowOpacity: Math.min(100, Math.max(10, Number(style.eyebrowOpacity ?? 100))),
       showEyebrowLine: typeof style.showEyebrowLine === "boolean" ? style.showEyebrowLine : true,
+      subtitleSize: Math.min(54, Math.max(18, Number(style.subtitleSize ?? 28))),
+      subtitleOffsetX: Math.min(30, Math.max(-30, Number(style.subtitleOffsetX ?? 0))),
+      subtitleOffsetY: Math.min(25, Math.max(-20, Number(style.subtitleOffsetY ?? 0))),
     },
     body: cleanText(input.body, 3000),
     tags: cleanList(input.tags, 12, 24),

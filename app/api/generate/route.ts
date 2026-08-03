@@ -21,7 +21,7 @@ function spaceDesignGuidanceBase(projectType: string, category: string) {
 }
 
 function spaceDesignGuidance(projectType: string, category: string) {
-  return `${spaceDesignGuidanceBase(projectType, category)} 每次生成都必须把3个标题方案、封面英文栏目、封面主标题、封面副标题、封面样式全部参数、正文和话题标签作为一个整体重新创作，不得沿用旧草稿或示例项目中的原值。coverStyle 还必须生成 patternOffsetX、patternOffsetY（-25至25）、eyebrowX（2至50）、eyebrowY（2至35）、eyebrowOpacity（10至100）和 showEyebrowLine（布尔值），让装饰图案与英文栏目具有适合画面的初始位置和透明度。正文从两种结构中选择更适合当前项目的一种：A. 先用一段说明设计核心，再用3至5段“💧 小标题：照片可验证的设计细节”展开；B. 用有辨识度的项目标题开场，再以3至5段编辑式叙事描述空间概念、真实场景、材质、动线与体验，可在结尾加入一句简短英文概念。无论选择哪种结构，所有事实都必须来自上传照片和已知设计信息；看不清或未提供的内容不得猜测。`;
+  return `${spaceDesignGuidanceBase(projectType, category)} 每次生成都必须把3个标题方案、封面英文栏目、封面主标题、封面副标题、封面样式全部参数、正文和话题标签作为一个整体重新创作，不得沿用旧草稿或示例项目中的原值。coverStyle 还必须生成 patternOffsetX、patternOffsetY（-25至25）、eyebrowX（2至50）、eyebrowY（2至35）、eyebrowOpacity（10至100）、showEyebrowLine（布尔值）、subtitleSize（18至54）、subtitleOffsetX（-30至30）和 subtitleOffsetY（-20至25），让装饰图案、英文栏目和副标题具有适合画面的初始大小、位置与透明度。正文从两种结构中选择更适合当前项目的一种：A. 先用一段说明设计核心，再用3至5段“💧 小标题：照片可验证的设计细节”展开；B. 用有辨识度的项目标题开场，再以3至5段编辑式叙事描述空间概念、真实场景、材质、动线与体验，可在结尾加入一句简短英文概念。无论选择哪种结构，所有事实都必须来自上传照片和已知设计信息；看不清或未提供的内容不得猜测。`;
 }
 
 function defaultCoverEyebrow(projectType: string, category: string) {

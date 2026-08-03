@@ -159,6 +159,21 @@ test("moves cover decorations and controls English eyebrow opacity and line visi
   assert.match(generate, /coverStyle 还必须生成 patternOffsetX/);
 });
 
+test("resizes and repositions the cover subtitle in preview and exported artwork", async () => {
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  const project = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
+  const generate = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
+  assert.match(studio, /副标题字号/);
+  assert.match(studio, /副标题水平位置/);
+  assert.match(studio, /副标题垂直位置/);
+  assert.match(studio, /style\.subtitleOffsetX \/ 100 \* canvas\.width/);
+  assert.match(studio, /style\.subtitleOffsetY \/ 100 \* canvas\.height/);
+  assert.match(project, /subtitleSize/);
+  assert.match(project, /subtitleOffsetX/);
+  assert.match(project, /subtitleOffsetY/);
+  assert.match(generate, /subtitleSize（18至54）/);
+});
+
 test("binds durable project storage", async () => {
   const hosting = JSON.parse(await readFile(new URL("../.openai/hosting.json", import.meta.url), "utf8"));
   const schema = await readFile(new URL("../db/schema.ts", import.meta.url), "utf8");
