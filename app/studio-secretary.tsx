@@ -1235,13 +1235,13 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
         <label className="upload-zone"><input type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={handleFiles}/><div className="upload-icon">＋</div><strong>{files.length ? "继续添加项目实景图" : "上传项目实景图"}</strong><span>可分批人工添加，最多 10 张；点击缩略图选择封面</span></label>
         <div className="thumb-strip">{previews.slice(0, MAX_PROJECT_IMAGES).map((image, index) => <div className="thumb-wrap" key={`${image}-${index}`}><button type="button" className={index === (draft.coverIndex ?? 0) ? "thumb selected" : "thumb"} onClick={() => setDraft((current) => ({ ...current, coverIndex: index }))} aria-label={`选择第 ${index + 1} 张作为封面`}><img src={image} alt=""/></button>{files.length > 0 && <button type="button" className="remove-thumb" onClick={() => removeFile(index)} aria-label={`删除第 ${index + 1} 张图片`}>×</button>}<span>{index + 1}</span></div>)}</div>
         <div className="form-grid">
-          <label className="wide"><span>项目名称</span><input value={meta.name} onChange={(event) => updateMeta("name", event.target.value)}/></label>
-          <label><span>所在地</span><input value={meta.location} onChange={(event) => updateMeta("location", event.target.value)}/></label>
-          <label><span>项目面积</span><input value={meta.area} onChange={(event) => updateMeta("area", event.target.value)}/></label>
+          <label className="wide"><span>项目名称（选填）</span><input placeholder="可留空，系统将仅根据实景图创作" value={meta.name} onChange={(event) => updateMeta("name", event.target.value)}/></label>
+          <label><span>所在地（选填）</span><input placeholder="可留空" value={meta.location} onChange={(event) => updateMeta("location", event.target.value)}/></label>
+          <label><span>项目面积（选填）</span><input placeholder="可留空" value={meta.area} onChange={(event) => updateMeta("area", event.target.value)}/></label>
           <label><span>资产库分区</span><select value={meta.category} onChange={(event) => updateMeta("category", event.target.value)}>{projectCategories.slice(1).map((category) => <option key={category}>{category}</option>)}</select></label>
           <label><span>空间类型（决定文案与封面策略）</span><input list="space-type-options" value={meta.projectType} placeholder="选择或输入具体空间" onChange={(event) => updateMeta("projectType", event.target.value)}/><datalist id="space-type-options">{spaceTypes.map((space) => <option key={space} value={space}/>)}</datalist><small className="field-hint">例如客厅侧重采光与家庭互动，商业空间侧重品牌与顾客动线</small></label>
-          <label><span>目标客户</span><input value={meta.audience} onChange={(event) => updateMeta("audience", event.target.value)}/></label>
-          <label className="wide"><span>已知设计信息</span><textarea value={meta.brief} onChange={(event) => updateMeta("brief", event.target.value)}/></label>
+          <label><span>目标客户（选填）</span><input placeholder="可留空" value={meta.audience} onChange={(event) => updateMeta("audience", event.target.value)}/></label>
+          <label className="wide"><span>已知设计信息（选填）</span><textarea placeholder="可留空；AI 会从实景图识别空间、材质、色彩、采光与动线" value={meta.brief} onChange={(event) => updateMeta("brief", event.target.value)}/></label>
         </div>
         <button className="primary-action" disabled={phase === "uploading" || phase === "analyzing"}><span>{phase === "analyzing" ? "正在同步更新全部内容…" : currentProjectId && !files.length ? "按原图与最新设计信息重新生成全部内容" : "保存项目并生成封面与文案"}</span><span>→</span></button>
         <p className="notice">{notice}</p>
