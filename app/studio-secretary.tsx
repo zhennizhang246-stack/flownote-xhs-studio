@@ -176,13 +176,13 @@ const seededDraft: Draft = {
   mode: "案例预览",
 };
 const initialMeta: ProjectMeta = {
-  name: "栖光木境",
-  location: "浙江 · 温州",
-  area: "150m²",
-  projectType: "住宅空间",
-  category: "住宅项目",
-  audience: "重视自然、松弛感与收纳秩序的改善型家庭",
-  brief: "温润木质、自然光与绿意贯穿全屋；客餐厅一体，包含厨房、家政、卧室、衣帽间与卫浴。",
+  name: "",
+  location: "",
+  area: "",
+  projectType: "",
+  category: "办公项目",
+  audience: "",
+  brief: "",
 };
 const defaultSettings: AutomationSettings = {
   publishTime: "12:00",
@@ -412,6 +412,38 @@ const loadImage = (source: string) => new Promise<HTMLImageElement>((resolve, re
   image.onerror = () => reject(new Error("封面底图读取失败"));
   image.src = source;
 });
+
+async function analyzeProjectImages(files: File[]) {
+  let red = 0, green = 0, blue = 0, luminance = 0, saturation = 0, contrast = 0, samples = 0;
+  for (const file of files.slice(0, MAX_PROJECT_IMAGES)) {
+    const bitmap = await createImageBitmap(file);
+    const canvas = document.createElement("canvas");
+    canvas.width = 32; canvas.height = 32;
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context) { bitmap.close(); continue; }
+    context.drawImage(bitmap, 0, 0, 32, 32); bitmap.close();
+    const pixels = context.getImageData(0, 0, 32, 32).data;
+    const lights: number[] = [];
+    for (let index = 0; index < pixels.length; index += 16) {
+      const r = pixels[index], g = pixels[index + 1], b = pixels[index + 2];
+      const max = Math.max(r, g, b), min = Math.min(r, g, b);
+      const light = (r * .2126 + g * .7152 + b * .0722) / 255;
+      red += r; green += g; blue += b; luminance += light;
+      saturation += max ? (max - min) / max : 0; lights.push(light); samples += 1;
+    }
+    const average = lights.reduce((sum, value) => sum + value, 0) / Math.max(lights.length, 1);
+    contrast += Math.sqrt(lights.reduce((sum, value) => sum + (value - average) ** 2, 0) / Math.max(lights.length, 1));
+  }
+  const divisor = Math.max(samples, 1), light = luminance / divisor, sat = saturation / divisor;
+  const warm = red / divisor > blue / divisor * 1.08;
+  const contrastValue = contrast / Math.max(files.length, 1);
+  if (light < .38) return { projectType: "沉浸质感办公室", brief: "实景图整体明度偏低、明暗层次鲜明，适合从沉浸氛围、品牌质感与重点照明的角度组织封面和正文。" };
+  if (sat > .34) return { projectType: "活力创意办公室", brief: "实景图色彩识别度较高、视觉节奏活跃，适合突出团队活力、品牌记忆点与多元协作场景。" };
+  if (warm && sat < .3) return { projectType: "温润自然办公室", brief: "实景图呈现偏暖且克制的综合色调，适合围绕自然感、舒适办公体验与温和的品牌表达展开。" };
+  if (light > .68) return { projectType: "明亮简约办公室", brief: "实景图整体明亮、色彩关系简洁，适合突出采光感、清晰秩序与轻盈高效的办公体验。" };
+  if (contrastValue > .22) return { projectType: "品牌展示型办公室", brief: "实景图明暗对比与视觉焦点较强，适合强调空间识别度、客户第一印象与品牌展示价值。" };
+  return { projectType: "秩序协作型办公室", brief: "实景图色彩与明度较为平衡，适合从空间秩序、团队协作、专注效率与日常使用体验展开。" };
+}
 
 function drawCoverPattern(context: CanvasRenderingContext2D, style: CoverStyle) {
   if (style.pattern === "none") return;
@@ -756,6 +788,14 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
     try {
       let projectId = currentProjectId;
       if (files.length) {
+        const visualMeta = await analyzeProjectImages(files);
+        const submissionMeta = {
+          ...meta,
+          projectType: meta.projectType.trim() || visualMeta.projectType,
+          brief: meta.brief.trim() || visualMeta.brief,
+          category: meta.category || "办公项目",
+        };
+        setMeta(submissionMeta);
         const images = await Promise.all(files.map(async (file) => ({
           name: file.name,
           type: file.type || "image/jpeg",
@@ -764,7 +804,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
         const saved = await fetch("/api/projects", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ ...meta, images }),
+          body: JSON.stringify({ ...submissionMeta, images }),
         });
         if (!saved.ok) throw new Error("项目资产暂时无法保存");
         const project = await saved.json() as { id: number };
