@@ -673,6 +673,8 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
   );
   const scheduledProjects = projects.filter((project) => project.scheduledAt)
     .sort((a, b) => String(a.scheduledAt).localeCompare(String(b.scheduledAt)));
+  const selectedScheduleProject = projects.find((project) => project.id === selectedScheduleProjectId);
+  const selectedScheduleReady = Boolean(selectedScheduleProject && ["approved", "scheduled"].includes(selectedScheduleProject.status));
   const visibleProjects = assetCategory === "全部项目"
     ? projects
     : projects.filter((project) => project.category === assetCategory);
@@ -888,7 +890,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
     const scheduledAt = scheduleDrafts[projectId] || nextSlot(settings);
     const project = projects.find((item) => item.id === projectId);
     if (settings.publishMode === "browser_bridge" && !bridgeReady) {
-      setNotice("发布桥定时发布需要先安装并连接 MJ 发布桥 1.8");
+      setNotice("发布桥定时发布需要先安装并连接 MJ 发布桥 1.9");
       return;
     }
     const response = await fetch(`/api/projects/${projectId}/schedule`, {
@@ -1129,7 +1131,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
     setResearching(true);
     setResearchNotice("正在同步浏览器中右键收藏的小红书室内设计笔记…");
     try {
-      if (!bridgeReady) throw new Error("请安装或更新 MJ 发布桥 1.8，刷新平台后再同步右键收藏笔记");
+      if (!bridgeReady) throw new Error("请安装或更新 MJ 发布桥 1.9，刷新平台后再解析右键收藏笔记");
       const browserCandidates = await collectResearchFromBridge(force);
       setResearchNotice(`已读取 ${browserCandidates.length} 篇右键收藏笔记，正在整理标题与正文引流结构…`);
       const response = await fetch("/api/research", {
@@ -1329,7 +1331,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
       <div className="phone-frame"><div className="cover-preview final-artwork-preview">{coverImage ? <img src={renderedCoverPreview || coverImage} alt="与小红书最终封面完全一致的发布预览"/> : <div className="empty-cover-placeholder">上传项目实景图后生成封面</div>}</div></div>
       <p className="final-preview-note">1080 × 1440 小红书竖版封面 · 此处直接显示最终合成图片</p>
       <div className={`bridge-status ${bridgeReady ? "connected" : ""}`}>
-        <span>{bridgeReady ? "MJ 发布桥 1.8 已连接" : "未连接最新版 MJ 发布桥"}</span>
+        <span>{bridgeReady ? "MJ 发布桥 1.9 已连接" : "未连接最新版 MJ 发布桥"}</span>
         <p>{bridgeReady ? "成品封面、项目图片、标题、正文与标签会保持统一；可选择人工发布或单篇确认后自动发布。" : "安装一次浏览器扩展，即可把已确认内容自动带入小红书官方图文发布页。"}</p>
         {!bridgeReady && <a href={XHS_BRIDGE_EXTENSION_URL} download>下载或更新 MJ 发布桥扩展</a>}
       </div>
@@ -1404,7 +1406,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
         <div className="publish-mode-picker wide">
           <span>发布模式</span>
           <button className={settings.publishMode === "manual" ? "active" : ""} onClick={() => setSettings((current) => ({ ...current, publishMode: "manual" }))}><strong>人工立即发布</strong><small>确认后复制文案并打开小红书官方发布页</small><em>始终可用</em></button>
-          <button className={settings.publishMode === "browser_bridge" ? "active" : ""} disabled={!bridgeReady} onClick={() => setSettings((current) => ({ ...current, publishMode: "browser_bridge" }))}><strong>发布桥定时发布</strong><small>当前电脑到点自动打开官方发布页、预填并执行一次发布</small><em>{bridgeReady ? "发布桥 1.8 已连接" : "请安装发布桥 1.8"}</em></button>
+          <button className={settings.publishMode === "browser_bridge" ? "active" : ""} disabled={!bridgeReady} onClick={() => setSettings((current) => ({ ...current, publishMode: "browser_bridge" }))}><strong>发布桥定时发布</strong><small>当前电脑到点自动打开官方发布页、预填并执行一次发布</small><em>{bridgeReady ? "发布桥 1.9 已连接" : "请安装发布桥 1.9"}</em></button>
         </div>
         <label><span>默认发布时间</span><input type="time" value={settings.publishTime} onChange={(event) => setSettings((current) => ({ ...current, publishTime: event.target.value }))}/></label>
         <label><span>发布间隔</span><div className="number-control"><input type="number" min="1" max="30" value={settings.publishCadenceDays} onChange={(event) => setSettings((current) => ({ ...current, publishCadenceDays: Number(event.target.value) }))}/><em>天</em></div></label>
@@ -1416,17 +1418,17 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
       <p className="notice">{settingsNotice || "可选择人工立即发布，或使用当前电脑上的 MJ 发布桥进行定时发布。"}</p>
     </section>
     <section className="dashboard-card queue-card">
-      <div className="section-heading"><div><span>PUBLISH QUEUE</span><h2>项目发布日历</h2><p>仅人工确认后的内容可排期；到期后进入官方发布交接流程。</p></div><span className="counter">{scheduledProjects.length} 个已排期</span></div>
+      <div className="section-heading"><div><span>PUBLISH QUEUE</span><h2>项目发布日历</h2><p>选择项目与北京时间；发布桥会同步任务，到点打开并预填小红书官方发布页。排期可随时更新或取消。</p></div><span className="counter">{scheduledProjects.length} 个已排期</span></div>
       <div className="quick-schedule">
-        <label><span>选择项目</span><select value={selectedScheduleProjectId ?? ""} onChange={(event) => setSelectedScheduleProjectId(event.target.value ? Number(event.target.value) : null)}><option value="">请选择已确认项目</option>{projects.filter((project) => ["approved", "scheduled"].includes(project.status)).map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
+        <label><span>选择项目</span><select value={selectedScheduleProjectId ?? ""} onChange={(event) => setSelectedScheduleProjectId(event.target.value ? Number(event.target.value) : null)}><option value="">请选择项目</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}{["approved", "scheduled"].includes(project.status) ? "" : "（需先确认文案）"}</option>)}</select></label>
         <label><span>发布日期与时间</span><input type="datetime-local" disabled={!selectedScheduleProjectId} value={selectedScheduleProjectId ? scheduleDrafts[selectedScheduleProjectId] || nextSlot(settings) : ""} onChange={(event) => selectedScheduleProjectId && setScheduleDrafts((current) => ({ ...current, [selectedScheduleProjectId]: event.target.value }))}/></label>
-        <button disabled={!selectedScheduleProjectId || (settings.publishMode === "browser_bridge" && !bridgeReady)} onClick={() => selectedScheduleProjectId && void scheduleProject(selectedScheduleProjectId)}>加入发布桥定时发布</button>
+        <button disabled={!selectedScheduleReady || (settings.publishMode === "browser_bridge" && !bridgeReady)} onClick={() => selectedScheduleProjectId && void scheduleProject(selectedScheduleProjectId)}>{selectedScheduleProject?.scheduledAt ? "同步更新排期" : "加入发布桥定时发布"}</button>
       </div>
       <div className="queue-list">
         {projects.map((project) => <div className="queue-item" key={project.id}>
-          <div className="queue-project">{project.images?.[0] ? <img src={project.images[0].url} alt=""/> : <span>{project.name.slice(0, 1)}</span>}<div><strong>{project.name}</strong><small>{project.location} · {project.area}</small></div></div>
+          <button className="queue-project queue-project-button" onClick={() => loadProject(project)}>{project.images?.[0] ? <img src={project.images[0].url} alt=""/> : <span>{project.name.slice(0, 1)}</span>}<div><strong>{project.name}</strong><small>{project.location || "未填写地点"} · {project.area || project.projectType || "室内设计项目"}</small><em>{project.scheduledAt ? `已同步：${new Date(project.scheduledAt).toLocaleString("zh-CN")}` : "点击打开项目"}</em></div></button>
           <input type="datetime-local" value={scheduleDrafts[project.id] || nextSlot(settings)} onChange={(event) => setScheduleDrafts((current) => ({ ...current, [project.id]: event.target.value }))}/>
-          <div className="queue-buttons"><button onClick={() => void scheduleProject(project.id)}>{project.scheduledAt ? "更新排期" : project.status === "approved" ? "加入日历" : "先确认"}</button>{project.scheduledAt && <button className="danger-action" onClick={() => void removeSchedule(project)}>删除排期</button>}</div>
+          <div className="queue-buttons"><button disabled={!['approved', 'scheduled'].includes(project.status)} onClick={() => void scheduleProject(project.id)}>{project.scheduledAt ? "更新并同步" : project.status === "approved" ? "加入日历" : "需先确认"}</button>{project.scheduledAt && <button className="danger-action" onClick={() => void removeSchedule(project)}>取消定时发布</button>}</div>
         </div>)}
         {!projects.length && <div className="empty-state"><strong>还没有可排期项目</strong><p>先在创作工作台上传项目实景图，项目会自动进入这里。</p></div>}
       </div>
@@ -1434,7 +1436,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
   </div>;
 
   const researchView = <section className="dashboard-card">
-    <div className="section-heading"><div><span>PLAYWRIGHT VIRAL RESEARCH</span><h2>室内设计热门笔记分析与选题</h2><p>本机 Playwright 读取当前人工登录的小红书公开页面，按可见互动热度整理室内设计图文笔记，分析关键词、标签、标题结构与互动写法，并用于下一次实景图创作。</p></div><div className="research-actions"><button className="small-action primary-research" disabled={researching} onClick={() => void runPlaywrightResearch()}>{researching ? "正在采集分析…" : "Playwright 采集热门笔记"}</button><button className="small-action" disabled={researching} onClick={() => void runResearch(true)}>同步右键收藏</button></div></div>
+    <div className="section-heading"><div><span>XIAOHONGSHU VIRAL NOTE LIBRARY</span><h2>室内设计引流笔记解析库</h2><p>从当前登录的小红书公开页面收藏真实笔记，按可见点赞排序，并用千问解析标题关键词、正文结构、空间卖点与互动转化方法；只提炼规律，不复制原文。</p></div><div className="research-actions"><button className="small-action primary-research" disabled={researching} onClick={() => void runPlaywrightResearch()}>{researching ? "正在采集分析…" : "采集热门室内设计笔记"}</button><button className="small-action" disabled={researching} onClick={() => void runResearch(true)}>解析右键收藏</button></div></div>
     <div className="research-summary"><div><strong>热度</strong><span>点赞优先排序</span></div><div><strong>规律</strong><span>关键词·标签·标题结构</span></div><div><strong>生成</strong><span>实景图原创文案</span></div></div>
     {viralAnalysis && <div className="viral-analysis-panel">
       <div><small>热门关键词</small><p>{viralAnalysis.topKeywords.slice(0, 6).map((item) => item.value).join(" · ") || "等待更多样本"}</p></div>
@@ -1446,7 +1448,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
     <div className="research-grid">
       {visibleResearchReferences.map((reference, index) => <a className="research-card" href={reference.sourceUrl} target="_blank" rel="noreferrer" key={reference.id}>
         <div className={`research-cover tone-${index % 3}`}><span>REFERENCE {String((index % 3) + 1).padStart(2, "0")}</span><strong>{reference.title}</strong><small>{reference.author || "公开来源"}</small></div>
-        <div className="research-analysis"><span className="generation-ready">✓ 原笔记完整网址、标题与可见正文已收藏</span>{reference.likes > 0 && <span className="generation-ready">公开可见点赞：{reference.likes.toLocaleString("zh-CN")}</span>}<h3>标题引流方式</h3><p>{reference.coverAnalysis}</p><h3>原笔记可见正文</h3><p>{reference.copyAnalysis}</p><h3>咨询转化写法</h3><p>{reference.reusablePattern}</p></div>
+        <div className="research-analysis"><span className="generation-ready">✓ 真实原笔记链接已收藏并完成结构解析</span>{reference.likes > 0 && <span className="generation-ready">公开可见点赞：{reference.likes.toLocaleString("zh-CN")}</span>}<h3>标题与关键词布局</h3><p>{reference.coverAnalysis}</p><h3>正文内容结构解析</h3><p>{reference.copyAnalysis}</p><h3>可复用的引流方法</h3><p>{reference.reusablePattern}</p></div>
         <div className="source-row"><span>来源：{reference.author || "小红书公开作者"}</span><strong>直接打开原笔记网页 ↗</strong></div>
       </a>)}
       {!visibleResearchReferences.length && <div className="empty-state research-empty"><strong>还没有热门笔记样本</strong><p>先启动本机 Playwright 采集助手，再点击“Playwright 采集热门笔记”；也可以继续使用扩展右键收藏单篇原笔记。</p><button onClick={() => void runPlaywrightResearch()}>开始热门笔记分析</button></div>}
