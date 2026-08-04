@@ -124,6 +124,7 @@ type ViralAnalysis = {
 };
 type XhsBridgeDraft = {
   version: 2;
+  ownerKey: string;
   projectId: number;
   projectName: string;
   title: string;
@@ -620,7 +621,7 @@ function localFallback(meta: ProjectMeta, existingProjects: ProjectRecord[] = []
   };
 }
 
-export function StudioSecretary({ accountName, isSiteOwner }: { accountName: string; isSiteOwner: boolean }) {
+export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { accountKey: string; accountName: string; isSiteOwner: boolean }) {
   const [activeTab, setActiveTab] = useState<Tab>("creator");
   const [meta, setMeta] = useState(initialMeta);
   const [files, setFiles] = useState<File[]>([]);
@@ -657,7 +658,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
   const [lastSyncedAt, setLastSyncedAt] = useState("");
   const [bridgeReady, setBridgeReady] = useState(false);
   const [profileUrl, setProfileUrl] = useState(() => (
-    typeof window === "undefined" ? "" : window.localStorage.getItem("mj-xhs-profile-url") || ""
+    typeof window === "undefined" ? "" : window.localStorage.getItem(`mj-xhs-profile-url:${accountKey}`) || ""
   ));
 
   const coverImage = previews[draft.coverIndex ?? 0] || "";
@@ -738,9 +739,10 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
       }
     }
     window.addEventListener("message", receiveBridgeStatus);
+    window.postMessage({ source: XHS_BRIDGE_SOURCE, type: "MJ_XHS_ACCOUNT_CONTEXT", ownerKey: accountKey }, window.location.origin);
     window.postMessage({ source: XHS_BRIDGE_SOURCE, type: "MJ_XHS_BRIDGE_PING" }, window.location.origin);
     return () => window.removeEventListener("message", receiveBridgeStatus);
-  }, []);
+  }, [accountKey]);
 
   const updateMeta = (key: keyof ProjectMeta, value: string) => setMeta((current) => ({ ...current, [key]: value }));
   const handleFiles = (event: ChangeEvent<HTMLInputElement>) => {
@@ -873,6 +875,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
     }));
     const payload: XhsBridgeDraft = {
       version: 2,
+      ownerKey: accountKey,
       projectId: project.id,
       projectName: project.name,
       title: projectDraft.title.trim(),
@@ -890,7 +893,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
     const scheduledAt = scheduleDrafts[projectId] || nextSlot(settings);
     const project = projects.find((item) => item.id === projectId);
     if (settings.publishMode === "browser_bridge" && !bridgeReady) {
-      setNotice("发布桥定时发布需要先安装并连接 MJ 发布桥 1.9");
+      setNotice("发布桥定时发布需要先安装并连接 MJ 发布桥 2.0");
       return;
     }
     const response = await fetch(`/api/projects/${projectId}/schedule`, {
@@ -929,7 +932,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
       return;
     }
     setScheduleDrafts((current) => ({ ...current, [project.id]: nextSlot(settings) }));
-    window.postMessage({ source: XHS_BRIDGE_SOURCE, type: "MJ_XHS_CANCEL_SCHEDULE", projectId: project.id }, window.location.origin);
+    window.postMessage({ source: XHS_BRIDGE_SOURCE, type: "MJ_XHS_CANCEL_SCHEDULE", ownerKey: accountKey, projectId: project.id }, window.location.origin);
     setNotice(`“${project.name}”已从发布日历移除，项目仍保存在资产库中`);
     await refreshProjects();
   }
@@ -1061,6 +1064,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
     const createdAt = new Date();
     const bridgeDraft: XhsBridgeDraft = {
       version: 2,
+      ownerKey: accountKey,
       projectId: currentProjectId,
       projectName: meta.name,
       title: draft.title.trim(),
@@ -1131,7 +1135,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
     setResearching(true);
     setResearchNotice("正在同步浏览器中右键收藏的小红书室内设计笔记…");
     try {
-      if (!bridgeReady) throw new Error("请安装或更新 MJ 发布桥 1.9，刷新平台后再解析右键收藏笔记");
+      if (!bridgeReady) throw new Error("请安装或更新 MJ 发布桥 2.0，刷新平台后再解析右键收藏笔记");
       const browserCandidates = await collectResearchFromBridge(force);
       setResearchNotice(`已读取 ${browserCandidates.length} 篇右键收藏笔记，正在整理标题与正文引流结构…`);
       const response = await fetch("/api/research", {
@@ -1331,7 +1335,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
       <div className="phone-frame"><div className="cover-preview final-artwork-preview">{coverImage ? <img src={renderedCoverPreview || coverImage} alt="与小红书最终封面完全一致的发布预览"/> : <div className="empty-cover-placeholder">上传项目实景图后生成封面</div>}</div></div>
       <p className="final-preview-note">1080 × 1440 小红书竖版封面 · 此处直接显示最终合成图片</p>
       <div className={`bridge-status ${bridgeReady ? "connected" : ""}`}>
-        <span>{bridgeReady ? "MJ 发布桥 1.9 已连接" : "未连接最新版 MJ 发布桥"}</span>
+        <span>{bridgeReady ? "MJ 发布桥 2.0 已连接" : "未连接最新版 MJ 发布桥"}</span>
         <p>{bridgeReady ? "成品封面、项目图片、标题、正文与标签会保持统一；可选择人工发布或单篇确认后自动发布。" : "安装一次浏览器扩展，即可把已确认内容自动带入小红书官方图文发布页。"}</p>
         {!bridgeReady && <a href={XHS_BRIDGE_EXTENSION_URL} download>下载或更新 MJ 发布桥扩展</a>}
       </div>
@@ -1406,7 +1410,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
         <div className="publish-mode-picker wide">
           <span>发布模式</span>
           <button className={settings.publishMode === "manual" ? "active" : ""} onClick={() => setSettings((current) => ({ ...current, publishMode: "manual" }))}><strong>人工立即发布</strong><small>确认后复制文案并打开小红书官方发布页</small><em>始终可用</em></button>
-          <button className={settings.publishMode === "browser_bridge" ? "active" : ""} disabled={!bridgeReady} onClick={() => setSettings((current) => ({ ...current, publishMode: "browser_bridge" }))}><strong>发布桥定时发布</strong><small>当前电脑到点自动打开官方发布页、预填并执行一次发布</small><em>{bridgeReady ? "发布桥 1.9 已连接" : "请安装发布桥 1.9"}</em></button>
+          <button className={settings.publishMode === "browser_bridge" ? "active" : ""} disabled={!bridgeReady} onClick={() => setSettings((current) => ({ ...current, publishMode: "browser_bridge" }))}><strong>发布桥定时发布</strong><small>当前电脑到点自动打开官方发布页、预填并执行一次发布</small><em>{bridgeReady ? "发布桥 2.0 已连接" : "请安装发布桥 2.0"}</em></button>
         </div>
         <label><span>默认发布时间</span><input type="time" value={settings.publishTime} onChange={(event) => setSettings((current) => ({ ...current, publishTime: event.target.value }))}/></label>
         <label><span>发布间隔</span><div className="number-control"><input type="number" min="1" max="30" value={settings.publishCadenceDays} onChange={(event) => setSettings((current) => ({ ...current, publishCadenceDays: Number(event.target.value) }))}/><em>天</em></div></label>
@@ -1496,8 +1500,8 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
       <p className="sidebar-note">图片、事实、排期与参考均按项目归档。正式发布前保留人工确认。</p>
     </aside>
     <section className="workspace">
-      <header className="topbar"><div><p className="kicker">XIAOHONGSHU CREATIVE SERVICE</p><h1>小红书创作服务平台</h1><p className="account-workspace">{isSiteOwner ? "网站作者专属工作区" : "新账户独立工作区"}：{accountName}</p><p className="account-privacy">仅当前登录账户可查看本工作区资料，其他账户无法访问。</p></div><div className="topbar-actions"><span className={`status-chip ${phase}`}>{phaseLabel}</span><a className="avatar" href="https://www.xiaohongshu.com/" target="_blank" rel="noreferrer" aria-label="登录当前浏览器的小红书账户">XHS</a></div></header>
-      <div className={`xhs-session-banner ${bridgeReady ? "connected" : ""}`}><div><strong>{bridgeReady ? "当前浏览器发布桥已连接" : "其他账户首次使用需重新登录小红书"}</strong><p>{bridgeReady ? "研究、评论与发布只使用这个浏览器当前登录的小红书账户，不会共享其他人的登录状态。" : "请先在当前浏览器登录自己的小红书账户，并安装 MJ 发布桥，再开始编辑创作和发布。"}</p><label><span>当前小红书主页链接</span><input value={profileUrl} onChange={(event) => { const value = event.target.value.trim(); setProfileUrl(value); window.localStorage.setItem("mj-xhs-profile-url", value); }} placeholder="登录后复制自己的小红书主页链接"/></label></div><div>{!bridgeReady && <a href={XHS_BRIDGE_EXTENSION_URL} download>下载发布桥</a>}<a href="https://www.xiaohongshu.com/" target="_blank" rel="noreferrer">登录小红书 ↗</a></div></div>
+      <header className="topbar"><div><p className="kicker">XIAOHONGSHU CREATIVE SERVICE</p><h1>小红书创作服务平台</h1><p className="account-workspace">{isSiteOwner ? "网站作者专属工作区" : "新账户独立工作区"}：{accountName}</p><p className="account-privacy">仅当前登录账户可查看本工作区资料，其他账户无法访问。</p></div><div className="topbar-actions"><span className={`status-chip ${phase}`}>{phaseLabel}</span><a className="account-signout" href="/signout-with-chatgpt?return_to=%2Fwechat">退出工作区</a><a className="avatar" href="https://www.xiaohongshu.com/" target="_blank" rel="noreferrer" aria-label="登录当前浏览器的小红书账户">XHS</a></div></header>
+      <div className={`xhs-session-banner ${bridgeReady ? "connected" : ""}`}><div><strong>{bridgeReady ? "当前账户的发布桥工作区已连接" : "其他账户首次使用需重新登录小红书"}</strong><p>{bridgeReady ? "项目、草稿、收藏和排期已按当前平台账户隔离；小红书登录仍以当前浏览器实际登录账号为准。" : "请先在当前浏览器登录自己的小红书账户，并安装 MJ 发布桥，再开始编辑创作和发布。"}</p><label><span>当前小红书主页链接</span><input value={profileUrl} onChange={(event) => { const value = event.target.value.trim(); setProfileUrl(value); window.localStorage.setItem(`mj-xhs-profile-url:${accountKey}`, value); }} placeholder="登录后复制自己的小红书主页链接"/></label></div><div>{!bridgeReady && <a href={XHS_BRIDGE_EXTENSION_URL} download>下载发布桥</a>}<a href="https://www.xiaohongshu.com/" target="_blank" rel="noreferrer">登录小红书 ↗</a></div></div>
       {activeTab === "creator" && creatorView}
       {activeTab === "assets" && assetView}
       {activeTab === "calendar" && calendarView}

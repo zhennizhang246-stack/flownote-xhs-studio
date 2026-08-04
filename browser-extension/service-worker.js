@@ -18,11 +18,16 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId !== COLLECT_NOTE_MENU_ID || !tab?.id) return;
   chrome.tabs.sendMessage(tab.id, { type: "MJ_XHS_COLLECT_CURRENT_NOTE" }, (response) => {
     if (chrome.runtime.lastError || !response?.candidate?.sourceUrl) return;
-    chrome.storage.local.get("mjXhsCollectedNotes", (stored) => {
-      const current = Array.isArray(stored.mjXhsCollectedNotes) ? stored.mjXhsCollectedNotes : [];
+    chrome.storage.local.get("mjXhsActiveOwnerKey", (ownerState) => {
+      const ownerKey = String(ownerState.mjXhsActiveOwnerKey || "");
+      if (!ownerKey) return;
+      const researchKey = `mjXhsCollectedNotes:${ownerKey}`;
+      chrome.storage.local.get(researchKey, (stored) => {
+      const current = Array.isArray(stored[researchKey]) ? stored[researchKey] : [];
       const candidate = response.candidate;
       const next = [candidate, ...current.filter((item) => item.sourceUrl !== candidate.sourceUrl)].slice(0, 30);
-      chrome.storage.local.set({ mjXhsCollectedNotes: next, mjXhsCollectedAt: new Date().toISOString() });
+      chrome.storage.local.set({ [researchKey]: next, mjXhsCollectedAt: new Date().toISOString() });
+      });
     });
   });
 });
@@ -176,23 +181,39 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   return true;
 });
 
-const scheduleKey = (projectId) => `mjXhsSchedule:${projectId}`;
-const alarmName = (projectId) => `mj-xhs-publish:${projectId}`;
+const encodedOwner = (ownerKey) => encodeURIComponent(String(ownerKey || ""));
+const scheduleKey = (ownerKey, projectId) => `mjXhsSchedule:${encodedOwner(ownerKey)}:${projectId}`;
+const alarmName = (ownerKey, projectId) => `mj-xhs-publish:${encodedOwner(ownerKey)}:${projectId}`;
 
 chrome.runtime.onMessage.addListener((message) => {
+  if (message?.type === "MJ_XHS_SET_ACCOUNT_CONTEXT") {
+    const ownerKey = String(message.ownerKey || "").slice(0, 200);
+    if (!ownerKey) return false;
+    chrome.storage.local.get("mjXhsActiveOwnerKey", (stored) => {
+      const previous = String(stored.mjXhsActiveOwnerKey || "");
+      if (previous && previous !== ownerKey) {
+        chrome.storage.local.remove("mjXhsDraft");
+        chrome.alarms.getAll((alarms) => alarms.filter((alarm) => alarm.name.startsWith("mj-xhs-publish:")).forEach((alarm) => chrome.alarms.clear(alarm.name)));
+      }
+      chrome.storage.local.set({ mjXhsActiveOwnerKey: ownerKey });
+    });
+    return false;
+  }
   if (message?.type === "MJ_XHS_SAVE_SCHEDULE") {
     const projectId = Number(message.draft?.projectId);
+    const ownerKey = String(message.draft?.ownerKey || "");
     const when = Date.parse(String(message.scheduledAt || ""));
-    if (!Number.isInteger(projectId) || !Number.isFinite(when) || when <= Date.now()) return false;
-    chrome.storage.local.set({ [scheduleKey(projectId)]: { draft: message.draft, scheduledAt: new Date(when).toISOString() } });
-    chrome.alarms.create(alarmName(projectId), { when });
+    if (!ownerKey || !Number.isInteger(projectId) || !Number.isFinite(when) || when <= Date.now()) return false;
+    chrome.storage.local.set({ [scheduleKey(ownerKey, projectId)]: { draft: message.draft, scheduledAt: new Date(when).toISOString() } });
+    chrome.alarms.create(alarmName(ownerKey, projectId), { when });
     return false;
   }
   if (message?.type === "MJ_XHS_CANCEL_SCHEDULE") {
     const projectId = Number(message.projectId);
-    if (!Number.isInteger(projectId)) return false;
-    chrome.alarms.clear(alarmName(projectId));
-    chrome.storage.local.remove(scheduleKey(projectId));
+    const ownerKey = String(message.ownerKey || "");
+    if (!ownerKey || !Number.isInteger(projectId)) return false;
+    chrome.alarms.clear(alarmName(ownerKey, projectId));
+    chrome.storage.local.remove(scheduleKey(ownerKey, projectId));
     return false;
   }
   return false;
@@ -200,9 +221,14 @@ chrome.runtime.onMessage.addListener((message) => {
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (!alarm.name.startsWith("mj-xhs-publish:")) return;
-  const projectId = Number(alarm.name.split(":").pop());
-  chrome.storage.local.get(scheduleKey(projectId), (stored) => {
-    const scheduled = stored[scheduleKey(projectId)];
+  const encoded = alarm.name.slice("mj-xhs-publish:".length);
+  const divider = encoded.lastIndexOf(":");
+  const ownerKey = decodeURIComponent(encoded.slice(0, divider));
+  const projectId = Number(encoded.slice(divider + 1));
+  const key = scheduleKey(ownerKey, projectId);
+  chrome.storage.local.get([key, "mjXhsActiveOwnerKey"], (stored) => {
+    const scheduled = stored[key];
+    if (stored.mjXhsActiveOwnerKey !== ownerKey) return;
     if (!scheduled?.draft) return;
     const confirmedAt = new Date();
     const draft = {
@@ -220,7 +246,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
         url: "https://creator.xiaohongshu.com/publish/publish?source=official&from=menu&target=image",
         active: true,
       });
-      chrome.storage.local.remove(scheduleKey(projectId));
+      chrome.storage.local.remove(key);
     });
   });
 });

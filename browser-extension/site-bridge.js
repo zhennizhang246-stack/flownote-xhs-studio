@@ -1,5 +1,6 @@
 const STUDIO_SOURCE = "mj-xhs-studio";
 const BRIDGE_SOURCE = "mj-xhs-bridge";
+let activeOwnerKey = "";
 
 function notifyPage(type) {
   window.postMessage({ source: BRIDGE_SOURCE, type, version: 4 }, window.location.origin);
@@ -16,6 +17,7 @@ function normalizeDraft(value) {
     : [];
   return {
     version: 2,
+    ownerKey: String(value.ownerKey || activeOwnerKey).slice(0, 200),
     projectId: value.projectId,
     projectName: String(value.projectName || "").slice(0, 120),
     title: String(value.title || "").trim().slice(0, 100),
@@ -41,14 +43,21 @@ window.addEventListener("message", (event) => {
   if (event.source !== window || event.origin !== window.location.origin) return;
   const message = event.data;
   if (message?.source !== STUDIO_SOURCE) return;
+  if (message.type === "MJ_XHS_ACCOUNT_CONTEXT") {
+    activeOwnerKey = String(message.ownerKey || "").slice(0, 200);
+    if (!activeOwnerKey) return;
+    chrome.runtime.sendMessage({ type: "MJ_XHS_SET_ACCOUNT_CONTEXT", ownerKey: activeOwnerKey });
+    return;
+  }
   if (message.type === "MJ_XHS_BRIDGE_PING") {
     notifyPage("MJ_XHS_BRIDGE_READY");
     return;
   }
   if (message.type === "MJ_XHS_RESEARCH_REQUEST") {
     const requestId = String(message.requestId || "");
-    chrome.storage.local.get("mjXhsCollectedNotes", (stored) => {
-      const candidates = Array.isArray(stored.mjXhsCollectedNotes) ? stored.mjXhsCollectedNotes : [];
+    const researchKey = `mjXhsCollectedNotes:${activeOwnerKey}`;
+    chrome.storage.local.get(researchKey, (stored) => {
+      const candidates = Array.isArray(stored[researchKey]) ? stored[researchKey] : [];
       window.postMessage({
         source: BRIDGE_SOURCE,
         type: "MJ_XHS_RESEARCH_RESULT",
@@ -86,7 +95,7 @@ window.addEventListener("message", (event) => {
     return;
   }
   if (message.type === "MJ_XHS_CANCEL_SCHEDULE") {
-    chrome.runtime.sendMessage({ type: "MJ_XHS_CANCEL_SCHEDULE", projectId: Number(message.projectId) });
+    chrome.runtime.sendMessage({ type: "MJ_XHS_CANCEL_SCHEDULE", ownerKey: String(message.ownerKey || activeOwnerKey), projectId: Number(message.projectId) });
     notifyPage("MJ_XHS_SCHEDULE_CANCELLED");
     return;
   }
