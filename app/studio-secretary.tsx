@@ -110,6 +110,17 @@ type BrowserResearchCandidate = {
   coverUrl?: string;
   coverAlt?: string;
   cardText?: string;
+  tags?: string[];
+  commentsText?: string;
+  savesText?: string;
+  keywordUsed?: string;
+};
+type ViralAnalysis = {
+  sampleCount: number;
+  topKeywords: Array<{ value: string; uses: number }>;
+  topTags: Array<{ value: string; uses: number }>;
+  titleStructures: Array<{ value: string; uses: number }>;
+  topics: string[];
 };
 type XhsBridgeDraft = {
   version: 2;
@@ -638,6 +649,7 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
   const [settingsNotice, setSettingsNotice] = useState("");
   const [researching, setResearching] = useState(false);
   const [researchNotice, setResearchNotice] = useState("");
+  const [viralAnalysis, setViralAnalysis] = useState<ViralAnalysis | null>(null);
   const [assetCategory, setAssetCategory] = useState("全部项目");
   const [messages, setMessages] = useState<CustomerMessage[]>([]);
   const [messageForm, setMessageForm] = useState({ senderName: "", message: "", sourceUrl: "" });
@@ -1137,6 +1149,45 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
     }
   }
 
+  async function runPlaywrightResearch() {
+    if (researching) return;
+    setResearching(true);
+    setResearchNotice("正在连接本机 Playwright，并采集室内设计热门图文笔记…");
+    try {
+      const local = await fetch("http://127.0.0.1:8766/crawl", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          keywords: ["室内设计", "住宅设计", "商业空间设计", "办公空间设计", "酒店设计", "展厅设计"],
+          targetCount: 12,
+        }),
+      });
+      const collected = await local.json() as { candidates?: BrowserResearchCandidate[]; analysis?: ViralAnalysis; error?: string };
+      if (!local.ok) throw new Error(collected.error || "Playwright 采集失败");
+      const browserCandidates = collected.candidates || [];
+      if (!browserCandidates.length) throw new Error("没有采集到可用的室内设计笔记");
+      setViralAnalysis(collected.analysis || null);
+      setResearchNotice(`已采集 ${browserCandidates.length} 篇热门笔记，正在保存爆款结构分析…`);
+      const response = await fetch("/api/research", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ force: true, browserCandidates }),
+      });
+      const payload = await response.json() as { references?: ResearchReference[]; error?: string };
+      if (!response.ok) throw new Error(payload.error || "热门笔记分析保存失败");
+      const latest = payload.references || [];
+      setReferences((current) => [...latest, ...current.filter((item) => item.researchDate !== localDate())]);
+      setResearchNotice(`已完成 ${browserCandidates.length} 篇样本分析；关键词、标签、标题结构和互动写法会用于下一次实景图文案生成`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Playwright 采集失败";
+      setResearchNotice(message.includes("fetch") || message.includes("Failed")
+        ? "本机采集助手未启动。请先运行 playwright-research/start.ps1，再点击采集"
+        : message);
+    } finally {
+      setResearching(false);
+    }
+  }
+
   async function refreshCustomerMessages() {
     const response = await fetch("/api/customer-service");
     if (!response.ok) return;
@@ -1383,16 +1434,22 @@ export function StudioSecretary({ accountName, isSiteOwner }: { accountName: str
   </div>;
 
   const researchView = <section className="dashboard-card">
-    <div className="section-heading"><div><span>INTERIOR DESIGN COPY LIBRARY</span><h2>室内设计小红书引流笔记收藏</h2><p>打开小红书原笔记后点击鼠标右键，选择“收藏到 MJ 引流笔记库”；平台保存完整原网址并按公开可见互动热度优先展示，整张卡片点击即可打开原笔记。</p></div><button className="small-action" disabled={researching} onClick={() => void runResearch(true)}>{researching ? "正在同步收藏…" : "同步右键收藏"}</button></div>
-    <div className="research-summary"><div><strong>右键</strong><span>原笔记页面收藏</span></div><div><strong>原文</strong><span>链接、标题与正文</span></div><div><strong>原创</strong><span>学习结构，不复制原文</span></div></div>
-    <p className="research-notice">{researchNotice || `最近收集日期：${visibleResearchReferences[0]?.researchDate || "请先右键收藏小红书原笔记"}`}</p>
+    <div className="section-heading"><div><span>PLAYWRIGHT VIRAL RESEARCH</span><h2>室内设计热门笔记分析与选题</h2><p>本机 Playwright 读取当前人工登录的小红书公开页面，按可见互动热度整理室内设计图文笔记，分析关键词、标签、标题结构与互动写法，并用于下一次实景图创作。</p></div><div className="research-actions"><button className="small-action primary-research" disabled={researching} onClick={() => void runPlaywrightResearch()}>{researching ? "正在采集分析…" : "Playwright 采集热门笔记"}</button><button className="small-action" disabled={researching} onClick={() => void runResearch(true)}>同步右键收藏</button></div></div>
+    <div className="research-summary"><div><strong>热度</strong><span>点赞优先排序</span></div><div><strong>规律</strong><span>关键词·标签·标题结构</span></div><div><strong>生成</strong><span>实景图原创文案</span></div></div>
+    {viralAnalysis && <div className="viral-analysis-panel">
+      <div><small>热门关键词</small><p>{viralAnalysis.topKeywords.slice(0, 6).map((item) => item.value).join(" · ") || "等待更多样本"}</p></div>
+      <div><small>热门标签</small><p>{viralAnalysis.topTags.slice(0, 6).map((item) => `#${item.value}`).join(" ") || "等待更多样本"}</p></div>
+      <div><small>标题结构</small><p>{viralAnalysis.titleStructures.filter((item) => item.uses > 0).map((item) => `${item.value}（${item.uses}）`).join(" · ") || "情绪体验 + 设计亮点"}</p></div>
+      <div className="topic-suggestions"><small>自动生成选题</small>{viralAnalysis.topics.map((topic, index) => <button type="button" key={topic} onClick={() => { setMeta((current) => ({ ...current, brief: `${current.brief ? `${current.brief}\n` : ""}选题方向 ${index + 1}：${topic}` })); setActiveTab("creator"); setNotice("选题已加入设计信息，请上传实景图并生成完整文案"); }}>{topic}<span>应用到创作 →</span></button>)}</div>
+    </div>}
+    <p className="research-notice">{researchNotice || `最近收集日期：${visibleResearchReferences[0]?.researchDate || "请启动本机采集助手或右键收藏原笔记"}`}</p>
     <div className="research-grid">
       {visibleResearchReferences.map((reference, index) => <a className="research-card" href={reference.sourceUrl} target="_blank" rel="noreferrer" key={reference.id}>
         <div className={`research-cover tone-${index % 3}`}><span>REFERENCE {String((index % 3) + 1).padStart(2, "0")}</span><strong>{reference.title}</strong><small>{reference.author || "公开来源"}</small></div>
         <div className="research-analysis"><span className="generation-ready">✓ 原笔记完整网址、标题与可见正文已收藏</span>{reference.likes > 0 && <span className="generation-ready">公开可见点赞：{reference.likes.toLocaleString("zh-CN")}</span>}<h3>标题引流方式</h3><p>{reference.coverAnalysis}</p><h3>原笔记可见正文</h3><p>{reference.copyAnalysis}</p><h3>咨询转化写法</h3><p>{reference.reusablePattern}</p></div>
         <div className="source-row"><span>来源：{reference.author || "小红书公开作者"}</span><strong>直接打开原笔记网页 ↗</strong></div>
       </a>)}
-      {!visibleResearchReferences.length && <div className="empty-state research-empty"><strong>还没有右键收藏笔记</strong><p>先打开一篇小红书室内设计原笔记，在页面空白处点击鼠标右键并选择“收藏到 MJ 引流笔记库”，然后回到这里同步。</p><button onClick={() => void runResearch(true)}>同步右键收藏</button></div>}
+      {!visibleResearchReferences.length && <div className="empty-state research-empty"><strong>还没有热门笔记样本</strong><p>先启动本机 Playwright 采集助手，再点击“Playwright 采集热门笔记”；也可以继续使用扩展右键收藏单篇原笔记。</p><button onClick={() => void runPlaywrightResearch()}>开始热门笔记分析</button></div>}
     </div>
   </section>;
 
