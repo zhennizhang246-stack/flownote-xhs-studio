@@ -8,7 +8,7 @@ test("ships the studio secretary product surface", async () => {
   assert.match(page, /上传项目实景图/);
   assert.match(page, /项目资产库/);
   assert.match(page, /自动工作节奏/);
-  assert.match(page, /室内设计小红书引流笔记收藏/);
+  assert.match(page, /室内设计热门笔记分析与选题/);
   assert.match(page, /确认并预填小红书发布页/);
   assert.match(page, /确认本篇并自动发布/);
   assert.match(page, /MJ 发布桥 1.8 已连接/);
@@ -237,6 +237,23 @@ test("starts with a blank creator and renders movable advertising cover graphics
     assert.match(project, new RegExp(pattern));
   }
   assert.match(studio, /广告封面装饰/);
+});
+
+test("integrates local Playwright viral research into photo-driven generation", async () => {
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  const research = await readFile(new URL("../lib/research.ts", import.meta.url), "utf8");
+  const generate = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
+  const collector = await readFile(new URL("../playwright-research/server.mjs", import.meta.url), "utf8");
+  assert.match(studio, /http:\/\/127\.0\.0\.1:8766\/crawl/);
+  assert.match(studio, /Playwright 采集热门笔记/);
+  assert.match(studio, /热门关键词/);
+  assert.match(studio, /自动生成选题/);
+  assert.match(collector, /launchPersistentContext/);
+  assert.match(collector, /室内设计/);
+  assert.match(collector, /titleStructures/);
+  assert.match(research, /keywordUsed/);
+  assert.match(generate, /Playwright 热门笔记样本/);
+  assert.match(generate, /结尾必须包含一个与该空间使用需求有关的自然互动问句/);
 });
 
 test("resizes and repositions the cover subtitle in preview and exported artwork", async () => {
