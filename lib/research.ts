@@ -32,6 +32,10 @@ export type BrowserResearchCandidate = {
   coverUrl?: string;
   coverAlt?: string;
   cardText?: string;
+  tags?: string[];
+  commentsText?: string;
+  savesText?: string;
+  keywordUsed?: string;
 };
 
 function outputText(payload: Record<string, unknown>) {
@@ -116,6 +120,10 @@ export async function collectBrowserResearch(env: ResearchRuntimeEnv, ownerEmail
       coverUrl: String(candidate.coverUrl || "").slice(0, 2000),
       coverAlt: String(candidate.coverAlt || "").replace(/\s+/g, " ").trim().slice(0, 180),
       cardText: String(candidate.cardText || "").replace(/\s+/g, " ").trim().slice(0, 1800),
+      tags: Array.isArray(candidate.tags) ? candidate.tags.map(String).map((tag) => tag.replace(/^#/, "").trim()).filter(Boolean).slice(0, 20) : [],
+      commentsText: String(candidate.commentsText || "").trim().slice(0, 30),
+      savesText: String(candidate.savesText || "").trim().slice(0, 30),
+      keywordUsed: String(candidate.keywordUsed || "").replace(/\s+/g, " ").trim().slice(0, 60),
     });
   }
   const selected = [...unique.values()]
@@ -132,13 +140,21 @@ export async function collectBrowserResearch(env: ResearchRuntimeEnv, ownerEmail
   }
   for (const candidate of selected) {
     const likes = parseVisibleMetric(candidate.likesText || "");
+    const saves = parseVisibleMetric(candidate.savesText || "");
+    const comments = parseVisibleMetric(candidate.commentsText || "");
+    const titleStructure = /\d|㎡|m²/i.test(candidate.title)
+      ? "数字或面积事实前置，再连接空间体验收益"
+      : /[?？]|怎么|如何|为什么|避坑/.test(candidate.title)
+        ? "用真实问题或痛点建立点击动机，再给出设计判断"
+        : "先交代空间情绪或视觉记忆点，再以设计细节支撑";
+    const tagSummary = candidate.tags?.length ? `；高频标签线索：${candidate.tags.slice(0, 6).join("、")}` : "";
     const item: ResearchItem = {
       sourceUrl: candidate.sourceUrl,
       title: candidate.title,
       author: candidate.author || "小红书公开作者",
       likes,
-      saves: 0,
-      comments: 0,
+      saves,
+      comments,
       metricsNote: likes
         ? `小红书搜索页采集时可见点赞约 ${candidate.likesText}；收藏与评论未在卡片中公开显示`
         : "已核验为小红书公开笔记；搜索卡片未稳定显示可解析的互动数",
@@ -146,9 +162,9 @@ export async function collectBrowserResearch(env: ResearchRuntimeEnv, ownerEmail
       copyAnalysis: candidate.cardText
         ? candidate.cardText
         : `${abstractCopyPattern(candidate.title)}正文应以项目照片可验证的空间、材质、光线、动线或使用体验为依据，结尾用自然的问题邀请读者交流需求。`,
-      coverAnalysis: "标题先明确空间类型或真实项目事实，再给出一种可感知的体验价值；避免夸张承诺和与项目无关的标题党表达。",
+      coverAnalysis: `${titleStructure}${candidate.keywordUsed ? `；搜索关键词：${candidate.keywordUsed}` : ""}${tagSummary}。新项目只复用结构，不复制词句。`,
       audienceInsight: "面向正在寻找设计灵感、比较设计公司专业度，或准备启动住宅与商业空间项目的人群。",
-      reusablePattern: `${abstractReusablePattern(candidate.title)}结尾可用“你更关注哪一处设计？”等低压力问题引导评论或咨询，不虚构优惠、客户评价与项目成果。`,
+      reusablePattern: `${abstractReusablePattern(candidate.title)}正文依次写照片钩子、3项可验证设计细节、使用价值与低压力互动语；结尾围绕当前空间提出具体问题，不虚构优惠、客户评价与项目成果。`,
     };
     const values = { ownerEmail, researchDate: date, ...item };
     await db.insert(researchReferences).values(values).onConflictDoUpdate({
