@@ -96,42 +96,38 @@ test("deletes owned projects and generates space-specific creative strategies", 
   assert.match(project, /db\.delete\(projectImages\)/);
   assert.match(studio, /删除项目/);
   assert.match(studio, /spaceTypes/);
-  assert.match(generate, /spaceDesignGuidance/);
-  assert.match(generate, /不能把住宅客厅、卧室、办公、酒店、商业和展厅写成同一套模板/);
+  assert.match(generate, /styleVariants/);
+  assert.match(generate, /松弛生活/);
+  assert.match(generate, /专业设计/);
+  assert.match(generate, /高级极简/);
 });
 
 test("generates and persists three selectable title options", async () => {
   const generate = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
   const project = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
-  assert.match(generate, /titleOptions 必须正好包含\s*3\s*个/);
+  assert.match(generate, /titleOptions 使用三套方案各自的 title/);
   assert.match(generate, /draft\.titleOptions=options/);
   assert.match(project, /titleOptions/);
 });
 
-test("generates a complete photo-driven draft with an English cover eyebrow and restrained emoji", async () => {
+test("generates a complete photo-driven draft with three styles and restrained emoji", async () => {
   const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
   const generate = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
   const project = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
   assert.match(studio, /ORIGINAL DESIGN · INTERIOR/);
   assert.match(studio, /封面英文栏目/);
   assert.match(studio, /renderCoverDataUrl\(coverImage, draft\.coverEyebrow/);
-  assert.match(generate, /coverEyebrow/);
-  assert.match(generate, /标题或正文可自然使用2至4个/);
-  assert.match(generate, /researchReferences\.title/);
-  assert.match(generate, /已有项目禁用文字/);
-  assert.match(generate, /duplicateFragments/);
-  assert.match(generate, /连续14个以上相同汉字/);
-  assert.match(generate, /detail:"high"/);
-  assert.match(generate, /DOUBAO_API_KEY/);
-  assert.match(generate, /ark\.cn-beijing\.volces\.com\/api\/v3\/responses/);
-  assert.match(generate, /doubao-seed-2-0-lite-260215/);
-  assert.match(generate, /providers/);
+  assert.match(generate, /每套正文自然加入 3-6 个/);
+  assert.match(generate, /researchReferences\.copyAnalysis/);
+  assert.match(generate, /不得复制原句或版式/);
+  assert.match(generate, /detail:"auto"/);
+  assert.doesNotMatch(generate, /DOUBAO_API_KEY/);
+  assert.match(generate, /api\.openai\.com\/v1\/responses/);
   assert.match(studio, /本地差异化预览/);
   assert.match(project, /coverEyebrow/);
   assert.match(studio, /生成封面＋正文与标题/);
-  assert.match(generate, /顶级室内设计互联网秘书/);
-  assert.match(generate, /风格、材质关系、色彩、光线、空间比例、动线/);
-  assert.match(generate, /主标题、副标题、3个笔记标题、正文、Emoji、话题标签/);
+  assert.match(generate, /先识别空间类型、材质、灯光、动线、功能和画面情绪/);
+  assert.match(generate, /AI 实景识别 · 3 种风格/);
 });
 
 test("regenerates existing projects from stored photos after syncing current design information", async () => {
@@ -143,9 +139,8 @@ test("regenerates existing projects from stored photos after syncing current des
   assert.match(studio, /正在逐张识别图片并生成全部内容/);
   assert.match(project, /payload\.meta/);
   assert.match(project, /projectType: cleanMeta/);
-  assert.match(generate, /不得沿用旧草稿或示例项目中的原值/);
-  assert.match(generate, /💧 小标题/);
-  assert.match(generate, /所有事实都必须来自上传照片和已知设计信息/);
+  assert.match(generate, /必须只依据上传的实景图/);
+  assert.match(generate, /项目可选事实/);
 });
 
 test("creates photo-only drafts when project metadata is omitted", async () => {
@@ -155,13 +150,9 @@ test("creates photo-only drafts when project metadata is omitted", async () => {
   assert.match(studio, /项目名称（选填）/);
   assert.match(studio, /可留空，系统将仅根据实景图创作/);
   assert.match(projects, /payload\.name\?\.trim\(\) \|\| "实景图识别项目"/);
-  assert.match(generate, /项目名称、所在地、面积、空间类型、目标客户和设计说明全部允许为空/);
-  assert.match(generate, /不得在成品中出现“未命名项目”“实景图识别项目”/);
-  assert.match(generate, /资产库分区只用于归档/);
-  assert.match(generate, /projectName 必须是根据照片气质原创的4至12字中文项目名称/);
-  assert.match(generate, /detectedSpaceType/);
-  assert.match(generate, /designSummary/);
-  assert.match(generate, /generatedMeta/);
+  assert.match(generate, /项目名称、地址、面积、客户与介绍均为可选信息/);
+  assert.match(generate, /缺失时直接省略/);
+  assert.match(generate, /绝不能写‘待确认’或猜测/);
   assert.match(studio, /result\.meta/);
 });
 
@@ -179,7 +170,6 @@ test("moves cover decorations and controls English eyebrow opacity and line visi
   assert.match(project, /patternOffsetX/);
   assert.match(project, /eyebrowOpacity/);
   assert.match(project, /showEyebrowLine/);
-  assert.match(generate, /coverStyle 还必须生成 titleOffsetX/);
 });
 
 test("renders polka, textile, gradient, and blue-white dot cover decorations", async () => {
@@ -204,8 +194,6 @@ test("resizes cover decorations, English eyebrow, and subtitle in the final artw
   assert.match(studio, /700 \$\{style\.eyebrowSize\}px/);
   assert.match(project, /patternScale: Math\.min\(160/);
   assert.match(project, /eyebrowSize: Math\.min\(48/);
-  assert.match(generate, /patternScale（50至160）/);
-  assert.match(generate, /eyebrowSize（16至48）/);
 });
 
 test("moves and resizes the cover main title and inserts emoji into body copy", async () => {
@@ -252,8 +240,8 @@ test("integrates local Playwright viral research into photo-driven generation", 
   assert.match(collector, /室内设计/);
   assert.match(collector, /titleStructures/);
   assert.match(research, /keywordUsed/);
-  assert.match(generate, /Playwright 热门笔记样本/);
-  assert.match(generate, /结尾必须包含一个与该空间使用需求有关的自然互动问句/);
+  assert.match(generate, /最近3篇流量研究的抽象规律/);
+  assert.match(generate, /不得复制原句或版式/);
 });
 
 test("resizes and repositions the cover subtitle in preview and exported artwork", async () => {
@@ -268,7 +256,6 @@ test("resizes and repositions the cover subtitle in preview and exported artwork
   assert.match(project, /subtitleSize/);
   assert.match(project, /subtitleOffsetX/);
   assert.match(project, /subtitleOffsetY/);
-  assert.match(generate, /subtitleSize（18至54）/);
 });
 
 test("uses the final 1080 by 1440 rendered cover as the live Xiaohongshu preview", async () => {
@@ -373,8 +360,8 @@ test("ships configurable scheduling and daily research APIs", async () => {
   assert.match(researchService, /parseVisibleMetric\(b\.likesText/);
   assert.match(researchService, /noteIdentity/);
   assert.match(researchService, /db\.delete\(researchReferences\)/);
-  assert.match(generate, /近期室内设计引流笔记/);
-  assert.match(generate, /不得复制参考原文/);
+  assert.match(generate, /近期研究规律（3篇）/);
+  assert.match(generate, /不得复制原句或版式/);
 });
 
 test("requires a human-approved draft before scheduling", async () => {
