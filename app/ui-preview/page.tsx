@@ -1,21 +1,33 @@
+"use client";
+
 import "./ui-preview.css";
+import { useState, type PointerEvent } from "react";
 
 const nav = ["创作工作台", "项目资产库", "发布日历", "引流笔记库"];
 const titleIdeas = ["谁懂啊！住进会呼吸的木色里", "原木住宅直接封神，越住越松弛", "建议收藏！自然系住宅抄作业模板"];
 
-export const metadata = { title: "栖作 UI 视觉预览" };
-
 export default function UiPreviewPage() {
-  return <main className="ui-demo">
+  const [activeNav, setActiveNav] = useState(0);
+  const moveScene = (event: PointerEvent<HTMLElement>) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const x = (event.clientX - bounds.left) / bounds.width - .5;
+    const y = (event.clientY - bounds.top) / bounds.height - .5;
+    event.currentTarget.style.setProperty("--scene-x", `${x * 8}deg`);
+    event.currentTarget.style.setProperty("--scene-y", `${y * -6}deg`);
+    event.currentTarget.style.setProperty("--light-x", `${(x + .5) * 100}%`);
+    event.currentTarget.style.setProperty("--light-y", `${(y + .5) * 100}%`);
+  };
+  return <main className="ui-demo" onPointerMove={moveScene} onPointerLeave={(event) => { event.currentTarget.style.setProperty("--scene-x", "0deg"); event.currentTarget.style.setProperty("--scene-y", "0deg"); }}>
     <aside className="demo-side">
       <div className="iris-mark" aria-hidden="true"><i/><i/><i/><i/><i/><span/></div>
       <div className="demo-brand"><b>栖</b><span>IRIS<br/>CREATIVE STUDIO</span></div>
-      <nav>{nav.map((item, index) => <button className={index === 0 ? "active" : ""} key={item}><i>{String(index + 1).padStart(2, "0")}</i>{item}</button>)}</nav>
+      <nav>{nav.map((item, index) => <button className={index === activeNav ? "active" : ""} onClick={() => setActiveNav(index)} key={item}><i>{String(index + 1).padStart(2, "0")}</i>{item}</button>)}</nav>
       <div className="side-status"><span>● 发布桥已连接</span><strong>12:00</strong><small>下一篇 · 三天后发布</small></div>
     </aside>
 
     <section className="demo-workspace">
       <div className="iris-ambient iris-ambient-one" aria-hidden="true"/><div className="iris-ambient iris-ambient-two" aria-hidden="true"/>
+      <div className="pixel-iris" aria-hidden="true"><span/><i>IRIS<br/>SYSTEM<br/>— 26</i></div>
       <header className="demo-top"><div><small>XIAOHONGSHU CREATIVE SERVICE</small><h1>让每个空间，都有值得被看见的表达。</h1><p>上传项目实景图，完成识别、文案、封面与发布排期。</p></div><div className="demo-user"><span>新账户 · 功能已同步</span><b>MJ</b></div></header>
 
       <div className="demo-grid">
@@ -26,9 +38,9 @@ export default function UiPreviewPage() {
           <button className="generate-button"><span>生成封面＋正文与标题</span><b>→</b></button>
         </section>
 
-        <aside className="demo-card cover-zone">
+        <aside className="demo-card cover-zone spatial-card">
           <div className="card-head"><div><small>LIVE COVER</small><h2>发布封面预览</h2></div><span>1080 × 1440</span></div>
-          <div className="cover-art"><img src="/ui-preview/project-living.jpg" alt="温润木色住宅项目"/><div className="cover-mask"/><span className="cover-en">ORIGINAL DESIGN · INTERIOR</span><div className="cover-title"><h3>松弛感<br/>才是家的顶级配置</h3><p>原木质感 · 自然光影</p></div><em>01 / 07</em></div>
+          <div className="cover-art"><img src="/ui-preview/project-living.jpg" alt="温润木色住宅项目"/><div className="cover-mask"/><div className="holo-orbit" aria-hidden="true"><i/><i/><i/></div><span className="cover-en">ORIGINAL DESIGN · INTERIOR</span><div className="cover-title"><h3>松弛感<br/>才是家的顶级配置</h3><p>原木质感 · 自然光影</p></div><em>01 / 07</em></div>
           <div className="cover-actions"><button>编辑封面样式</button><button className="dark">确认封面</button></div>
         </aside>
       </div>
