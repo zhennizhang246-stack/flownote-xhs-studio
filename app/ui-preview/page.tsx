@@ -8,12 +8,14 @@ export const metadata = { title: "栖作 UI 视觉预览" };
 export default function UiPreviewPage() {
   return <main className="ui-demo">
     <aside className="demo-side">
-      <div className="demo-brand"><b>栖</b><span>QIZUO<br/>STUDIO</span></div>
+      <div className="iris-mark" aria-hidden="true"><i/><i/><i/><i/><i/><span/></div>
+      <div className="demo-brand"><b>栖</b><span>IRIS<br/>CREATIVE STUDIO</span></div>
       <nav>{nav.map((item, index) => <button className={index === 0 ? "active" : ""} key={item}><i>{String(index + 1).padStart(2, "0")}</i>{item}</button>)}</nav>
       <div className="side-status"><span>● 发布桥已连接</span><strong>12:00</strong><small>下一篇 · 三天后发布</small></div>
     </aside>
 
     <section className="demo-workspace">
+      <div className="iris-ambient iris-ambient-one" aria-hidden="true"/><div className="iris-ambient iris-ambient-two" aria-hidden="true"/>
       <header className="demo-top"><div><small>XIAOHONGSHU CREATIVE SERVICE</small><h1>让每个空间，都有值得被看见的表达。</h1><p>上传项目实景图，完成识别、文案、封面与发布排期。</p></div><div className="demo-user"><span>新账户 · 功能已同步</span><b>MJ</b></div></header>
 
       <div className="demo-grid">
