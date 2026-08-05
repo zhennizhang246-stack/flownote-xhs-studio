@@ -22,7 +22,7 @@ test("ships the studio secretary product surface", async () => {
   assert.match(page, /办公项目/);
   assert.match(page, /酒店项目/);
   assert.match(page, /展厅陈列项目/);
-  assert.match(page, /3 个标题方案 · 点击选择/);
+  assert.match(page, /5 个爆款标题公式 · 点击选择/);
   assert.match(page, /确认并同步保存/);
   assert.match(page, /©2026/);
   assert.match(page, /由 MJ 制作/);
@@ -118,12 +118,26 @@ test("deletes owned projects and generates space-specific creative strategies", 
   assert.match(generate, /高级极简/);
 });
 
-test("generates and persists three selectable title options", async () => {
+test("generates and persists five selectable title options", async () => {
   const generate = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
   const project = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
-  assert.match(generate, /titleOptions 是三套方案各自的 title/);
+  assert.match(generate, /titleOptions 必须有 5 项/);
   assert.match(generate, /draft\.titleOptions = options/);
   assert.match(project, /titleOptions/);
+});
+
+test("falls back to an embedded viral-copy engine when visual API quota is unavailable", async () => {
+  const generate = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
+  const fallback = await readFile(new URL("../lib/fallback-copy.ts", import.meta.url), "utf8");
+  assert.match(generate, /createFallbackDraft/);
+  assert.match(generate, /apiResponse\.status === 429/);
+  assert.match(generate, /return Response\.json\(\{ draft, fallback: true \}\)/);
+  assert.match(fallback, /网站内置爆款文案引擎 · 免 API 额度/);
+  assert.match(fallback, /body\.slice\(0, 150\)/);
+  assert.match(fallback, /titleOptions/);
+  assert.match(fallback, /谁懂啊！这/);
+  assert.match(fallback, /建议收藏！/);
+  assert.match(fallback, /\.slice\(0, 8\)/);
 });
 
 test("generates a complete photo-driven draft with three styles and restrained emoji", async () => {

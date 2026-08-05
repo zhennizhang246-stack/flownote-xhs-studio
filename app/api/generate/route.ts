@@ -3,6 +3,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { projectImages, projects, researchReferences } from "../../../db/schema";
 import { apiError, requireAccountEmail } from "../../../lib/account";
+import { createFallbackDraft } from "../../../lib/fallback-copy";
 
 type RuntimeEnv = {
   PROJECT_MEDIA?: R2Bucket;
@@ -75,19 +76,16 @@ function normalizeDraft(draft: GeneratedDraft, imageCount: number) {
   const validIds = new Set(["lifestyle", "professional", "minimal"]);
   const variants = (Array.isArray(draft.styleVariants) ? draft.styleVariants : [])
     .filter((item) => item && validIds.has(item.id))
-    .slice(0, 3);
+    .slice(0, 5);
 
-  const options = (variants.length === 3
-    ? variants.map((item) => item.title)
-    : Array.isArray(draft.titleOptions)
+  const options = (Array.isArray(draft.titleOptions) && draft.titleOptions.length
       ? draft.titleOptions
-      : [draft.title]
-  )
+      : variants.length === 3 ? variants.map((item) => item.title) : [draft.title])
     .map((item) => String(item || "").trim())
     .filter(Boolean)
-    .slice(0, 3);
+    .slice(0, 5);
 
-  while (options.length < 3) options.push(`${options[0] || "空间设计灵感"}｜方案${options.length + 1}`);
+  while (options.length < 5) options.push(`${options[0] || "空间设计灵感"}｜方案${options.length + 1}`);
   draft.titleOptions = options;
   draft.styleVariants = variants;
 
@@ -118,9 +116,6 @@ export async function POST(request: Request) {
 
     const runtime = env as unknown as RuntimeEnv;
     if (!runtime.PROJECT_MEDIA) throw new Error("项目图片存储暂不可用");
-    if (!runtime.DASHSCOPE_API_KEY?.trim()) {
-      return Response.json({ error: "尚未配置阿里云百炼 DASHSCOPE_API_KEY" }, { status: 503 });
-    }
 
     const db = getDb();
     const [project] = await db
@@ -136,6 +131,7 @@ export async function POST(request: Request) {
       .where(eq(projectImages.projectId, projectId));
     const selectedImages = images.sort((a, b) => a.sortOrder - b.sortOrder).slice(0, 10);
     if (!selectedImages.length) return Response.json({ error: "请先上传项目实景图" }, { status: 400 });
+    const fallback = (reason?: string) => normalizeDraft(createFallbackDraft(project, selectedImages.length, reason), selectedImages.length);
 
     const research = await db
       .select({
@@ -157,7 +153,9 @@ export async function POST(request: Request) {
 
 coverStyle 规则：fontFamily 只能为 serif、sans、kai；颜色使用 6 位十六进制；overlayOpacity 为 0-90；pattern 只能为 none、frame、grid、dots、corners；titleSize 为 52-120；align 只能为 left、center；position 只能为 top、middle、bottom。
 
-只返回一个 JSON 对象，不要 Markdown。顶层字段必须为 title、titleOptions、coverTitle、coverSubtitle、coverStyle、body、tags、highlights、riskNotes、coverIndex、styleVariants。coverIndex 是最适合做封面的图片序号，从 0 开始。顶层文案使用 lifestyle 方案；titleOptions 是三套方案各自的 title。
+正文采用“情绪钩子→1-2句核心亮点→2句场景梗→互动收尾”，控制在 150 个汉字以内。titleOptions 必须生成 5 个不重复标题，分别使用情绪口语、风格封神、颜值惊叹、场景发现、建议收藏结构。标签固定为 2 个大流量词、3 个精准风格词、2 个垂类词和 1 个可选地域词。
+
+只返回一个 JSON 对象，不要 Markdown。顶层字段必须为 title、titleOptions、coverTitle、coverSubtitle、coverStyle、body、tags、highlights、riskNotes、coverIndex、styleVariants。coverIndex 是最适合做封面的图片序号，从 0 开始。顶层文案使用 lifestyle 方案；titleOptions 必须有 5 项。
 
 用户提供的可选项目信息：${JSON.stringify(project)}
 近期引流笔记的抽象规律（只能借鉴规律，不得复制原句）：${JSON.stringify(research)}`;
@@ -176,6 +174,12 @@ coverStyle 规则：fontFamily 只能为 serif、sans、kai；颜色使用 6 位
     }
 
     if (content.length === 1) throw new Error("无法读取项目图片，请重新上传");
+
+    if (!runtime.DASHSCOPE_API_KEY?.trim()) {
+      const draft = fallback("尚未配置视觉 API");
+      await db.update(projects).set({ status: "drafted", draftJson: JSON.stringify(draft) }).where(and(eq(projects.id, projectId), eq(projects.ownerEmail, ownerEmail)));
+      return Response.json({ draft, fallback: true });
+    }
 
     const apiResponse = await fetch(normalizeEndpoint(runtime.QWEN_BASE_URL), {
       method: "POST",
@@ -196,21 +200,25 @@ coverStyle 规则：fontFamily 只能为 serif、sans、kai；颜色使用 6 位
     const payload = (await apiResponse.json().catch(() => ({}))) as QwenResponse;
     if (!apiResponse.ok) {
       const detail = payload.error?.message || payload.message || `HTTP ${apiResponse.status}`;
-      if (apiResponse.status === 401) throw new Error("百炼 API Key 无效、地域不匹配或已失效");
-      if (apiResponse.status === 429) throw new Error("百炼调用频率或账户额度已达上限，请稍后重试或检查余额");
-      throw new Error(`千问视觉服务暂不可用：${detail}`);
+      const draft = fallback(apiResponse.status === 429 ? "视觉 API 额度或频率已达上限" : `视觉 API 暂不可用：${detail}`);
+      await db.update(projects).set({ status: "drafted", draftJson: JSON.stringify(draft) }).where(and(eq(projects.id, projectId), eq(projects.ownerEmail, ownerEmail)));
+      return Response.json({ draft, fallback: true });
     }
 
     const text = payload.choices?.[0]?.message?.content;
-    if (!text) throw new Error("千问没有返回文案内容，请重新生成");
-    const draft = normalizeDraft(parseDraft(text), selectedImages.length);
+    let draft: GeneratedDraft;
+    try {
+      draft = text ? normalizeDraft(parseDraft(text), selectedImages.length) : fallback("视觉 API 未返回有效内容");
+    } catch {
+      draft = fallback("视觉 API 返回内容无法解析");
+    }
 
     await db
       .update(projects)
       .set({ status: "drafted", draftJson: JSON.stringify(draft) })
       .where(and(eq(projects.id, projectId), eq(projects.ownerEmail, ownerEmail)));
 
-    return Response.json({ draft });
+    return Response.json({ draft, fallback: draft.mode.includes("免 API 额度") });
   } catch (error) {
     return apiError(error, "生成失败");
   }

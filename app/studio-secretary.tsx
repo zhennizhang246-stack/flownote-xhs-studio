@@ -177,7 +177,7 @@ const defaultCoverStyle: CoverStyle = {
 };
 const emptyDraft: Draft = {
   title: "",
-  titleOptions: ["", "", ""],
+  titleOptions: ["", "", "", "", ""],
   coverEyebrow: "",
   coverTitle: "",
   coverSubtitle: "",
@@ -578,25 +578,25 @@ function localFallback(meta: ProjectMeta, existingProjects: ProjectRecord[] = []
   const hospitality = /酒店|民宿/.test(space);
   const creative = office ? {
     eyebrow: "ORIGINAL DESIGN · WORKPLACE",
-    titles: [`${projectName}｜让灵感正在发生✨`, `${projectName}的协作场景`, `${projectName}如何表达品牌气质`],
+    titles: [`谁懂啊！这办公空间一走进去就像开了滤镜`, `现代感办公空间直接封神！拍不完根本拍不完`, `救命！这办公空间颜值也太超标了吧😭`, `藏在城市里的松弛感办公室，美到失语`, `建议收藏！办公空间设计抄作业模板`],
     cover: `${projectName} · 灵感发生地`,
     body: `${projectName}位于${location}，这次先从已知设计信息梳理它与日常工作的关系✨\n\n${meta.brief || "项目围绕品牌表达、团队交流与真实工作动线组织空间。"}\n\n当前为本地预览，画面中的具体材质、色彩、灯光和空间关系需在 AI 图像识别恢复后进一步核验；未确认的内容不会写成项目事实。\n\n对于这个项目，你更希望先了解品牌表达还是协作动线？`,
     tags: ["办公空间设计", "办公室设计", "品牌空间", "室内设计", "实景案例", "设计工作室"],
   } : commercial ? {
     eyebrow: "ORIGINAL DESIGN · RETAIL",
-    titles: [`${projectName}｜把体验写进空间✨`, `${projectName}的到店第一眼`, `${projectName}如何组织顾客路径`],
+    titles: [`谁懂啊！这商业空间一走进去就像开了滤镜`, `氛围感商业空间直接封神！拍不完根本拍不完`, `救命！这门店颜值也太超标了吧😭`, `藏在街角的氛围感门店，美到失语`, `建议收藏！商业空间设计抄作业模板`],
     cover: `${projectName} · 品牌场景`,
     body: `${projectName}位于${location}，本次先依据已知信息整理品牌与空间体验的关系✨\n\n${meta.brief || "项目围绕品牌识别、顾客路径、陈列与停留体验组织空间。"}\n\n当前为本地预览，照片中的材料、灯光、陈列和真实动线需在 AI 图像识别恢复后逐项核验，不把推测写成结论。\n\n你更想了解这个项目的品牌记忆点，还是顾客行走路径？`,
     tags: ["商业空间设计", "店铺设计", "品牌空间", "室内设计", "实景案例", "空间设计"],
   } : hospitality ? {
     eyebrow: "ORIGINAL DESIGN · HOSPITALITY",
-    titles: [`${projectName}｜从抵达开始✨`, `${projectName}的停留节奏`, `${projectName}如何安放旅居体验`],
+    titles: [`谁懂啊！这度假空间一走进去就像开了滤镜`, `东方感旅居空间直接封神！拍不完根本拍不完`, `救命！这民宿颜值也太超标了吧😭`, `藏在城市里的避世空间，美到失语`, `建议收藏！民宿空间设计抄作业模板`],
     cover: `${projectName} · 抵达之后`,
     body: `${projectName}位于${location}，本次从已知需求梳理抵达、停留和休息之间的关系✨\n\n${meta.brief || "项目围绕客人的抵达、停留、休息与服务动线重新组织空间。"}\n\n当前为本地预览，照片中的光线、材质、尺度和服务场景将在 AI 图像识别恢复后核验，避免把看不清的内容写进正文。\n\n对于这次旅居设计，你更关注抵达体验还是客房舒适度？`,
     tags: ["酒店设计", "民宿设计", "旅居空间", "室内设计", "实景案例", "空间体验"],
   } : {
     eyebrow: "ORIGINAL DESIGN · INTERIOR",
-    titles: [`${projectName}｜${area}的居住线索🌿`, `${projectName}从已知需求出发`, `${projectName}如何回应日常生活`],
+    titles: [`谁懂啊！这住宅一走进去就像开了滤镜`, `自然感住宅直接封神！拍不完根本拍不完`, `救命！这住宅颜值也太超标了吧😭`, `藏在日常里的治愈感之家，美到失语`, `建议收藏！住宅设计抄作业模板`],
     cover: `${projectName} · 居住线索`,
     body: `${projectName}位于${location}，面积为${area}。本次先从已知设计信息理解它的居住需求🌿\n\n${meta.brief || "项目围绕光线、材质、动线与收纳重新梳理空间。"}\n\n当前为本地预览，实景图中的具体空间、材料、光线和功能关系将在 AI 图像识别恢复后逐项核验；没有得到照片或资料支持的内容不会被写成事实。\n\n对于${projectName}，你最想先了解哪一种生活场景？`,
     tags: ["室内设计", "住宅设计", "实景案例", "全案设计", "自然系住宅", "设计工作室"],
@@ -1029,7 +1029,7 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
       audience: project.audience,
       brief: project.brief,
     });
-    setDraft({ ...emptyDraft, ...project.draft, coverStyle: normalizedCoverStyle(project.draft?.coverStyle), titleOptions: project.draft?.titleOptions?.length === 3 ? project.draft.titleOptions : [project.draft?.title || "", "", ""], tags: project.draft?.tags || [], highlights: project.draft?.highlights || [], riskNotes: project.draft?.riskNotes || [] });
+    setDraft({ ...emptyDraft, ...project.draft, coverStyle: normalizedCoverStyle(project.draft?.coverStyle), titleOptions: project.draft?.titleOptions?.length === 5 ? project.draft.titleOptions : [project.draft?.title || "", ...(project.draft?.titleOptions || []).filter((title) => title !== project.draft?.title), "", "", "", ""].slice(0, 5), tags: project.draft?.tags || [], highlights: project.draft?.highlights || [], riskNotes: project.draft?.riskNotes || [] });
     setPreviews(project.images?.map((image) => image.url) || []);
     setFiles([]);
     setPhase("done");
@@ -1405,7 +1405,7 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
     <section className="editorial-card editor-mode">
       <div className="editorial-title"><span>EDITABLE COPY</span><label><small>已选择的笔记标题</small><textarea value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}/></label><div className="fact-row">{facts.map((fact) => <span key={fact}>{fact}</span>)}</div></div>
       <div className="copy-column">
-        <div className="title-options"><small>3 个标题方案 · 点击选择</small>{draft.titleOptions.map((title, index) => <button className={draft.title === title ? "active" : ""} key={`${title}-${index}`} onClick={() => setDraft((current) => ({ ...current, title }))}><span>0{index + 1}</span>{title}<em>{draft.title === title ? "已选择" : "选择"}</em></button>)}</div>
+        <div className="title-options"><small>5 个爆款标题公式 · 点击选择</small>{draft.titleOptions.map((title, index) => <button className={draft.title === title ? "active" : ""} key={`${title}-${index}`} onClick={() => setDraft((current) => ({ ...current, title }))}><span>0{index + 1}</span>{title}<em>{draft.title === title ? "已选择" : "选择"}</em></button>)}</div>
         <label><small>封面英文栏目</small><input value={draft.coverEyebrow} maxLength={44} onChange={(event) => setDraft((current) => ({ ...current, coverEyebrow: event.target.value.toUpperCase() }))}/></label>
         <label><small>封面主标题</small><input value={draft.coverTitle} onChange={(event) => setDraft((current) => ({ ...current, coverTitle: event.target.value }))}/></label>
         <label><small>封面副标题</small><input value={draft.coverSubtitle} onChange={(event) => setDraft((current) => ({ ...current, coverSubtitle: event.target.value }))}/></label>

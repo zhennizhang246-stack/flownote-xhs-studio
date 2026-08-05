@@ -60,7 +60,7 @@ function cleanDraft(value: unknown): Draft {
   );
   const draft = {
     title: cleanText(input.title, 80),
-    titleOptions: cleanList(input.titleOptions, 3, 80),
+    titleOptions: cleanList(input.titleOptions, 5, 80),
     coverEyebrow: cleanText(input.coverEyebrow, 44).toUpperCase() || "ORIGINAL DESIGN · INTERIOR",
     coverTitle: cleanText(input.coverTitle, 30),
     coverSubtitle: cleanText(input.coverSubtitle, 60),
@@ -97,8 +97,8 @@ function cleanDraft(value: unknown): Draft {
     coverIndex: Math.max(0, Math.min(11, Number(input.coverIndex) || 0)),
     mode: cleanText(input.mode, 30) || "人工编辑",
   };
-  if (!draft.titleOptions.includes(draft.title)) draft.titleOptions = [draft.title, ...draft.titleOptions].filter(Boolean).slice(0, 3);
-  while (draft.titleOptions.length < 3) draft.titleOptions.push(`${draft.title}｜备选${draft.titleOptions.length + 1}`);
+  if (!draft.titleOptions.includes(draft.title)) draft.titleOptions = [draft.title, ...draft.titleOptions].filter(Boolean).slice(0, 5);
+  while (draft.titleOptions.length < 5) draft.titleOptions.push(`${draft.title}｜备选${draft.titleOptions.length + 1}`);
   if (!draft.title || !draft.coverTitle || !draft.body) throw new Error("标题、封面标题和正文不能为空");
   return draft;
 }
