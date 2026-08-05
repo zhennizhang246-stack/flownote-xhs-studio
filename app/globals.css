@@ -91,3 +91,23 @@ html,body{background:#f7f6fa;color:var(--ink)}body{font-family:Inter,"Microsoft 
 @media(max-width:1100px){.topbar h1{font-size:clamp(38px,6vw,65px);letter-spacing:-3.5px}.content-grid{grid-template-columns:minmax(0,1fr) minmax(300px,.64fr)}.asset-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:780px){.topbar{padding-top:0}.topbar:after{width:300px;height:130px;right:-90px;top:-40px}.topbar h1{font-size:clamp(32px,10vw,45px);line-height:1;letter-spacing:-2.5px;padding-right:34px}.content-grid{grid-template-columns:1fr}.asset-grid{grid-template-columns:1fr}.section-heading h2{font-size:22px}.creator-card,.dashboard-card{padding:18px}.editorial-title h2{font-size:30px;letter-spacing:-1.4px}.wechat-hero{min-height:auto}.wechat-hero h1{font-size:44px;letter-spacing:-2.6px}.wechat-feature-grid article{min-height:190px;padding:24px}.creator-card:after,.preview-panel:after,.dashboard-card:after,.editorial-card:after{width:180px;height:140px;filter:blur(34px)}}
 @media(prefers-reduced-motion:reduce){.topbar:after,.creator-card:after,.preview-panel:after,.dashboard-card:after,.editorial-card:after,.wechat-preview:after{animation:none!important}}
+
+/* FULL-HEIGHT RAIL + HORIZONTAL CREATION DESK */
+@media(min-width:1081px){
+  .app-shell{background:linear-gradient(90deg,#24252c 0 236px,transparent 236px),linear-gradient(145deg,#f9f8fb 0%,#f5f4f9 48%,#faf8f5 100%);overflow:visible}
+  .sidebar{position:relative;top:auto;align-self:stretch;min-height:100%;height:auto;background:#24252c;padding-bottom:42px}
+  .editorial-card{grid-template-columns:minmax(210px,.42fr) minmax(0,1.65fr) minmax(210px,.42fr);gap:24px}
+  .copy-column{grid-template-columns:repeat(3,minmax(0,1fr));align-items:start}
+  .copy-column>.title-options,.copy-column>.cover-designer,.copy-column>.body-compose,.copy-column>.editor-actions,.copy-column>.sync-state{grid-column:1/-1}
+  .copy-column>.body-compose+label{grid-column:1/-1}
+  .cover-control-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .cover-control-grid .range-control{grid-column:span 2}
+  .cover-control-grid .line-toggle{grid-column:span 2}
+}
+@media(min-width:781px) and (max-width:1080px){
+  .app-shell{background:linear-gradient(90deg,#24252c 0 82px,transparent 82px),linear-gradient(145deg,#f9f8fb 0%,#f5f4f9 48%,#faf8f5 100%);overflow:visible}
+  .sidebar{position:relative;top:auto;align-self:stretch;min-height:100%;height:auto;background:#24252c}
+  .editorial-card{grid-template-columns:minmax(180px,.45fr) minmax(0,1.55fr)}
+  .copy-column{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .copy-column>.title-options,.copy-column>.cover-designer,.copy-column>.body-compose,.copy-column>.editor-actions,.copy-column>.sync-state,.copy-column>.body-compose+label{grid-column:1/-1}
+}
