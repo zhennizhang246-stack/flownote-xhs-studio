@@ -1,5 +1,5 @@
 ﻿import { sql } from "drizzle-orm";
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 export const projects = sqliteTable("projects", {
   id: integer("id").primaryKey({ autoIncrement: true }), name: text("name").notNull(),
   ownerEmail: text("owner_email").notNull().default(""),
@@ -42,6 +42,19 @@ export const accountAutomationSettings = sqliteTable("account_automation_setting
   publishMode: text("publish_mode").notNull().default("manual"),
   updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
+
+export const accountDevices = sqliteTable("account_devices", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  ownerEmail: text("owner_email").notNull(),
+  deviceKey: text("device_key").notNull(),
+  deviceName: text("device_name").notNull().default("创作电脑"),
+  bridgeConnected: integer("bridge_connected", { mode: "boolean" }).notNull().default(false),
+  lastSeenAt: text("last_seen_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [
+  uniqueIndex("idx_account_devices_owner_key").on(table.ownerEmail, table.deviceKey),
+  index("idx_account_devices_owner_seen").on(table.ownerEmail, table.lastSeenAt),
+]);
 
 export const researchReferences = sqliteTable("research_references", {
   id: integer("id").primaryKey({ autoIncrement: true }),

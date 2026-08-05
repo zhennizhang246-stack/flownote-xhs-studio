@@ -39,7 +39,7 @@ export default function WechatSharePage() {
           <div className="wechat-preview-card">
             <small>PRIVATE CREATIVE WORKSPACE</small>
             <strong>上传自己的实景图<br />创作自己的内容</strong>
-            <span>实景图 → 封面 → 文案 → 发布</span>
+            <span>实景图 → 封面 → 文案 → 三端共享发布</span>
           </div>
           <div className="wechat-preview-status">
             <span>封面与文案</span>
@@ -66,8 +66,8 @@ export default function WechatSharePage() {
 
       <section className="wechat-privacy">
         <p>独立工作区</p>
-        <h2>分享平台，不共享账号。</h2>
-        <span>本页不读取、不展示任何作者项目、创作文案、小红书主页、发布队列或登录状态。进入创作区后，新账户只会看到自己的独立资料。</span>
+        <h2>分享平台，不泄露账号。</h2>
+        <span>同一创作账户可在三台电脑共享项目库与排期，每台电脑通过小红书官方扫码独立登录；本公开页面不读取或展示任何项目、主页、发布队列与登录状态。</span>
         <Link href="/">创建自己的独立工作区 →</Link>
       </section>
 

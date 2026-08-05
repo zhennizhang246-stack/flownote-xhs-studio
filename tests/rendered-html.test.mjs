@@ -69,6 +69,22 @@ test("ships a local bridge with manual prefill and single-use auto-publish autho
   assert.match(research, /MJ_XHS_COLLECT_CURRENT_NOTE/);
 });
 
+test("binds at most three computers to one isolated cloud workspace", async () => {
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  const devicesApi = await readFile(new URL("../app/api/devices/route.ts", import.meta.url), "utf8");
+  const schema = await readFile(new URL("../db/schema.ts", import.meta.url), "utf8");
+  const sharedContent = await readFile(new URL("../lib/site-content.ts", import.meta.url), "utf8");
+  assert.match(devicesApi, /MAX_ACCOUNT_DEVICES = 3/);
+  assert.match(devicesApi, /requireAccountEmail/);
+  assert.match(devicesApi, /eq\(accountDevices\.ownerEmail, ownerEmail\)/);
+  assert.match(schema, /account_devices/);
+  assert.match(schema, /idx_account_devices_owner_key/);
+  assert.match(studio, /共享电脑 \{devices\.length\} \/ 3/);
+  assert.match(studio, /打开小红书扫码登录/);
+  assert.match(studio, /项目库、文案和发布排期实时共享/);
+  assert.match(sharedContent, /最多绑定三台电脑/);
+});
+
 test("uses Node CI instead of applying Deno lint rules to the Node app", async () => {
   const workflow = await readFile(new URL("../.github/workflows/node.yml", import.meta.url), "utf8");
   assert.match(workflow, /name: Node CI/);
@@ -400,7 +416,7 @@ test("publishes a sign-in-gated multi-account workspace without sharing Xiaohong
   assert.match(page, /requireChatGPTUser/);
   assert.match(page, /force-dynamic/);
   assert.match(page, /canClaimLegacyData/);
-  assert.match(studio, /其他账户首次使用需重新登录小红书/);
+  assert.match(studio, /请扫码登录当前电脑的小红书/);
   assert.match(studio, /网站作者专属工作区/);
   assert.match(studio, /新账户独立工作区/);
   assert.match(studio, /其他账户无法访问/);
