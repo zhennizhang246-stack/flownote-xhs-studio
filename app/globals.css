@@ -111,3 +111,18 @@ html,body{background:#f7f6fa;color:var(--ink)}body{font-family:Inter,"Microsoft 
   .copy-column{grid-template-columns:repeat(2,minmax(0,1fr))}
   .copy-column>.title-options,.copy-column>.cover-designer,.copy-column>.body-compose,.copy-column>.editor-actions,.copy-column>.sync-state,.copy-column>.body-compose+label{grid-column:1/-1}
 }
+
+/* FLOATING GLASS NAV + CONTINUOUS LIVE PREVIEW */
+@media(min-width:1081px){
+  .app-shell{grid-template-columns:268px minmax(0,1fr);background:linear-gradient(145deg,#f9f8fb 0%,#f5f4f9 48%,#faf8f5 100%)}
+  .sidebar{position:sticky;top:18px;align-self:start;width:236px;height:calc(100vh - 36px);min-height:0;margin:18px 0 18px 18px;padding:28px 20px;border:1px solid #ffffff80;border-radius:28px;background:linear-gradient(150deg,#2d2e3acc,#242630b8);box-shadow:0 28px 80px #3a334c2b,inset 0 1px #ffffff2b;backdrop-filter:blur(28px) saturate(135%);overflow:auto}
+  .content-grid>.creator-card{grid-column:1;grid-row:1}
+  .content-grid>.preview-panel{grid-column:2;grid-row:1 / span 2;top:18px;max-height:calc(100vh - 36px);overflow:auto}
+  .content-grid>.editorial-card{grid-column:1;grid-row:2;grid-template-columns:minmax(190px,.38fr) minmax(0,1.62fr);gap:24px}
+  .content-grid>.editorial-card .analysis-column{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:18px}
+}
+@media(min-width:781px) and (max-width:1080px){
+  .app-shell{grid-template-columns:104px minmax(0,1fr);background:linear-gradient(145deg,#f9f8fb 0%,#f5f4f9 48%,#faf8f5 100%)}
+  .sidebar{position:sticky;top:14px;align-self:start;width:76px;height:calc(100vh - 28px);min-height:0;margin:14px;border:1px solid #ffffff70;border-radius:23px;background:linear-gradient(150deg,#2d2e3acc,#242630b8);box-shadow:0 24px 65px #3a334c24;backdrop-filter:blur(26px);overflow:auto}
+  .content-grid>.preview-panel{position:sticky;top:14px}
+}
