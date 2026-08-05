@@ -8,11 +8,11 @@ test("ships the studio secretary product surface", async () => {
   assert.match(page, /上传项目实景图/);
   assert.match(page, /项目资产库/);
   assert.match(page, /自动工作节奏/);
-  assert.match(page, /每日 3 篇小红书高热参考解析/);
+  assert.match(page, /引流笔记库/);
   assert.match(page, /确认并预填小红书发布页/);
   assert.match(page, /确认本篇并自动发布/);
-  assert.match(page, /MJ 发布桥 1.3 已连接/);
-  assert.match(page, /秘书会重新打开小红书/);
+  assert.match(page, /MJ 发布桥 2.0 已连接/);
+  assert.match(page, /同步浏览器中右键收藏/);
   assert.match(page, /from=menu&target=image/);
   assert.match(page, /renderCoverDataUrl/);
   assert.match(page, /5 \* 60_000/);
@@ -22,10 +22,6 @@ test("ships the studio secretary product surface", async () => {
   assert.match(page, /办公项目/);
   assert.match(page, /酒店项目/);
   assert.match(page, /展厅陈列项目/);
-  assert.match(page, /笔记评论自动回复秘书/);
-  assert.match(page, /同步最近笔记评论/);
-  assert.match(page, /确认并自动回复安全评论/);
-  assert.match(page, /高风险评论 · 自动转人工/);
   assert.match(page, /3 个标题方案 · 点击选择/);
   assert.match(page, /确认并同步保存/);
   assert.match(page, /©2026/);
@@ -33,17 +29,18 @@ test("ships the studio secretary product surface", async () => {
   assert.match(page, /最多 10 张实景图/);
   assert.match(page, /可分批人工添加，最多 10 张/);
   assert.match(page, /人工立即发布/);
-  assert.match(page, /官方 API 自动发布/);
-  assert.match(page, /等待官方授权/);
+  assert.doesNotMatch(page, /官方 API 自动发布/);
   assert.match(page, /封面样式编辑/);
   assert.match(page, /建筑网格/);
   assert.match(page, /标题颜色/);
-  assert.match(page, /已纳入后续生成策略/);
-  assert.match(page, /直接打开当前可浏览的原笔记网页/);
-  assert.match(page, /重新采集今日 3 篇/);
+  assert.match(page, /真实原笔记链接已收藏并完成结构解析/);
+  assert.match(page, /href=\{reference\.sourceUrl\}/);
+  assert.match(page, /直接打开原笔记网页/);
+  assert.match(page, /解析右键收藏/);
   assert.match(page, /visibleResearchReferences/);
-  assert.match(page, /保存项目并生成封面与文案/);
-  assert.match(page, /浙江 · 温州/);
+  assert.match(page, /生成封面＋正文与标题/);
+  assert.match(page, /const emptyDraft/);
+  assert.doesNotMatch(page, /浙江 · 温州/);
 });
 
 test("ships a local bridge with manual prefill and single-use auto-publish authorization", async () => {
@@ -51,8 +48,8 @@ test("ships a local bridge with manual prefill and single-use auto-publish autho
   const siteBridge = await readFile(new URL("../browser-extension/site-bridge.js", import.meta.url), "utf8");
   const prefill = await readFile(new URL("../browser-extension/xhs-prefill.js", import.meta.url), "utf8");
   const research = await readFile(new URL("../browser-extension/xhs-research.js", import.meta.url), "utf8");
-  const comments = await readFile(new URL("../browser-extension/xhs-comments.js", import.meta.url), "utf8");
   assert.equal(manifest.manifest_version, 3);
+  assert.equal(manifest.version, "2.0.0");
   assert.ok(manifest.content_scripts.some((entry) => entry.matches.includes("https://creator.xiaohongshu.com/publish/*")));
   assert.match(siteBridge, /MJ_XHS_DRAFT_STORED/);
   assert.match(prefill, /DataTransfer/);
@@ -68,12 +65,8 @@ test("ships a local bridge with manual prefill and single-use auto-publish autho
   assert.match(research, /collectCandidates/);
   assert.match(research, /安全验证/);
   assert.match(research, /MJ_XHS_RESEARCH_RESULTS/);
-  assert.match(siteBridge, /MJ_XHS_COMMENT_SYNC_REQUEST/);
-  assert.match(siteBridge, /MJ_XHS_COMMENT_REPLY_REQUEST/);
-  assert.match(comments, /collectProfileNotes/);
-  assert.match(comments, /collectNoteComments/);
-  assert.match(comments, /authorizationValid/);
-  assert.match(comments, /20_000/);
+  assert.ok(manifest.permissions.includes("contextMenus"));
+  assert.match(research, /MJ_XHS_COLLECT_CURRENT_NOTE/);
 });
 
 test("uses Node CI instead of applying Deno lint rules to the Node app", async () => {
@@ -91,15 +84,199 @@ test("accepts and analyzes at most ten project images", async () => {
   const generate = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
   assert.match(projects, /images\.length > 10/);
   assert.match(projects, /最多上传 10 张图片/);
-  assert.match(generate, /slice\(0,10\)/);
+  assert.match(generate, /slice\(0, 10\)/);
+});
+
+test("deletes owned projects and generates space-specific creative strategies", async () => {
+  const project = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
+  const generate = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  assert.match(project, /export async function DELETE/);
+  assert.match(project, /eq\(projects\.ownerEmail, ownerEmail\)/);
+  assert.match(project, /db\.delete\(projectImages\)/);
+  assert.match(studio, /删除项目/);
+  assert.match(studio, /spaceTypes/);
+  assert.match(generate, /styleVariants/);
+  assert.match(generate, /松弛生活/);
+  assert.match(generate, /专业设计/);
+  assert.match(generate, /高级极简/);
 });
 
 test("generates and persists three selectable title options", async () => {
   const generate = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
   const project = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
-  assert.match(generate, /titleOptions 必须正好包含 3 个标题/);
-  assert.match(generate, /draft\.titleOptions=options/);
+  assert.match(generate, /titleOptions 是三套方案各自的 title/);
+  assert.match(generate, /draft\.titleOptions = options/);
   assert.match(project, /titleOptions/);
+});
+
+test("generates a complete photo-driven draft with three styles and restrained emoji", async () => {
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  const generate = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
+  const project = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
+  assert.match(studio, /ORIGINAL DESIGN · INTERIOR/);
+  assert.match(studio, /封面英文栏目/);
+  assert.match(studio, /renderCoverDataUrl\(coverImage, draft\.coverEyebrow/);
+  assert.match(generate, /正文自然加入 3-6 个/);
+  assert.match(generate, /researchReferences\.copyAnalysis/);
+  assert.match(generate, /不得复制原句/);
+  assert.match(generate, /image_url/);
+  assert.doesNotMatch(generate, /DOUBAO_API_KEY/);
+  assert.match(generate, /qwen3-vl-plus/);
+  assert.match(studio, /本地差异化预览/);
+  assert.match(project, /coverEyebrow/);
+  assert.match(studio, /生成封面＋正文与标题/);
+  assert.match(generate, /识别空间类型、材质、色彩、自然与人工采光/);
+  assert.match(generate, /千问视觉实景识别 · 3 种风格/);
+});
+
+test("regenerates existing projects from stored photos after syncing current design information", async () => {
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  const project = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
+  const generate = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
+  assert.match(studio, /currentProjectId \? "正在同步设计信息并重新分析项目原图/);
+  assert.match(studio, /JSON\.stringify\(\{ meta \}\)/);
+  assert.match(studio, /正在逐张识别图片并生成全部内容/);
+  assert.match(project, /payload\.meta/);
+  assert.match(project, /projectType: cleanMeta/);
+  assert.match(generate, /只依据画面中可见事实/);
+  assert.match(generate, /可选项目信息/);
+});
+
+test("creates photo-only drafts when project metadata is omitted", async () => {
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  const projects = await readFile(new URL("../app/api/projects/route.ts", import.meta.url), "utf8");
+  const generate = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
+  assert.match(studio, /项目名称（选填）/);
+  assert.match(studio, /可留空，系统将仅根据实景图创作/);
+  assert.match(projects, /payload\.name\?\.trim\(\) \|\| "实景图识别项目"/);
+  assert.match(generate, /用户提供的可选项目信息/);
+  assert.match(generate, /禁止猜测材料品牌/);
+  assert.match(generate, /项目名称、地点、面积、客户和设计信息缺失时直接省略/);
+  assert.match(studio, /result\.meta/);
+});
+
+test("moves cover decorations and controls English eyebrow opacity and line visibility", async () => {
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  const project = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
+  const generate = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
+  assert.match(studio, /图案水平位置/);
+  assert.match(studio, /图案垂直位置/);
+  assert.match(studio, /英文水平位置/);
+  assert.match(studio, /英文垂直位置/);
+  assert.match(studio, /英文透明度/);
+  assert.match(studio, /英文栏目横线/);
+  assert.match(studio, /if \(style\.showEyebrowLine\)/);
+  assert.match(project, /patternOffsetX/);
+  assert.match(project, /eyebrowOpacity/);
+  assert.match(project, /showEyebrowLine/);
+});
+
+test("renders polka, textile, gradient, and blue-white dot cover decorations", async () => {
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  const project = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
+  for (const label of ["波点", "面料肌理", "柔和渐变", "蓝白波点"]) assert.match(studio, new RegExp(label));
+  for (const value of ["polka", "textile", "gradient", "blue-white-dots"]) {
+    assert.match(studio, new RegExp(`style\\.pattern === \\\"${value}\\\"`));
+    assert.match(project, new RegExp(value));
+  }
+  assert.match(studio, /createRadialGradient/);
+});
+
+test("resizes cover decorations, English eyebrow, and subtitle in the final artwork", async () => {
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  const project = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
+  const generate = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
+  assert.match(studio, /图案大小 · \{normalizedCoverStyle\(draft\.coverStyle\)\.patternScale\}%/);
+  assert.match(studio, /英文字号 · \{normalizedCoverStyle\(draft\.coverStyle\)\.eyebrowSize\}/);
+  assert.match(studio, /副标题字号 · \{normalizedCoverStyle\(draft\.coverStyle\)\.subtitleSize\}/);
+  assert.match(studio, /context\.scale\(patternScale, patternScale\)/);
+  assert.match(studio, /700 \$\{style\.eyebrowSize\}px/);
+  assert.match(project, /patternScale: Math\.min\(160/);
+  assert.match(project, /eyebrowSize: Math\.min\(48/);
+});
+
+test("moves and resizes the cover main title and inserts emoji into body copy", async () => {
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  const project = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
+  assert.match(studio, /主标题水平位置/);
+  assert.match(studio, /主标题垂直位置/);
+  assert.match(studio, /主标题排版/);
+  assert.match(studio, /titleDirection === "vertical"/);
+  assert.match(studio, /Emoji 表情大全/);
+  assert.match(studio, /bodyEmojiGroups/);
+  assert.match(studio, /bodyTextareaRef/);
+  assert.match(studio, /selectionStart/);
+  assert.match(studio, /insertBodyEmoji/);
+  assert.match(studio, /插入光标处/);
+  assert.match(project, /titleOffsetX/);
+  assert.match(project, /titleDirection/);
+});
+
+test("starts with a blank creator and renders movable advertising cover graphics", async () => {
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  const project = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
+  assert.match(studio, /const emptyDraft/);
+  assert.match(studio, /useState<string\[\]>\(\[\]\)/);
+  assert.match(studio, /上传项目实景图后生成封面/);
+  assert.doesNotMatch(studio, /<span className="state-pill">示例项目<\/span>/);
+  for (const pattern of ["ad-badge", "ad-ribbon", "editorial-bars", "spotlight"]) {
+    assert.match(studio, new RegExp(`style\\.pattern === "${pattern}"`));
+    assert.match(project, new RegExp(pattern));
+  }
+  assert.match(studio, /广告封面装饰/);
+});
+
+test("integrates local Playwright viral research into photo-driven generation", async () => {
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  const research = await readFile(new URL("../lib/research.ts", import.meta.url), "utf8");
+  const generate = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
+  const collector = await readFile(new URL("../playwright-research/server.mjs", import.meta.url), "utf8");
+  assert.match(studio, /http:\/\/127\.0\.0\.1:8766\/crawl/);
+  assert.match(studio, /Playwright 采集热门笔记/);
+  assert.match(studio, /热门关键词/);
+  assert.match(studio, /自动生成选题/);
+  assert.match(collector, /launchPersistentContext/);
+  assert.match(collector, /室内设计/);
+  assert.match(collector, /titleStructures/);
+  assert.match(research, /keywordUsed/);
+  assert.match(generate, /近期引流笔记的抽象规律/);
+  assert.match(generate, /不得复制原句/);
+});
+
+test("resizes and repositions the cover subtitle in preview and exported artwork", async () => {
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  const project = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
+  const generate = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
+  assert.match(studio, /副标题字号/);
+  assert.match(studio, /副标题水平位置/);
+  assert.match(studio, /副标题垂直位置/);
+  assert.match(studio, /style\.subtitleOffsetX \/ 100 \* canvas\.width/);
+  assert.match(studio, /style\.subtitleOffsetY \/ 100 \* canvas\.height/);
+  assert.match(project, /subtitleSize/);
+  assert.match(project, /subtitleOffsetX/);
+  assert.match(project, /subtitleOffsetY/);
+});
+
+test("uses the final 1080 by 1440 rendered cover as the live Xiaohongshu preview", async () => {
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  assert.match(studio, /const \[renderedCoverPreview/);
+  assert.match(studio, /renderCoverDataUrl\(coverImage, draft\.coverEyebrow/);
+  assert.match(studio, /src=\{renderedCoverPreview \|\| coverImage\}/);
+  assert.match(studio, /1080 × 1440 小红书竖版封面/);
+  assert.match(studio, /与小红书最终封面完全一致的发布预览/);
+});
+
+test("keeps save, prefill, three-day queue, and guarded auto-publish actions clickable", async () => {
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  assert.match(studio, /const automaticAuthorized = autoPublish && bridgeReady/);
+  assert.doesNotMatch(studio, /className="auto-publish-action" disabled=/);
+  assert.match(studio, /publishAction: automaticAuthorized \? "auto_publish" : "prefill"/);
+  assert.match(studio, /本次已安全降级为人工确认发布/);
+  assert.match(studio, /await saveProject\("approved"\)/);
+  assert.match(studio, /await scheduleProject\(currentProjectId\)/);
+  assert.match(studio, /保存前请确认笔记标题、封面主标题和正文不为空/);
+  assert.match(studio, /同步1080×1440成品封面/);
 });
 
 test("binds durable project storage", async () => {
@@ -118,15 +295,55 @@ test("binds durable project storage", async () => {
   assert.match(schema, /account_automation_settings/);
 });
 
-test("ships a durable, guarded note comment reply manager", async () => {
-  const route = await readFile(new URL("../app/api/customer-service/route.ts", import.meta.url), "utf8");
-  assert.match(route, /MANUAL_REVIEW_PATTERN/);
-  assert.match(route, /suggestedReply/);
-  assert.match(route, /autoReplyEligible/);
-  assert.doesNotMatch(route, /LIKE-MJ0666666/);
+test("removes the note comment secretary from navigation and the publishing bridge", async () => {
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  const manifest = await readFile(new URL("../browser-extension/manifest.json", import.meta.url), "utf8");
+  assert.doesNotMatch(studio, /id: "service"/);
+  assert.doesNotMatch(studio, /activeTab === "service"/);
+  assert.doesNotMatch(manifest, /xhs-comments\.js/);
 });
 
-test("ships configurable scheduling and daily research APIs", async () => {
+test("removes scheduled projects from the calendar without deleting their assets", async () => {
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  const schedule = await readFile(new URL("../app/api/projects/[id]/schedule/route.ts", import.meta.url), "utf8");
+  assert.match(studio, /取消排期/);
+  assert.match(studio, /body: JSON\.stringify\(\{ scheduledAt: null \}\)/);
+  assert.match(schedule, /scheduledAt === null/);
+  assert.match(schedule, /scheduledAt: null, status: "approved"/);
+});
+
+test("schedules guarded Xiaohongshu publishing through the local browser bridge", async () => {
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  const settings = await readFile(new URL("../app/api/settings/route.ts", import.meta.url), "utf8");
+  const bridge = await readFile(new URL("../browser-extension/site-bridge.js", import.meta.url), "utf8");
+  const worker = await readFile(new URL("../browser-extension/service-worker.js", import.meta.url), "utf8");
+  const manifest = JSON.parse(await readFile(new URL("../browser-extension/manifest.json", import.meta.url), "utf8"));
+  assert.match(studio, /发布桥定时发布/);
+  assert.match(studio, /自动发布小红书笔记项目/);
+  assert.doesNotMatch(studio, /每日自动研究/);
+  assert.match(studio, /MJ_XHS_SCHEDULE_REQUEST/);
+  assert.match(studio, /MJ_XHS_CANCEL_SCHEDULE/);
+  assert.match(settings, /browser_bridge/);
+  assert.match(bridge, /MJ_XHS_SAVE_SCHEDULE/);
+  assert.match(worker, /chrome\.alarms\.create/);
+  assert.match(worker, /chrome\.alarms\.onAlarm/);
+  assert.match(worker, /publishAction: "auto_publish"/);
+  assert.match(worker, /5 \* 60_000/);
+  assert.ok(manifest.permissions.includes("alarms"));
+  assert.match(worker, /收藏到 MJ 引流笔记库/);
+});
+
+test("selects an approved project and date for bridge scheduling", async () => {
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  assert.match(studio, /selectedScheduleProjectId/);
+  assert.match(studio, /请选择项目/);
+  assert.match(studio, /发布日期与时间/);
+  assert.match(studio, /加入发布桥定时发布/);
+  assert.match(styles, /quick-schedule/);
+});
+
+test("ships configurable scheduling and browser-collected research APIs", async () => {
   const settings = await readFile(new URL("../app/api/settings/route.ts", import.meta.url), "utf8");
   const research = await readFile(new URL("../app/api/research/route.ts", import.meta.url), "utf8");
   const researchService = await readFile(new URL("../lib/research.ts", import.meta.url), "utf8");
@@ -134,16 +351,17 @@ test("ships configurable scheduling and daily research APIs", async () => {
   assert.match(settings, /publishCadenceDays/);
   assert.match(settings, /researchTime/);
   assert.match(research, /collectDailyResearch/);
-  assert.match(researchService, /type: "web_search"/);
-  assert.match(researchService, /不得大段摘录或改写原文/);
+  assert.match(researchService, /analyzeCollectedNotes/);
+  assert.match(researchService, /不复述或改写原文/);
   assert.match(researchService, /isXiaohongshuNoteUrl/);
   assert.match(researchService, /collectBrowserResearch/);
   assert.match(researchService, /abstractReusablePattern/);
-  assert.match(researchService, /xsec_token/);
+  assert.match(researchService, /return url\.href\.slice/);
+  assert.match(researchService, /parseVisibleMetric\(b\.likesText/);
   assert.match(researchService, /noteIdentity/);
   assert.match(researchService, /db\.delete\(researchReferences\)/);
-  assert.match(generate, /近期研究规律/);
-  assert.match(generate, /不得复制标题、原句、段落或封面版式/);
+  assert.match(generate, /近期引流笔记的抽象规律/);
+  assert.match(generate, /不得复制原句/);
 });
 
 test("requires a human-approved draft before scheduling", async () => {
@@ -154,7 +372,7 @@ test("requires a human-approved draft before scheduling", async () => {
   assert.match(scheduleApi, /请先保存并人工确认封面与文案/);
 });
 
-test("persists designed covers and gates official publishing behind approved credentials", async () => {
+test("persists designed covers while keeping official API publishing out of the interface", async () => {
   const page = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
   const projectApi = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
   const coverApi = await readFile(new URL("../app/api/projects/[id]/cover/route.ts", import.meta.url), "utf8");
@@ -163,7 +381,7 @@ test("persists designed covers and gates official publishing behind approved cre
   const worker = await readFile(new URL("../worker/index.ts", import.meta.url), "utf8");
   assert.match(page, /normalizedCoverStyle/);
   assert.match(page, /drawCoverPattern/);
-  assert.match(page, /submitOfficialProject/);
+  assert.doesNotMatch(page, /submitOfficialProject/);
   assert.match(projectApi, /coverStyle/);
   assert.match(coverApi, /approved-cover\.jpg/);
   assert.match(publishApi, /publishProjectOfficial/);
@@ -201,7 +419,7 @@ test("publishes a WeChat share page synchronized with the main site content", as
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   const layout = await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
   assert.match(sharePage, /微信转发专页/);
-  assert.match(sharePage, /与主站同步/);
+  assert.match(sharePage, /公开功能介绍 · 不包含任何账户资料/);
   assert.match(sharePage, /openGraph/);
   assert.match(sharePage, /href="\/"/);
   assert.match(sharePage, /siteContent\.features/);

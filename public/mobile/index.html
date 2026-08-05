@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#1a1816">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta name="format-detection" content="telephone=no,email=no,address=no">
+  <title>栖作 · 微信手机创作入口</title>
+  <style>
+    :root {
+      --bg-dark: #1a1816;
+      --bg-light: #f2ebd9;
+      --text-dark: #1a1816;
+      --text-light: #f2ebd9;
+      --accent-gold: #c2a682;
+      --font-serif: "Songti SC", "Noto Serif CJK SC", "Source Han Serif SC", "SimSun", serif;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: var(--font-sans);
+      background-color: var(--bg-dark);
+    }
+
+    /* 容器与页面切换 */
+    .swiper-container {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    .slide {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.5s ease, transform 0.5s ease;
+      transform: translateY(20px);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: max(30px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(40px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
+      overflow-y: auto;
+    }
+
+    .slide.active {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+    }
+
+    /* 主题配色类 */
+    .theme-dark {
+      background-color: var(--bg-dark);
+      color: var(--text-light);
+    }
+
+    .theme-light {
+      background-color: var(--bg-light);
+      color: var(--text-dark);
+    }
+
+    /* 字体排版样式 */
+    .top-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      opacity: 0.6;
+      font-family: var(--font-sans);
+    }
+
+    .sub-title-sm {
+      font-size: 12px;
+      letter-spacing: 1.5px;
+      margin-bottom: 12px;
+      opacity: 0.8;
+    }
+
+    .hero-title {
+      font-family: var(--font-serif);
+      font-size: 46px;
+      line-height: 1.1;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .hero-sub {
+      font-family: var(--font-serif);
+      font-size: 20px;
+      line-height: 1.3;
+      margin-bottom: 24px;
+      font-weight: 500;
+    }
+
+    .desc-text {
+      font-size: 14px;
+      line-height: 1.8;
+      opacity: 0.85;
+      margin-bottom: 24px;
+    }
+
+    .tag-line {
+      font-size: 11px;
+      letter-spacing: 1.5px;
+      opacity: 0.5;
+      font-family: monospace;
+    }
+
+    .bottom-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      opacity: 0.5;
+      padding-top: 20px;
+    }
+
+    /* 模块布局 */
+    .grid-3 {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      margin-top: 20px;
+    }
+
+    .card {
+      border-top: 1px solid rgba(125, 125, 125, 0.3);
+      padding-top: 12px;
+    }
+
+    .card-num {
+      font-size: 11px;
+      opacity: 0.5;
+      margin-bottom: 4px;
+    }
+
+    .card-title {
+      font-family: var(--font-serif);
+      font-size: 26px;
+      font-weight: bold;
+      margin-bottom: 6px;
+    }
+
+    .card-desc {
+      font-size: 12px;
+      opacity: 0.7;
+      line-height: 1.5;
+    }
+
+    .quote-box {
+      border-left: 2px solid var(--accent-gold);
+      padding-left: 16px;
+      margin: 20px 0;
+      font-family: var(--font-serif);
+      font-size: 16px;
+      line-height: 1.6;
+    }
+
+    /* 按钮控制 */
+    .btn {
+      display: inline-block;
+      padding: 14px 28px;
+      border: 1px solid var(--text-dark);
+      background: transparent;
+      color: var(--text-dark);
+      font-size: 13px;
+      letter-spacing: 1px;
+      text-decoration: none;
+      text-align: center;
+      margin-top: 20px;
+      cursor: pointer;
+    }
+
+    .btn-secondary {
+      display: block;
+      margin: 14px auto 0;
+      color: currentColor;
+      font-size: 12px;
+      text-underline-offset: 4px;
+      opacity: 0.72;
+    }
+
+    .account-note {
+      margin: 20px auto 0;
+      max-width: 320px;
+      padding: 14px 16px;
+      border-top: 1px solid rgba(125,125,125,.35);
+      border-bottom: 1px solid rgba(125,125,125,.35);
+      font-size: 12px;
+      line-height: 1.7;
+      text-align: left;
+    }
+
+    .nav-controls {
+      position: fixed;
+      bottom: max(12px, env(safe-area-inset-bottom));
+      right: max(20px, env(safe-area-inset-right));
+      z-index: 100;
+      display: flex;
+      gap: 10px;
+    }
+
+    .nav-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.2);
+      color: #fff;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      backdrop-filter: blur(5px);
+    }
+  </style>
+</head>
+<body>
+
+<div class="swiper-container" id="swiper">
+  <!-- Slide 1: 首页封面 -->
+  <div class="slide theme-dark active">
+    <div class="top-meta">
+      <span>MJ STUDIO · CREATIVE SERVICE</span>
+      <span>VOL.01</span>
+    </div>
+    <div style="margin: auto 0;">
+      <p class="sub-title-sm">室内设计互联网秘书</p>
+      <h1 class="hero-title">栖作</h1>
+      <h2 class="hero-sub">小红书创作服务平台</h2>
+      <p class="desc-text">从项目实景图出发，完成风格识别、封面设计、标题正文、资产归档与发布排期。</p>
+      <p class="tag-line">IMAGE → STORY → PUBLISH ©2026 MJ</p>
+    </div>
+    <div class="bottom-meta">
+      <span>上下滑动或按按钮浏览</span>
+      <span>01 / 05</span>
+    </div>
+  </div>
+
+  <!-- Slide 2: 核心功能概览 -->
+  <div class="slide theme-light">
+    <div class="top-meta">
+      <span>不是套模板，是先读懂空间</span>
+      <span>VOL.01</span>
+    </div>
+    <div>
+      <h2 class="hero-title" style="font-size: 32px; margin-top: 10px;">一组实景图，<br>生成一套完整笔记。</h2>
+      <div class="grid-3">
+        <div class="card">
+          <p class="card-num">01 · 识别</p>
+          <h3 class="card-title">空间</h3>
+          <p class="card-desc">项目类型、比例、动线与功能关系</p>
+        </div>
+        <div class="card">
+          <p class="card-num">02 · 提炼</p>
+          <h3 class="card-title">设计</h3>
+          <p class="card-desc">材质、色彩、采光、陈设与情绪</p>
+        </div>
+        <div class="card">
+          <p class="card-num">03 · 转化</p>
+          <h3 class="card-title">内容</h3>
+          <p class="card-desc">打开率、完读率与搜索关键词布局</p>
+        </div>
+      </div>
+    </div>
+    <div class="bottom-meta">
+      <span>CONTENT ENGINE</span>
+      <span>02 / 05</span>
+    </div>
+  </div>
+
+  <!-- Slide 3: 叙事策略 -->
+  <div class="slide theme-dark">
+    <div class="top-meta">
+      <span>NARRATIVE STRATEGY</span>
+      <span>VOL.01</span>
+    </div>
+    <div style="margin: auto 0;">
+      <div class="quote-box">
+        住宅、商业、办公、酒店、展厅陈列与其他项目，使用不同叙事策略。
+      </div>
+      <p class="desc-text" style="margin-top: 20px;">每一个项目，都有自己的位置。支持长期内容资产沉淀，避免一次性草稿。</p>
+    </div>
+    <div class="bottom-meta">
+      <span>SUPPORTED CATEGORIES</span>
+      <span>03 / 05</span>
+    </div>
+  </div>
+
+  <!-- Slide 4: 封面排版与灵活性 -->
+  <div class="slide theme-light">
+    <div class="top-meta">
+      <span>画面与小红书封面一比一统一</span>
+      <span>VOL.01</span>
+    </div>
+    <div style="margin: auto 0;">
+      <h2 class="hero-title" style="font-size: 36px;">每一个字，<br>都可以移动。</h2>
+      <p class="desc-text" style="margin-top: 16px;">主标题、副标题、英文栏目、横杠与广告装饰图案均可调整位置、字号、颜色和透明度；确认后的预览直接生成发布封面。</p>
+    </div>
+    <div class="bottom-meta">
+      <span>COVER DESIGN SYSTEM</span>
+      <span>04 / 05</span>
+    </div>
+  </div>
+
+  <!-- Slide 5: 尾页 & 动作召唤 -->
+  <div class="slide theme-light" style="text-align: center; justify-content: space-between;">
+    <div class="top-meta">
+      <span>TOP INTERIOR DESIGN CONTENT SECRETARY</span>
+      <span>VOL.01</span>
+    </div>
+    <div>
+      <h2 class="hero-title" style="font-size: 38px; margin-bottom: 16px;">让好设计，<br>被更多人看见。</h2>
+      <p class="desc-text">登录自己的独立工作区，上传项目实景图，开始生成封面、标题与正文。</p>
+      <div class="account-note">新用户进入后只会看到自己的项目、图片、文案与发布排期。发布前请先确认当前浏览器登录的是自己的小红书账号。</div>
+      <a href="/" class="btn">进入独立创作工作区 →</a>
+      <a href="https://www.xiaohongshu.com/" target="_blank" rel="noreferrer" class="btn-secondary">先登录或切换小红书账号</a>
+    </div>
+    <div class="bottom-meta">
+      <span>微信分享页</span>
+      <span>05 / 05</span>
+    </div>
+  </div>
+</div>
+
+<!-- 浮动切换按钮 -->
+<div class="nav-controls">
+  <button class="nav-btn" type="button" aria-label="上一页" onclick="prevSlide()">↑</button>
+  <button class="nav-btn" type="button" aria-label="下一页" onclick="nextSlide()">↓</button>
+</div>
+
+<script>
+  let currentSlide = 0;
+  const slides = document.querySelectorAll('.slide');
+  const totalSlides = slides.length;
+  let startY = 0;
+
+  function showSlide(index) {
+    slides.forEach((slide, i) => {
+      slide.classList.remove('active');
+      if (i === index) slide.classList.add('active');
+    });
+  }
+
+  function nextSlide() {
+    if (currentSlide < totalSlides - 1) {
+      currentSlide++;
+      showSlide(currentSlide);
+    }
+  }
+
+  function prevSlide() {
+    if (currentSlide > 0) {
+      currentSlide--;
+      showSlide(currentSlide);
+    }
+  }
+
+  // 手势触摸滑动（适合微信端操作）
+  const swiper = document.getElementById('swiper');
+  swiper.addEventListener('touchstart', e => {
+    startY = e.touches[0].clientY;
+  }, { passive: true });
+
+  swiper.addEventListener('touchend', e => {
+    let endY = e.changedTouches[0].clientY;
+    let diff = startY - endY;
+    if (diff > 50) nextSlide();       // 向上滑动 -> 下一页
+    else if (diff < -50) prevSlide(); // 向下滑动 -> 上一页
+  }, { passive: true });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === 'PageDown') nextSlide();
+    if (e.key === 'ArrowUp' || e.key === 'ArrowLeft' || e.key === 'PageUp') prevSlide();
+  });
+
+  let wheelLocked = false;
+  document.addEventListener('wheel', e => {
+    if (wheelLocked || Math.abs(e.deltaY) < 25) return;
+    wheelLocked = true;
+    e.deltaY > 0 ? nextSlide() : prevSlide();
+    setTimeout(() => { wheelLocked = false; }, 550);
+  }, { passive: true });
+</script>
+
+</body>
+</html>
