@@ -3,6 +3,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { projectImages, projects, researchReferences } from "../../../db/schema";
 import { apiError, requireAccountEmail } from "../../../lib/account";
+import { generateWithModelFallback, hasConfiguredAI } from "../../../lib/ai-model-router";
 import { createFallbackDraft } from "../../../lib/fallback-copy";
 
 type RuntimeEnv = {
@@ -10,6 +11,9 @@ type RuntimeEnv = {
   DASHSCOPE_API_KEY?: string;
   QWEN_MODEL?: string;
   QWEN_BASE_URL?: string;
+  XHS_AI_API_KEY?: string;
+  XHS_AI_BASE_URL?: string;
+  XHS_AI_MODELS?: string;
 };
 
 type CoverStyle = Record<string, unknown>;
@@ -41,15 +45,6 @@ type GeneratedDraft = {
   styleVariants?: StyleVariant[];
 };
 
-type QwenResponse = {
-  choices?: Array<{ message?: { content?: string } }>;
-  error?: { message?: string; code?: string };
-  message?: string;
-};
-
-const DEFAULT_QWEN_ENDPOINT =
-  "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
-
 function parseDraft(text: string): GeneratedDraft {
   const cleaned = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
   const start = cleaned.indexOf("{");
@@ -66,13 +61,7 @@ function bytesToBase64(bytes: Uint8Array) {
   return btoa(binary);
 }
 
-function normalizeEndpoint(value?: string) {
-  const base = value?.trim().replace(/\/$/, "");
-  if (!base) return DEFAULT_QWEN_ENDPOINT;
-  return base.endsWith("/chat/completions") ? base : `${base}/chat/completions`;
-}
-
-function normalizeDraft(draft: GeneratedDraft, imageCount: number) {
+function normalizeDraft(draft: GeneratedDraft, imageCount: number, mode?: string) {
   const validIds = new Set(["lifestyle", "professional", "minimal"]);
   const variants = (Array.isArray(draft.styleVariants) ? draft.styleVariants : [])
     .filter((item) => item && validIds.has(item.id))
@@ -104,7 +93,7 @@ function normalizeDraft(draft: GeneratedDraft, imageCount: number) {
   draft.highlights = Array.isArray(draft.highlights) ? draft.highlights.map(String).slice(0, 10) : [];
   draft.riskNotes = Array.isArray(draft.riskNotes) ? draft.riskNotes.map(String).slice(0, 10) : [];
   draft.coverIndex = Math.min(Math.max(0, Number(draft.coverIndex) || 0), Math.max(0, imageCount - 1));
-  draft.mode = "千问视觉实景识别 · 3 种风格";
+  draft.mode = mode || draft.mode || "免 API 额度 · 实景图项目规则引擎";
   return draft;
 }
 
@@ -175,40 +164,25 @@ coverStyle 规则：fontFamily 只能为 serif、sans、kai；颜色使用 6 位
 
     if (content.length === 1) throw new Error("无法读取项目图片，请重新上传");
 
-    if (!runtime.DASHSCOPE_API_KEY?.trim()) {
+    if (!hasConfiguredAI(runtime)) {
       const draft = fallback("尚未配置视觉 API");
       await db.update(projects).set({ status: "drafted", draftJson: JSON.stringify(draft) }).where(and(eq(projects.id, projectId), eq(projects.ownerEmail, ownerEmail)));
       return Response.json({ draft, fallback: true });
     }
 
-    const apiResponse = await fetch(normalizeEndpoint(runtime.QWEN_BASE_URL), {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${runtime.DASHSCOPE_API_KEY.trim()}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model: runtime.QWEN_MODEL?.trim() || "qwen3-vl-plus",
-        messages: [{ role: "user", content }],
-        response_format: { type: "json_object" },
-        temperature: 0.75,
-        max_tokens: 4_000,
-        stream: false,
-      }),
-    });
-
-    const payload = (await apiResponse.json().catch(() => ({}))) as QwenResponse;
-    if (!apiResponse.ok) {
-      const detail = payload.error?.message || payload.message || `HTTP ${apiResponse.status}`;
-      const draft = fallback(apiResponse.status === 429 ? "视觉 API 额度或频率已达上限" : `视觉 API 暂不可用：${detail}`);
+    const generated = await generateWithModelFallback(runtime, content);
+    if (!generated.text) {
+      const reason = generated.attempts.some((item) => item.includes("429"))
+        ? "视觉模型额度或频率已达上限，已自动切换免额度生成"
+        : "所有视觉模型暂不可用，已自动切换免额度生成";
+      const draft = fallback(reason);
       await db.update(projects).set({ status: "drafted", draftJson: JSON.stringify(draft) }).where(and(eq(projects.id, projectId), eq(projects.ownerEmail, ownerEmail)));
-      return Response.json({ draft, fallback: true });
+      return Response.json({ draft, fallback: true, modelAttempts: generated.attempts.length });
     }
 
-    const text = payload.choices?.[0]?.message?.content;
     let draft: GeneratedDraft;
     try {
-      draft = text ? normalizeDraft(parseDraft(text), selectedImages.length) : fallback("视觉 API 未返回有效内容");
+      draft = normalizeDraft(parseDraft(generated.text), selectedImages.length, `${generated.mode} · 实景识别`);
     } catch {
       draft = fallback("视觉 API 返回内容无法解析");
     }
