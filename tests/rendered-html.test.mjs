@@ -128,10 +128,12 @@ test("generates and persists five selectable title options", async () => {
 
 test("falls back to an embedded viral-copy engine when visual API quota is unavailable", async () => {
   const generate = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
+  const router = await readFile(new URL("../lib/ai-model-router.ts", import.meta.url), "utf8");
   const fallback = await readFile(new URL("../lib/fallback-copy.ts", import.meta.url), "utf8");
   assert.match(generate, /createFallbackDraft/);
-  assert.match(generate, /apiResponse\.status === 429/);
-  assert.match(generate, /return Response\.json\(\{ draft, fallback: true \}\)/);
+  assert.match(generate, /generated\.attempts\.some/);
+  assert.match(generate, /已自动切换免额度生成/);
+  assert.match(router, /429/);
   assert.match(fallback, /网站内置爆款文案引擎 · 免 API 额度/);
   assert.match(fallback, /body\.slice\(0, 150\)/);
   assert.match(fallback, /titleOptions/);
@@ -143,6 +145,7 @@ test("falls back to an embedded viral-copy engine when visual API quota is unava
 test("generates a complete photo-driven draft with three styles and restrained emoji", async () => {
   const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
   const generate = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
+  const router = await readFile(new URL("../lib/ai-model-router.ts", import.meta.url), "utf8");
   const project = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
   assert.match(studio, /ORIGINAL DESIGN · INTERIOR/);
   assert.match(studio, /封面英文栏目/);
@@ -152,12 +155,12 @@ test("generates a complete photo-driven draft with three styles and restrained e
   assert.match(generate, /不得复制原句/);
   assert.match(generate, /image_url/);
   assert.doesNotMatch(generate, /DOUBAO_API_KEY/);
-  assert.match(generate, /qwen3-vl-plus/);
+  assert.match(router, /qwen3-vl-plus/);
   assert.match(studio, /本地差异化预览/);
   assert.match(project, /coverEyebrow/);
   assert.match(studio, /生成封面＋正文与标题/);
   assert.match(generate, /识别空间类型、材质、色彩、自然与人工采光/);
-  assert.match(generate, /千问视觉实景识别 · 3 种风格/);
+  assert.match(generate, /generated\.mode/);
 });
 
 test("regenerates existing projects from stored photos after syncing current design information", async () => {
@@ -257,13 +260,16 @@ test("starts with a blank creator and renders movable advertising cover graphics
   assert.match(studio, /广告封面装饰/);
 });
 
-test("integrates local Playwright viral research into photo-driven generation", async () => {
+test("uses browser right-click collection first and keeps Playwright optional", async () => {
   const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
   const research = await readFile(new URL("../lib/research.ts", import.meta.url), "utf8");
   const generate = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
+  const router = await readFile(new URL("../lib/ai-model-router.ts", import.meta.url), "utf8");
   const collector = await readFile(new URL("../playwright-research/server.mjs", import.meta.url), "utf8");
   assert.match(studio, /http:\/\/127\.0\.0\.1:8766\/crawl/);
-  assert.match(studio, /Playwright 采集热门笔记/);
+  assert.match(studio, /同步右键收藏并解析/);
+  assert.match(studio, /本机批量采集（可选）/);
+  assert.match(studio, /无需启动本机助手/);
   assert.match(studio, /热门关键词/);
   assert.match(studio, /自动生成选题/);
   assert.match(collector, /launchPersistentContext/);
@@ -272,6 +278,10 @@ test("integrates local Playwright viral research into photo-driven generation", 
   assert.match(research, /keywordUsed/);
   assert.match(generate, /近期引流笔记的抽象规律/);
   assert.match(generate, /不得复制原句/);
+  assert.match(generate, /generateWithModelFallback/);
+  assert.match(router, /XHS_AI_MODELS/);
+  assert.match(router, /for \(const model of provider\.models\)/);
+  assert.match(router, /\[408, 429, 500, 502, 503, 504\]/);
 });
 
 test("resizes and repositions the cover subtitle in preview and exported artwork", async () => {
