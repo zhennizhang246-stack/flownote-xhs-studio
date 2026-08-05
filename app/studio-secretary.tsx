@@ -122,6 +122,13 @@ type ViralAnalysis = {
   titleStructures: Array<{ value: string; uses: number }>;
   topics: string[];
 };
+type AccountDevice = {
+  id: number;
+  deviceKey: string;
+  deviceName: string;
+  bridgeConnected: boolean;
+  lastSeenAt: string;
+};
 type XhsBridgeDraft = {
   version: 2;
   ownerKey: string;
@@ -657,6 +664,17 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
   const [serviceNotice, setServiceNotice] = useState("");
   const [lastSyncedAt, setLastSyncedAt] = useState("");
   const [bridgeReady, setBridgeReady] = useState(false);
+  const [devices, setDevices] = useState<AccountDevice[]>([]);
+  const [deviceNotice, setDeviceNotice] = useState("");
+  const [deviceKey] = useState(() => {
+    if (typeof window === "undefined") return "";
+    const storageKey = `mj-studio-device:${accountKey}`;
+    const existing = window.localStorage.getItem(storageKey);
+    if (existing) return existing;
+    const created = crypto.randomUUID();
+    window.localStorage.setItem(storageKey, created);
+    return created;
+  });
   const [profileUrl, setProfileUrl] = useState(() => (
     typeof window === "undefined" ? "" : window.localStorage.getItem(`mj-xhs-profile-url:${accountKey}`) || ""
   ));
@@ -744,6 +762,43 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
     window.postMessage({ source: XHS_BRIDGE_SOURCE, type: "MJ_XHS_BRIDGE_PING" }, window.location.origin);
     return () => window.removeEventListener("message", receiveBridgeStatus);
   }, [accountKey]);
+
+  useEffect(() => {
+    if (!deviceKey) return;
+    const deviceName = /Mac/i.test(navigator.userAgent) ? "Mac 创作电脑" : /Windows/i.test(navigator.userAgent) ? "Windows 创作电脑" : "创作电脑";
+    async function syncDevice() {
+      try {
+        const response = await fetch("/api/devices", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ deviceKey, deviceName, bridgeConnected: bridgeReady }),
+        });
+        const payload = await response.json() as { error?: string };
+        if (!response.ok) throw new Error(payload.error || "设备同步失败");
+        const listResponse = await fetch("/api/devices");
+        const list = await listResponse.json() as { devices?: AccountDevice[] };
+        if (listResponse.ok) setDevices(list.devices || []);
+        setDeviceNotice("");
+      } catch (error) {
+        setDeviceNotice(error instanceof Error ? error.message : "设备同步失败");
+      }
+    }
+    void syncDevice();
+    const timer = window.setInterval(() => void syncDevice(), 60_000);
+    return () => window.clearInterval(timer);
+  }, [bridgeReady, deviceKey]);
+
+  async function removeDevice(targetKey: string) {
+    if (targetKey === deviceKey) {
+      setDeviceNotice("当前电脑不能在这里移除，请在其他已绑定电脑上操作");
+      return;
+    }
+    const response = await fetch(`/api/devices?deviceKey=${encodeURIComponent(targetKey)}`, { method: "DELETE" });
+    const payload = await response.json() as { error?: string };
+    if (!response.ok) { setDeviceNotice(payload.error || "设备移除失败"); return; }
+    setDevices((current) => current.filter((device) => device.deviceKey !== targetKey));
+    setDeviceNotice("设备已移除，可在另一台电脑重新绑定");
+  }
 
   const updateMeta = (key: keyof ProjectMeta, value: string) => setMeta((current) => ({ ...current, [key]: value }));
   const handleFiles = (event: ChangeEvent<HTMLInputElement>) => {
@@ -1502,7 +1557,8 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
     </aside>
     <section className="workspace">
       <header className="topbar"><div><p className="kicker">XIAOHONGSHU CREATIVE SERVICE</p><h1>小红书创作服务平台</h1><p className="account-workspace">{isSiteOwner ? "网站作者专属工作区" : "新账户独立工作区"}：{accountName}</p><p className="account-privacy">仅当前登录账户可查看本工作区资料，其他账户无法访问。</p></div><div className="topbar-actions"><a className="web-mode-link" href="/web/" target="_blank" rel="noreferrer">网页展示模式 ↗</a><span className={`status-chip ${phase}`}>{phaseLabel}</span><a className="account-signout" href="/signout-with-chatgpt?return_to=%2Fwechat">退出工作区</a><a className="avatar" href="https://www.xiaohongshu.com/" target="_blank" rel="noreferrer" aria-label="登录当前浏览器的小红书账户">XHS</a></div></header>
-      <div className={`xhs-session-banner ${bridgeReady ? "connected" : ""}`}><div><strong>{bridgeReady ? "当前账户的发布桥工作区已连接" : "其他账户首次使用需重新登录小红书"}</strong><p>{bridgeReady ? "项目、草稿、收藏和排期已按当前平台账户隔离；小红书登录仍以当前浏览器实际登录账号为准。" : "请先在当前浏览器登录自己的小红书账户，并安装 MJ 发布桥，再开始编辑创作和发布。"}</p><label><span>当前小红书主页链接</span><input value={profileUrl} onChange={(event) => { const value = event.target.value.trim(); setProfileUrl(value); window.localStorage.setItem(`mj-xhs-profile-url:${accountKey}`, value); }} placeholder="登录后复制自己的小红书主页链接"/></label></div><div>{!bridgeReady && <a href={XHS_BRIDGE_EXTENSION_URL} download>下载发布桥</a>}<a href="https://www.xiaohongshu.com/" target="_blank" rel="noreferrer">登录小红书 ↗</a></div></div>
+      <div className={`xhs-session-banner ${bridgeReady ? "connected" : ""}`}><div><strong>{bridgeReady ? "当前电脑已连接共享创作工作区" : "请扫码登录当前电脑的小红书"}</strong><p>同一平台账户最多绑定 3 台电脑，项目库、文案和发布排期实时共享；每台电脑只需在小红书官方页面扫码登录，不传输密码或登录状态。</p><label><span>当前小红书主页链接</span><input value={profileUrl} onChange={(event) => { const value = event.target.value.trim(); setProfileUrl(value); window.localStorage.setItem(`mj-xhs-profile-url:${accountKey}`, value); }} placeholder="扫码登录后复制同一个小红书主页链接"/></label></div><div>{!bridgeReady && <a href={XHS_BRIDGE_EXTENSION_URL} download>下载发布桥</a>}<a href="https://www.xiaohongshu.com/" target="_blank" rel="noreferrer">打开小红书扫码登录 ↗</a></div></div>
+      <section className="device-workspace-card" aria-label="共享设备管理"><div><small>MULTI-DEVICE WORKSPACE</small><strong>共享电脑 {devices.length} / 3</strong><p>三台电脑共享同一项目资产库与发布日历，小红书扫码会话分别保存在各自浏览器。</p>{deviceNotice && <em>{deviceNotice}</em>}</div><div className="device-list">{devices.map((device) => <article key={device.deviceKey} className={device.deviceKey === deviceKey ? "current" : ""}><span>{device.bridgeConnected ? "●" : "○"}</span><div><strong>{device.deviceName}{device.deviceKey === deviceKey ? "（当前）" : ""}</strong><small>{device.bridgeConnected ? "发布桥已连接" : "等待扫码或连接发布桥"} · {new Date(device.lastSeenAt).toLocaleString("zh-CN")}</small></div>{device.deviceKey !== deviceKey && <button onClick={() => void removeDevice(device.deviceKey)}>移除</button>}</article>)}</div></section>
       {activeTab === "creator" && creatorView}
       {activeTab === "assets" && assetView}
       {activeTab === "calendar" && calendarView}
