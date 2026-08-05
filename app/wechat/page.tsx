@@ -30,7 +30,7 @@ export default function WechatSharePage() {
           <h1>让每一个室内设计项目，<br />都变成值得被看见的内容。</h1>
           <p className="wechat-lead">{siteContent.shareDescription}</p>
           <ShareActions />
-          <div className="wechat-actions"><Link className="wechat-secondary" href="/">创建自己的独立工作区</Link><a className="wechat-secondary" href="#features">查看平台能力</a></div>
+          <div className="wechat-actions"><a className="wechat-secondary" href="/mobile/">打开微信手机创作入口</a><Link className="wechat-secondary" href="/">创建自己的独立工作区</Link><a className="wechat-secondary" href="#features">查看平台能力</a></div>
           <p className="wechat-account-note">{siteContent.accountNote}</p>
         </div>
 
