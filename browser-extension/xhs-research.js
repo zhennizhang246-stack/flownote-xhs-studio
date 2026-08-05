@@ -58,6 +58,68 @@ function collectCandidates() {
   return candidates.slice(0, 12);
 }
 
+function collectCurrentNote() {
+  const sourceUrl = absoluteNoteUrl(window.location.href);
+  if (!sourceUrl) return null;
+  const meta = (property) => cleanText(document.querySelector(`meta[property="${property}"]`)?.content, 2000);
+  const title = cleanText(
+    document.querySelector("h1")?.textContent
+      || document.querySelector('[class*="title"]')?.textContent
+      || meta("og:title")
+      || document.title,
+    120,
+  ).replace(/\s*[-|｜].*小红书.*$/i, "");
+  const body = cleanText(
+    document.querySelector('[class*="desc"]')?.textContent
+      || document.querySelector('[class*="note-text"]')?.textContent
+      || document.querySelector("article")?.textContent
+      || meta("og:description"),
+    1800,
+  );
+  const author = cleanText(
+    document.querySelector('[class*="author"]')?.textContent
+      || document.querySelector('[class*="username"]')?.textContent,
+    80,
+  );
+  const engagementText = cleanText(
+    document.querySelector('[class*="like-wrapper"]')?.textContent
+      || document.querySelector('[class*="engage"] [class*="like"]')?.textContent
+      || document.querySelector('[class*="interact"] [class*="like"]')?.textContent,
+    80,
+  );
+  const likesMatch = engagementText.match(/(?:赞|点赞)?\s*(\d+(?:\.\d+)?\s*[万wWkK]?)/);
+  if (!title || title.length < 3) return null;
+  return {
+    sourceUrl,
+    title,
+    author,
+    likesText: cleanText(likesMatch?.[1], 30),
+    coverUrl: meta("og:image"),
+    coverAlt: title,
+    cardText: body,
+  };
+}
+
+function showCollectedToast(message) {
+  const toast = document.createElement("div");
+  toast.textContent = message;
+  Object.assign(toast.style, {
+    position: "fixed", right: "24px", bottom: "24px", zIndex: "2147483647",
+    padding: "12px 18px", borderRadius: "10px", color: "#fff", background: "#13241d",
+    boxShadow: "0 8px 30px rgba(0,0,0,.22)", fontSize: "14px",
+  });
+  document.documentElement.appendChild(toast);
+  window.setTimeout(() => toast.remove(), 2600);
+}
+
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.type !== "MJ_XHS_COLLECT_CURRENT_NOTE") return false;
+  const candidate = collectCurrentNote();
+  showCollectedToast(candidate ? "已收藏到 MJ 引流笔记库" : "当前页面未读取到可收藏的笔记");
+  sendResponse({ candidate });
+  return false;
+});
+
 function complete(request, candidates, error = "") {
   if (!request?.requestId || deliveredRequestId === request.requestId) return;
   deliveredRequestId = request.requestId;
@@ -94,4 +156,4 @@ function inspect() {
   });
 }
 
-inspect();
+if (window.location.pathname === "/search_result") inspect();

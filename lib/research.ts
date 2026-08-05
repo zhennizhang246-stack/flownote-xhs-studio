@@ -5,8 +5,9 @@ import { researchReferences } from "../db/schema";
 
 export type ResearchRuntimeEnv = {
   DB: D1Database;
-  OPENAI_API_KEY?: string;
-  OPENAI_MODEL?: string;
+  DASHSCOPE_API_KEY?: string;
+  QWEN_MODEL?: string;
+  QWEN_BASE_URL?: string;
 };
 
 type ResearchItem = {
@@ -32,16 +33,67 @@ export type BrowserResearchCandidate = {
   coverUrl?: string;
   coverAlt?: string;
   cardText?: string;
+  tags?: string[];
+  commentsText?: string;
+  savesText?: string;
+  keywordUsed?: string;
 };
 
-function outputText(payload: Record<string, unknown>) {
-  const output = Array.isArray(payload.output) ? payload.output : [];
-  return output.flatMap((item) => {
-    const content = item && typeof item === "object" && Array.isArray((item as { content?: unknown[] }).content)
-      ? (item as { content: Array<{ text?: string }> }).content
-      : [];
-    return content.map((part) => part.text || "");
-  }).join("\n");
+type ResearchAnalysis = Pick<ResearchItem, "sourceUrl" | "copyAnalysis" | "coverAnalysis" | "audienceInsight" | "reusablePattern">;
+
+type QwenResponse = { choices?: Array<{ message?: { content?: string } }> };
+
+function qwenEndpoint(value?: string) {
+  const base = value?.trim().replace(/\/$/, "") || "https://dashscope.aliyuncs.com/compatible-mode/v1";
+  return base.endsWith("/chat/completions") ? base : `${base}/chat/completions`;
+}
+
+function parseJsonObject(text: string) {
+  const cleaned = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+  const start = cleaned.indexOf("{");
+  const end = cleaned.lastIndexOf("}");
+  if (start < 0 || end <= start) throw new Error("invalid JSON response");
+  return JSON.parse(cleaned.slice(start, end + 1)) as { items?: ResearchAnalysis[] };
+}
+
+async function analyzeCollectedNotes(env: ResearchRuntimeEnv, candidates: BrowserResearchCandidate[]) {
+  const analyses = new Map<string, ResearchAnalysis>();
+  if (!env.DASHSCOPE_API_KEY?.trim() || !candidates.length) return analyses;
+  const visibleNotes = candidates.map((candidate) => ({
+    sourceUrl: candidate.sourceUrl,
+    title: candidate.title,
+    visibleBody: candidate.cardText || "",
+    tags: candidate.tags || [],
+    likesText: candidate.likesText || "",
+    keywordUsed: candidate.keywordUsed || "",
+  }));
+  const prompt = `你是室内设计工作室的小红书内容研究秘书。以下内容来自用户在当前登录浏览器中主动收藏的小红书公开室内设计笔记。请逐篇分析，不复述或改写原文，不虚构热度数据。
+每篇返回 sourceUrl（必须原样返回）、copyAnalysis（正文的开场钩子、设计细节展开顺序和结尾互动）、coverAnalysis（标题关键词、情绪触发和点击结构）、audienceInsight（客户需求）、reusablePattern（未来原创项目可复用的方法，不得复制原句）。
+只返回 JSON：{"items":[...]}。待分析笔记：${JSON.stringify(visibleNotes)}`;
+  try {
+    const response = await fetch(qwenEndpoint(env.QWEN_BASE_URL), {
+      method: "POST",
+      headers: { authorization: `Bearer ${env.DASHSCOPE_API_KEY.trim()}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        model: env.QWEN_MODEL?.trim() || "qwen3-vl-plus",
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+        temperature: 0.35,
+        max_tokens: 3_000,
+      }),
+    });
+    if (!response.ok) return analyses;
+    const payload = await response.json() as QwenResponse;
+    const parsed = parseJsonObject(payload.choices?.[0]?.message?.content || "");
+    for (const item of Array.isArray(parsed.items) ? parsed.items : []) {
+      const identity = noteIdentity(String(item.sourceUrl || ""));
+      if (!identity || !visibleNotes.some((note) => noteIdentity(note.sourceUrl) === identity)) continue;
+      analyses.set(identity, item);
+    }
+  } catch {
+    // Rule-based analysis below keeps collection usable during temporary model failures.
+  }
+  return analyses;
 }
 
 function chinaDate() {
@@ -68,12 +120,7 @@ function isXiaohongshuNoteUrl(value: string) {
 function canonicalXiaohongshuNoteUrl(value: string) {
   if (!isXiaohongshuNoteUrl(value)) return "";
   const url = new URL(value);
-  const canonical = new URL(`${url.origin}${url.pathname}`);
-  for (const key of ["xsec_token", "xsec_source", "source"]) {
-    const parameter = url.searchParams.get(key);
-    if (parameter) canonical.searchParams.set(key, parameter.slice(0, 1000));
-  }
-  return canonical.href.slice(0, 2000);
+  return url.href.slice(0, 2000);
 }
 
 function noteIdentity(value: string) {
@@ -120,13 +167,19 @@ export async function collectBrowserResearch(env: ResearchRuntimeEnv, ownerEmail
       likesText: String(candidate.likesText || "").trim().slice(0, 30),
       coverUrl: String(candidate.coverUrl || "").slice(0, 2000),
       coverAlt: String(candidate.coverAlt || "").replace(/\s+/g, " ").trim().slice(0, 180),
-      cardText: String(candidate.cardText || "").replace(/\s+/g, " ").trim().slice(0, 800),
+      cardText: String(candidate.cardText || "").replace(/\s+/g, " ").trim().slice(0, 1800),
+      tags: Array.isArray(candidate.tags) ? candidate.tags.map(String).map((tag) => tag.replace(/^#/, "").trim()).filter(Boolean).slice(0, 20) : [],
+      commentsText: String(candidate.commentsText || "").trim().slice(0, 30),
+      savesText: String(candidate.savesText || "").trim().slice(0, 30),
+      keywordUsed: String(candidate.keywordUsed || "").replace(/\s+/g, " ").trim().slice(0, 60),
     });
   }
   const selected = [...unique.values()]
     .sort((a, b) => parseVisibleMetric(b.likesText || "") - parseVisibleMetric(a.likesText || ""))
-    .slice(0, 3);
-  if (selected.length !== 3) throw new Error("未从小红书公开搜索页读取到 3 篇可核验笔记，请确认已登录后重试");
+    .slice(0, 10);
+  if (!selected.length) throw new Error("还没有可同步的右键收藏笔记，请先在小红书原笔记页面完成收藏");
+
+  const qwenAnalyses = await analyzeCollectedNotes(env, selected);
 
   const db = drizzle(env.DB, { schema });
   if (force) {
@@ -136,24 +189,31 @@ export async function collectBrowserResearch(env: ResearchRuntimeEnv, ownerEmail
     ));
   }
   for (const candidate of selected) {
+    const analysis = qwenAnalyses.get(noteIdentity(candidate.sourceUrl));
     const likes = parseVisibleMetric(candidate.likesText || "");
+    const saves = parseVisibleMetric(candidate.savesText || "");
+    const comments = parseVisibleMetric(candidate.commentsText || "");
+    const titleStructure = /\d|㎡|m²/i.test(candidate.title)
+      ? "数字或面积事实前置，再连接空间体验收益"
+      : /[?？]|怎么|如何|为什么|避坑/.test(candidate.title)
+        ? "用真实问题或痛点建立点击动机，再给出设计判断"
+        : "先交代空间情绪或视觉记忆点，再以设计细节支撑";
+    const tagSummary = candidate.tags?.length ? `；高频标签线索：${candidate.tags.slice(0, 6).join("、")}` : "";
     const item: ResearchItem = {
       sourceUrl: candidate.sourceUrl,
       title: candidate.title,
       author: candidate.author || "小红书公开作者",
       likes,
-      saves: 0,
-      comments: 0,
+      saves,
+      comments,
       metricsNote: likes
         ? `小红书搜索页采集时可见点赞约 ${candidate.likesText}；收藏与评论未在卡片中公开显示`
         : "已核验为小红书公开笔记；搜索卡片未稳定显示可解析的互动数",
       metricConfidence: "estimated",
-      copyAnalysis: abstractCopyPattern(candidate.title),
-      coverAnalysis: candidate.coverAlt
-        ? "封面以室内实景为主体，并通过画面主体、留白和文字层级建立首屏识别；生成时应结合项目原图重新构图。"
-        : "公开卡片以项目空间实景建立视觉信任；生成时保持单一视觉中心、克制文字和清晰项目事实。",
-      audienceInsight: "面向正在寻找设计灵感、比较设计公司专业度，或准备启动住宅与商业空间项目的人群。",
-      reusablePattern: abstractReusablePattern(candidate.title),
+      copyAnalysis: analysis?.copyAnalysis || `${abstractCopyPattern(candidate.title)}正文以项目照片可验证的空间、材质、光线、动线或使用体验为依据，结尾用自然的问题邀请读者交流需求。`,
+      coverAnalysis: analysis?.coverAnalysis || `${titleStructure}${candidate.keywordUsed ? `；搜索关键词：${candidate.keywordUsed}` : ""}${tagSummary}。新项目只复用结构，不复制词句。`,
+      audienceInsight: analysis?.audienceInsight || "面向正在寻找设计灵感、比较设计公司专业度，或准备启动住宅、商业、办公、酒店及展陈空间项目的人群。",
+      reusablePattern: analysis?.reusablePattern || `${abstractReusablePattern(candidate.title)}正文依次写照片钩子、3项可验证设计细节、使用价值与低压力互动语；结尾围绕当前空间提出具体问题，不虚构优惠、客户评价与项目成果。`,
     };
     const values = { ownerEmail, researchDate: date, ...item };
     await db.insert(researchReferences).values(values).onConflictDoUpdate({
@@ -164,42 +224,6 @@ export async function collectBrowserResearch(env: ResearchRuntimeEnv, ownerEmail
   return listResearch(env, ownerEmail, date);
 }
 
-const researchSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["items"],
-  properties: {
-    items: {
-      type: "array",
-      minItems: 3,
-      maxItems: 3,
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: [
-          "sourceUrl", "title", "author", "likes", "saves", "comments",
-          "metricsNote", "metricConfidence", "copyAnalysis", "coverAnalysis",
-          "audienceInsight", "reusablePattern",
-        ],
-        properties: {
-          sourceUrl: { type: "string" },
-          title: { type: "string" },
-          author: { type: "string" },
-          likes: { type: "integer", minimum: 0 },
-          saves: { type: "integer", minimum: 0 },
-          comments: { type: "integer", minimum: 0 },
-          metricsNote: { type: "string" },
-          metricConfidence: { type: "string", enum: ["verified", "estimated"] },
-          copyAnalysis: { type: "string" },
-          coverAnalysis: { type: "string" },
-          audienceInsight: { type: "string" },
-          reusablePattern: { type: "string" },
-        },
-      },
-    },
-  },
-};
-
 export async function listResearch(env: ResearchRuntimeEnv, ownerEmail: string, date?: string) {
   const db = drizzle(env.DB, { schema });
   return date
@@ -208,59 +232,8 @@ export async function listResearch(env: ResearchRuntimeEnv, ownerEmail: string, 
 }
 
 export async function collectDailyResearch(env: ResearchRuntimeEnv, ownerEmail: string, force = false) {
-  if (!env.OPENAI_API_KEY?.startsWith("sk-")) throw new Error("OpenAI API 密钥尚未连接");
   const date = chinaDate();
   const existing = await listResearch(env, ownerEmail, date);
   if (existing.length >= 3 && !force) return existing;
-
-  const prompt = `今天是 ${date}。你是室内设计工作室的内容研究员。
-使用联网搜索寻找小红书（xiaohongshu.com）公开可访问的室内设计、住宅实景、空间改造内容。
-筛选 3 篇具有高点赞或高收藏信号的内容，优先最近 90 天；若无法核实确切互动量，不得编造，
-将数值写为 0，并在 metricsNote 说明可见的热度信号与限制，metricConfidence 写 estimated。
-只分析选题、叙事结构、首屏信息层级、封面构图、字体位置、色彩和受众需求。
-不得大段摘录或改写原文，不得建议复制原句或照搬封面。
-  sourceUrl 必须是实际可访问的小红书笔记详情页（xiaohongshu.com/discovery/item 或 /explore），
-  不得使用搜索页、聚合页、其他网站或虚构链接。
-reusablePattern 必须是可用于未来原创项目的抽象方法。`;
-
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: { authorization: `Bearer ${env.OPENAI_API_KEY}`, "content-type": "application/json" },
-    body: JSON.stringify({
-      model: env.OPENAI_MODEL || "gpt-5.6-luna",
-      tools: [{
-        type: "web_search",
-        search_context_size: "high",
-        user_location: {
-          type: "approximate",
-          country: "CN",
-          city: "Wenzhou",
-          region: "Zhejiang",
-          timezone: "Asia/Shanghai",
-        },
-      }],
-      input: prompt,
-      text: { format: { type: "json_schema", name: "xhs_daily_research", strict: true, schema: researchSchema } },
-      max_output_tokens: 3600,
-    }),
-  });
-  if (!response.ok) {
-    if (response.status === 401) throw new Error("OpenAI API 密钥无效或已失效");
-    throw new Error(`每日研究暂不可用（${response.status}）`);
-  }
-
-  const payload = await response.json() as Record<string, unknown>;
-  const parsed = JSON.parse(outputText(payload)) as { items: ResearchItem[] };
-  const items = parsed.items.filter((item) => isXiaohongshuNoteUrl(item.sourceUrl)).slice(0, 3);
-  if (items.length !== 3) throw new Error("未找到 3 篇可核验的小红书室内设计笔记，请稍后重试");
-
-  const db = drizzle(env.DB, { schema });
-  for (const item of items) {
-    const values = { ownerEmail, researchDate: date, ...item };
-    await db.insert(researchReferences).values(values).onConflictDoUpdate({
-      target: researchReferences.sourceUrl,
-      set: values,
-    });
-  }
-  return listResearch(env, ownerEmail, date);
+  throw new Error("请先用 MJ 发布桥在小红书搜索页采集热门室内设计笔记，或在原笔记页面右键收藏；平台只解析真实链接，不生成虚构来源");
 }
