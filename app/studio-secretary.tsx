@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, DragEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 type Draft = {
   projectName?: string;
@@ -633,6 +633,7 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
   const [meta, setMeta] = useState(initialMeta);
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
+  const [isDraggingFiles, setIsDraggingFiles] = useState(false);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const bodyTextareaRef = useRef<HTMLTextAreaElement>(null);
   const insertBodyEmoji = (emoji: string) => {
@@ -801,20 +802,35 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
   }
 
   const updateMeta = (key: keyof ProjectMeta, value: string) => setMeta((current) => ({ ...current, [key]: value }));
-  const handleFiles = (event: ChangeEvent<HTMLInputElement>) => {
-    const incoming = Array.from(event.target.files || []);
-    event.target.value = "";
-    if (!incoming.length) return;
-    const merged = [...files, ...incoming].filter((file, index, all) => (
+  const addProjectFiles = (incoming: File[]) => {
+    const supported = incoming.filter((file) => ["image/jpeg", "image/png", "image/webp"].includes(file.type));
+    if (!supported.length) {
+      setNotice("请拖入 JPG、PNG 或 WebP 格式的项目实景图");
+      return;
+    }
+    const merged = [...files, ...supported].filter((file, index, all) => (
       all.findIndex((item) => `${item.name}-${item.size}-${item.lastModified}` === `${file.name}-${file.size}-${file.lastModified}`) === index
     )).slice(0, MAX_PROJECT_IMAGES);
     setFiles(merged);
     setPreviews(merged.map((file) => URL.createObjectURL(file)));
     setDraft((current) => ({ ...current, coverIndex: Math.min(current.coverIndex ?? 0, Math.max(merged.length - 1, 0)) }));
-    setNotice(incoming.length + files.length > MAX_PROJECT_IMAGES
+    setNotice(supported.length + files.length > MAX_PROJECT_IMAGES
       ? `最多添加 ${MAX_PROJECT_IMAGES} 张图片，超出的图片未加入`
-      : `已添加 ${merged.length} / ${MAX_PROJECT_IMAGES} 张项目实景图，可继续分批添加`);
+      : `已添加 ${merged.length} / ${MAX_PROJECT_IMAGES} 张项目实景图，可继续点击或拖拽添加`);
     setPhase("ready");
+  };
+
+  const handleFiles = (event: ChangeEvent<HTMLInputElement>) => {
+    const incoming = Array.from(event.target.files || []);
+    event.target.value = "";
+    if (!incoming.length) return;
+    addProjectFiles(incoming);
+  };
+
+  const handleFileDrop = (event: DragEvent<HTMLLabelElement>) => {
+    event.preventDefault();
+    setIsDraggingFiles(false);
+    addProjectFiles(Array.from(event.dataTransfer.files || []));
   };
 
   const removeFile = (index: number) => {
@@ -1371,7 +1387,7 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
     <section className="creator-card">
       <div className="section-heading"><div><span>PROJECT INTAKE</span><h2>交给秘书一个新项目</h2></div><span className="counter">{files.length ? `${files.length} / ${MAX_PROJECT_IMAGES} 张实景图` : "最多 10 张实景图"}</span></div>
       <form onSubmit={handleGenerate}>
-        <label className="upload-zone"><input type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={handleFiles}/><div className="upload-icon">＋</div><strong>{files.length ? "继续添加项目实景图" : "上传项目实景图"}</strong><span>可分批人工添加，最多 10 张；点击缩略图选择封面</span></label>
+        <label className={`upload-zone ${isDraggingFiles ? "dragging" : ""}`} onDragEnter={(event) => { event.preventDefault(); setIsDraggingFiles(true); }} onDragOver={(event) => event.preventDefault()} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setIsDraggingFiles(false); }} onDrop={handleFileDrop}><input type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={handleFiles}/><div className="upload-icon">＋</div><strong>{isDraggingFiles ? "松开即可加入项目图片" : files.length ? "继续添加或拖入项目实景图" : "点击选择或拖拽项目实景图到这里"}</strong><span>支持 JPG、PNG、WebP，可分批人工添加，最多 10 张；点击缩略图选择封面</span></label>
         <div className="thumb-strip">{previews.slice(0, MAX_PROJECT_IMAGES).map((image, index) => <div className="thumb-wrap" key={`${image}-${index}`}><button type="button" className={index === (draft.coverIndex ?? 0) ? "thumb selected" : "thumb"} onClick={() => setDraft((current) => ({ ...current, coverIndex: index }))} aria-label={`选择第 ${index + 1} 张作为封面`}><img src={image} alt=""/></button>{files.length > 0 && <button type="button" className="remove-thumb" onClick={() => removeFile(index)} aria-label={`删除第 ${index + 1} 张图片`}>×</button>}<span>{index + 1}</span></div>)}</div>
         <div className="form-grid">
           <label className="wide"><span>项目名称（选填）</span><input placeholder="可留空，系统将仅根据实景图创作" value={meta.name} onChange={(event) => updateMeta("name", event.target.value)}/></label>

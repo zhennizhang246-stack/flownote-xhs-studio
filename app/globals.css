@@ -112,6 +112,9 @@ html,body{background:#f7f6fa;color:var(--ink)}body{font-family:Inter,"Microsoft 
   .copy-column>.title-options,.copy-column>.cover-designer,.copy-column>.body-compose,.copy-column>.editor-actions,.copy-column>.sync-state,.copy-column>.body-compose+label{grid-column:1/-1}
 }
 
+.upload-zone.dragging{border-color:#795ee0;background:linear-gradient(135deg,#f2ecff,#fff1f7);box-shadow:0 0 0 5px #8266df1b,0 20px 48px #7359cf24;transform:translateY(-2px)}
+.upload-zone.dragging .upload-icon{transform:scale(1.12);background:linear-gradient(145deg,#6659dc,#d36fc4)}
+
 /* FLOATING GLASS NAV + CONTINUOUS LIVE PREVIEW */
 @media(min-width:1081px){
   .app-shell{grid-template-columns:268px minmax(0,1fr);background:linear-gradient(145deg,#f9f8fb 0%,#f5f4f9 48%,#faf8f5 100%)}
