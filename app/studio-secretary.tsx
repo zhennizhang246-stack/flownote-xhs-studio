@@ -1441,6 +1441,7 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
     <section className="editorial-card editor-mode">
       <div className="editorial-title"><span>EDITABLE COPY</span><label><small>已选择的笔记标题</small><textarea value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}/></label><div className="fact-row">{facts.map((fact) => <span key={fact}>{fact}</span>)}</div></div>
       <div className="copy-column">
+        <div className="generation-basis"><small>统一生成依据 · 实景图视觉档案</small><strong>{draft.detectedSpaceType || meta.projectType || meta.category}</strong><p>{draft.designSummary || "上传实景图后，系统会先归纳空间、材质、色彩、采光、可见动线与空间情绪，再统一生成全部内容。"}</p></div>
         <div className="title-options"><small>5 个爆款标题公式 · 点击选择</small>{draft.titleOptions.map((title, index) => <button className={draft.title === title ? "active" : ""} key={`${title}-${index}`} onClick={() => setDraft((current) => ({ ...current, title }))}><span>0{index + 1}</span>{title}<em>{draft.title === title ? "已选择" : "选择"}</em></button>)}</div>
         <label><small>封面英文栏目</small><input value={draft.coverEyebrow} maxLength={44} onChange={(event) => setDraft((current) => ({ ...current, coverEyebrow: event.target.value.toUpperCase() }))}/></label>
         <label><small>封面主标题</small><input value={draft.coverTitle} onChange={(event) => setDraft((current) => ({ ...current, coverTitle: event.target.value }))}/></label>

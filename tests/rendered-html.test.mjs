@@ -113,6 +113,10 @@ test("deletes owned projects and generates space-specific creative strategies", 
   assert.match(studio, /删除项目/);
   assert.match(studio, /spaceTypes/);
   assert.match(generate, /styleVariants/);
+  assert.match(generate, /detectedSpaceType/);
+  assert.match(generate, /coverEyebrow/);
+  assert.match(generate, /blue-white-dots/);
+  assert.match(generate, /项目视觉档案/);
   assert.match(generate, /松弛生活/);
   assert.match(generate, /专业设计/);
   assert.match(generate, /高级极简/);
