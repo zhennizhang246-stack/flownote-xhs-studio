@@ -83,14 +83,21 @@ export function createFallbackDraft(facts: ProjectFacts, imageCount: number, rea
     `建议收藏！${style}${profile.space}抄作业模板`,
   ];
   const body = `第一眼就被这组空间氛围拿捏了✨\n${visual}成为画面记忆点，整体克制却很有情绪。\n${first}\n${second}\n你最想把哪一处灵感搬进自己的项目？`;
+  const bodyOptions = [
+    body,
+    `这组${profile.space}把${style}做得很克制✨\n从已知信息看，${visual}是最清晰的设计线索，空间重点落在尺度、秩序与使用体验。\n${first}\n你更想继续看材质还是动线解析？`,
+    `推门进入${profile.space}，情绪一下慢了下来🌿\n${visual}串起画面，也让日常使用多了一层故事感。\n${second}\n如果是你，会先停在哪个角落？`,
+    `建议收藏这组${style}${profile.space}📌\n可借鉴的重点有三处：明确视觉中心、控制色彩关系、让陈设服务真实场景。\n${first}\n哪一点最值得你抄作业？`,
+  ].map((item) => item.slice(0, 180));
   return {
     title: titleOptions[seed % titleOptions.length],
     titleOptions,
-    coverEyebrow: "ORIGINAL DESIGN · INTERIOR",
+    coverEyebrow: "",
     coverTitle: `${memory}才是顶级情绪价值`,
     coverSubtitle: `${style}・${visual}`,
     coverStyle: { fontFamily: "serif", titleColor: "#ffffff", subtitleColor: "#eee9df", overlayColor: "#121713", overlayOpacity: 58, pattern: "frame", patternColor: "#ffffff", titleSize: 88, align: "left", position: "bottom" },
-    body: body.slice(0, 180),
+    body: bodyOptions[0],
+    bodyOptions,
     tags: tagsFor(profile.scene, style, clean(facts.location)),
     highlights: ["5 套点击标题公式", "120-180 字短正文", "按六类空间匹配网感梗句", "8 个搜索标签配比"],
     riskNotes: [`${reason}，已启用网站内置备用创作引擎`, "备用模式只使用项目分区与已知信息，不猜测未知材质"],

@@ -13,6 +13,7 @@ type Draft = {
   coverSubtitle: string;
   coverStyle?: CoverStyle;
   body: string;
+  bodyOptions: string[];
   tags: string[];
   highlights: string[];
   riskNotes: string[];
@@ -183,6 +184,7 @@ const emptyDraft: Draft = {
   coverSubtitle: "",
   coverStyle: defaultCoverStyle,
   body: "",
+  bodyOptions: ["", "", "", ""],
   tags: [],
   highlights: [],
   riskNotes: [],
@@ -527,16 +529,19 @@ async function renderCoverDataUrl(source: string, eyebrow: string, title: string
   context.fillRect(0, 0, canvas.width, canvas.height);
   context.globalAlpha = 1;
   drawCoverPattern(context, style);
-  context.textAlign = "left";
-  context.font = `700 ${style.eyebrowSize}px Georgia, "Times New Roman", serif`;
-  context.fillStyle = style.titleColor;
-  const eyebrowX = style.eyebrowX / 100 * canvas.width;
-  const eyebrowY = style.eyebrowY / 100 * canvas.height;
-  context.globalAlpha = style.eyebrowOpacity / 100;
-  context.fillText((eyebrow || "ORIGINAL DESIGN · INTERIOR").toUpperCase().slice(0, 44), eyebrowX, eyebrowY);
-  if (style.showEyebrowLine) {
-    context.globalAlpha = style.eyebrowOpacity / 100 * 0.72;
-    context.fillRect(eyebrowX, eyebrowY + style.eyebrowSize, Math.max(180, canvas.width - eyebrowX - 82), 2);
+  const eyebrowText = eyebrow.trim().toUpperCase().slice(0, 44);
+  if (eyebrowText) {
+    context.textAlign = "left";
+    context.font = `700 ${style.eyebrowSize}px Georgia, "Times New Roman", serif`;
+    context.fillStyle = style.titleColor;
+    const eyebrowX = style.eyebrowX / 100 * canvas.width;
+    const eyebrowY = style.eyebrowY / 100 * canvas.height;
+    context.globalAlpha = style.eyebrowOpacity / 100;
+    context.fillText(eyebrowText, eyebrowX, eyebrowY);
+    if (style.showEyebrowLine) {
+      context.globalAlpha = style.eyebrowOpacity / 100 * 0.72;
+      context.fillRect(eyebrowX, eyebrowY + style.eyebrowSize, Math.max(180, canvas.width - eyebrowX - 82), 2);
+    }
   }
   context.globalAlpha = 1;
   context.textAlign = style.align;
@@ -615,11 +620,12 @@ function localFallback(meta: ProjectMeta, existingProjects: ProjectRecord[] = []
   return {
     title: titleOptions[0],
     titleOptions,
-    coverEyebrow: creative.eyebrow,
+    coverEyebrow: "",
     coverTitle,
     coverSubtitle: `${location} · ${area} ${meta.projectType || "空间设计"}`,
     coverStyle: defaultCoverStyle,
     body,
+    bodyOptions: [body, `${body}\n\n你更关注这个空间的材质表达吗？`, `${body}\n\n如果置身其中，你会先停在哪个区域？`, `${body}\n\n建议先收藏，再从色彩、采光和动线逐项拆解。`],
     tags: creative.tags,
     highlights: ["从上传图片提取视觉基调", "依据画面选择竖版封面", "正文避免虚构未知项目事实"],
     riskNotes: ["当前为本地差异化预览；AI 调用恢复后才能完成逐张实景图语义识别"],
@@ -1443,7 +1449,7 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
       <div className="copy-column">
         <div className="generation-basis"><small>统一生成依据 · 实景图视觉档案</small><strong>{draft.detectedSpaceType || meta.projectType || meta.category}</strong><p>{draft.designSummary || "上传实景图后，系统会先归纳空间、材质、色彩、采光、可见动线与空间情绪，再统一生成全部内容。"}</p></div>
         <div className="title-options"><small>5 个爆款标题公式 · 点击选择</small>{draft.titleOptions.map((title, index) => <button className={draft.title === title ? "active" : ""} key={`${title}-${index}`} onClick={() => setDraft((current) => ({ ...current, title }))}><span>0{index + 1}</span>{title}<em>{draft.title === title ? "已选择" : "选择"}</em></button>)}</div>
-        <label><small>封面英文栏目</small><input value={draft.coverEyebrow} maxLength={44} onChange={(event) => setDraft((current) => ({ ...current, coverEyebrow: event.target.value.toUpperCase() }))}/></label>
+        <label><small>封面英文栏目（留空则封面不显示英文）</small><input placeholder="选填；请输入希望展示的英文" value={draft.coverEyebrow} maxLength={44} onChange={(event) => setDraft((current) => ({ ...current, coverEyebrow: event.target.value.toUpperCase() }))}/></label>
         <label><small>封面主标题</small><input value={draft.coverTitle} onChange={(event) => setDraft((current) => ({ ...current, coverTitle: event.target.value }))}/></label>
         <label><small>封面副标题</small><input value={draft.coverSubtitle} onChange={(event) => setDraft((current) => ({ ...current, coverSubtitle: event.target.value }))}/></label>
         <div className="cover-designer">
@@ -1475,6 +1481,7 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
             <label className="range-control"><small>副标题垂直位置 · {normalizedCoverStyle(draft.coverStyle).subtitleOffsetY}</small><input type="range" min="-20" max="25" value={normalizedCoverStyle(draft.coverStyle).subtitleOffsetY} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), subtitleOffsetY: Number(event.target.value) } }))}/></label>
           </div>
         </div>
+        <div className="body-options"><small>4 套图片识别正文 · 点击选择</small>{draft.bodyOptions.map((body, index) => <button type="button" className={draft.body === body ? "active" : ""} key={`${index}-${body.slice(0, 12)}`} onClick={() => setDraft((current) => ({ ...current, body }))}><span>0{index + 1}</span><p>{body || `正文方案 ${index + 1}`}</p><em>{draft.body === body ? "已选择" : "选择"}</em></button>)}</div>
         <div className="body-compose"><label><small>正文</small><textarea ref={bodyTextareaRef} className="body-editor" value={draft.body} onChange={(event) => setDraft((current) => ({ ...current, body: event.target.value }))}/></label><details className="emoji-picker"><summary>Emoji 表情大全</summary><p>先点击正文任意位置，再点击表情即可插入光标处</p><div>{bodyEmojiGroups.flatMap((group) => Array.from(group).filter((emoji) => emoji !== "️")).map((emoji, index) => <button type="button" key={`${emoji}-${index}`} onMouseDown={(event) => event.preventDefault()} onClick={() => insertBodyEmoji(emoji)} aria-label={`插入 ${emoji}`}>{emoji}</button>)}</div></details></div>
         <label><small>话题标签（用逗号或空格分隔）</small><input value={draft.tags.join("，")} onChange={(event) => setDraft((current) => ({ ...current, tags: event.target.value.split(/[，,\s#]+/).filter(Boolean).slice(0, 12) }))}/></label>
         <div className="editor-actions"><button type="button" onClick={() => void saveProject("drafted")}>保存到资产库</button><button type="button" className="approve-action" onClick={() => void saveProject("approved")}>确认并同步保存</button><button type="button" onClick={() => void approveAndSchedule()}>确认并加入三天队列</button></div>

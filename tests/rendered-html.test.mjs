@@ -115,6 +115,8 @@ test("deletes owned projects and generates space-specific creative strategies", 
   assert.match(generate, /styleVariants/);
   assert.match(generate, /detectedSpaceType/);
   assert.match(generate, /coverEyebrow/);
+  assert.match(generate, /bodyOptions/);
+  assert.match(generate, /coverEyebrow = ""/);
   assert.match(generate, /blue-white-dots/);
   assert.match(generate, /项目视觉档案/);
   assert.match(generate, /松弛生活/);
@@ -139,7 +141,8 @@ test("falls back to an embedded viral-copy engine when visual API quota is unava
   assert.match(generate, /已自动切换免额度生成/);
   assert.match(router, /429/);
   assert.match(fallback, /网站内置爆款文案引擎 · 免 API 额度/);
-  assert.match(fallback, /body\.slice\(0, 180\)/);
+  assert.match(fallback, /bodyOptions/);
+  assert.match(fallback, /item\.slice\(0, 180\)/);
   assert.match(fallback, /exhibition/);
   assert.match(fallback, /architecture/);
   assert.match(fallback, /titleOptions/);
@@ -156,6 +159,9 @@ test("generates a complete photo-driven draft with three styles and restrained e
   assert.match(studio, /ORIGINAL DESIGN · INTERIOR/);
   assert.match(studio, /封面英文栏目/);
   assert.match(studio, /renderCoverDataUrl\(coverImage, draft\.coverEyebrow/);
+  assert.match(studio, /留空则封面不显示英文/);
+  assert.match(studio, /4 套图片识别正文/);
+  assert.doesNotMatch(studio, /eyebrow \|\| "ORIGINAL DESIGN · INTERIOR"/);
   assert.match(generate, /正文自然加入 3-6 个/);
   assert.match(generate, /researchReferences\.copyAnalysis/);
   assert.match(generate, /不得复制原句/);
