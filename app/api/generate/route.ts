@@ -5,6 +5,7 @@ import { projectImages, projects, researchReferences } from "../../../db/schema"
 import { apiError, requireAccountEmail } from "../../../lib/account";
 import { generateWithModelFallback, hasConfiguredAI } from "../../../lib/ai-model-router";
 import { createFallbackDraft } from "../../../lib/fallback-copy";
+import { COPYWRITING_MD_RULES } from "../../../lib/copywriting-rules";
 
 type RuntimeEnv = {
   PROJECT_MEDIA?: R2Bucket;
@@ -136,13 +137,15 @@ export async function POST(request: Request) {
 
     const prompt = `你是顶级室内设计互联网内容秘书。请逐张分析上传的项目实景图，只依据画面中可见事实和用户提供的可选项目信息，生成原创的小红书室内设计笔记。
 
+${COPYWRITING_MD_RULES}
+
 分析要求：识别空间类型、材质、色彩、自然与人工采光、家具陈设、空间比例、功能关系、可见通道与动线、设计风格和空间情绪。没有平面图时，只描述画面可见的动线关系，不得虚构。项目名称、地点、面积、客户和设计信息缺失时直接省略，禁止猜测材料品牌、造价、完工时间和客户身份。
 
 内容要求：围绕打开率、完读转发率和长尾搜索关键词生成，但不得照搬参考笔记。生成三套差异明显的方案：lifestyle（松弛生活，强调感受与共鸣）、professional（专业设计，强调空间逻辑与方法）、minimal（高级极简，强调审美与留白）。每套必须包含 description、title、coverTitle、coverSubtitle、coverStyle、body、tags。标题自然加入最多一个 Emoji，正文自然加入 3-6 个语义相关 Emoji；文案必须与本项目图片强关联。
 
 coverStyle 规则：fontFamily 只能为 serif、sans、kai；颜色使用 6 位十六进制；overlayOpacity 为 0-90；pattern 只能为 none、frame、grid、dots、corners；titleSize 为 52-120；align 只能为 left、center；position 只能为 top、middle、bottom。
 
-正文采用“情绪钩子→1-2句核心亮点→2句场景梗→互动收尾”，控制在 150 个汉字以内。titleOptions 必须生成 5 个不重复标题，分别使用情绪口语、风格封神、颜值惊叹、场景发现、建议收藏结构。标签固定为 2 个大流量词、3 个精准风格词、2 个垂类词和 1 个可选地域词。
+正文采用“情绪钩子→1-2句核心亮点→2句场景梗→互动收尾”，控制在 120-180 个汉字。titleOptions 必须生成 5 个不重复标题，分别使用情绪口语、风格封神、颜值惊叹、场景发现、建议收藏结构。标签固定为 2 个大流量词、3 个精准风格词、2 个垂类词和 1 个可选地域词。
 
 只返回一个 JSON 对象，不要 Markdown。顶层字段必须为 title、titleOptions、coverTitle、coverSubtitle、coverStyle、body、tags、highlights、riskNotes、coverIndex、styleVariants。coverIndex 是最适合做封面的图片序号，从 0 开始。顶层文案使用 lifestyle 方案；titleOptions 必须有 5 项。
 

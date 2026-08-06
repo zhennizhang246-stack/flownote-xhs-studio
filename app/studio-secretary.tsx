@@ -1419,7 +1419,7 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
           <label className="wide"><span>已知设计信息（选填）</span><textarea placeholder="可留空；AI 会从实景图识别空间、材质、色彩、采光与动线" value={meta.brief} onChange={(event) => updateMeta("brief", event.target.value)}/></label>
         </div>
         <button className="primary-action" disabled={phase === "uploading" || phase === "analyzing"}><span>{phase === "analyzing" ? "正在逐张识别图片并生成全部内容…" : "生成封面＋正文与标题"}</span><span>→</span></button>
-        <p className="notice">{notice}</p>
+        <p className="notice">{notice}　<a href="/content/xhs-copywriting-library.md" target="_blank" rel="noreferrer">查看已启用的 MD 文案库 ↗</a></p>
       </form>
     </section>
     <section className="preview-panel">

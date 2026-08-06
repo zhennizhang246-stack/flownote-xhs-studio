@@ -135,7 +135,9 @@ test("falls back to an embedded viral-copy engine when visual API quota is unava
   assert.match(generate, /已自动切换免额度生成/);
   assert.match(router, /429/);
   assert.match(fallback, /网站内置爆款文案引擎 · 免 API 额度/);
-  assert.match(fallback, /body\.slice\(0, 150\)/);
+  assert.match(fallback, /body\.slice\(0, 180\)/);
+  assert.match(fallback, /exhibition/);
+  assert.match(fallback, /architecture/);
   assert.match(fallback, /titleOptions/);
   assert.match(fallback, /谁懂啊！这/);
   assert.match(fallback, /建议收藏！/);
