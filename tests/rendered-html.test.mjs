@@ -373,6 +373,19 @@ test("schedules guarded Xiaohongshu publishing through the local browser bridge"
   assert.match(worker, /收藏到 MJ 引流笔记库/);
 });
 
+test("syncs confirmed Xiaohongshu publish results back to the project calendar", async () => {
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  const bridge = await readFile(new URL("../browser-extension/site-bridge.js", import.meta.url), "utf8");
+  const worker = await readFile(new URL("../browser-extension/service-worker.js", import.meta.url), "utf8");
+  const prefill = await readFile(new URL("../browser-extension/xhs-prefill.js", import.meta.url), "utf8");
+  assert.match(prefill, /MJ_XHS_PUBLISH_RESULT/);
+  assert.match(prefill, /发布成功\|发布完成\|已成功发布/);
+  assert.match(worker, /mjXhsPublishResults/);
+  assert.match(bridge, /MJ_XHS_PUBLISH_RESULTS/);
+  assert.match(studio, /syncPublishedResults/);
+  assert.match(studio, /仅在官方页面确认发布成功后/);
+});
+
 test("selects an approved project and date for bridge scheduling", async () => {
   const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
   const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");

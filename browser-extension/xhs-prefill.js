@@ -6,6 +6,8 @@ let bodyFilled = false;
 let imageUploadCompleted = false;
 let imagesTransferredAt = 0;
 let autoPublishAttempted = false;
+let publishSubmissionStarted = false;
+let publishResultReported = false;
 let currentDraft = null;
 
 function statusPanel() {
@@ -214,9 +216,38 @@ function tryAutoPublish(draft) {
       return;
     }
     setStatus("已使用本次限时授权点击一次官方发布按钮，正在等待小红书返回结果。");
+    publishSubmissionStarted = true;
     button.click();
   });
 }
+
+function findPublishedNoteUrl() {
+  const link = [...document.querySelectorAll("a[href]")].find((item) => /xiaohongshu\.com\/(?:explore|discovery\/item)\//.test(String(item.href || "")));
+  return link ? String(link.href || "") : "";
+}
+
+function reportPublishedResult() {
+  if (!currentDraft || !publishSubmissionStarted || publishResultReported) return;
+  const pageText = document.body?.innerText || "";
+  const confirmed = /(?:笔记)?发布成功|发布完成|已成功发布/.test(pageText);
+  if (!confirmed) return;
+  publishResultReported = true;
+  const result = {
+    ownerKey: String(currentDraft.ownerKey || ""),
+    projectId: Number(currentDraft.projectId),
+    projectName: String(currentDraft.projectName || ""),
+    status: "published",
+    publishedAt: new Date().toISOString(),
+    publishUrl: findPublishedNoteUrl(),
+  };
+  chrome.runtime.sendMessage({ type: "MJ_XHS_PUBLISH_RESULT", result });
+  setStatus("小红书已返回发布成功，结果已同步到项目发布日历。");
+}
+
+document.addEventListener("click", (event) => {
+  const button = event.target instanceof Element ? event.target.closest("button") : null;
+  if (currentDraft && button?.textContent?.trim() === "发布") publishSubmissionStarted = true;
+}, true);
 
 function applyDraft(draft) {
   if (!draft?.title || !draft?.body) {
@@ -232,6 +263,8 @@ function applyDraft(draft) {
     imageUploadCompleted = false;
     imagesTransferredAt = 0;
     autoPublishAttempted = false;
+    publishSubmissionStarted = false;
+    publishResultReported = false;
   }
   currentDraft = draft;
   void uploadImages(draft);
@@ -246,6 +279,9 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "local" && changes[DRAFT_KEY]?.newValue) applyDraft(changes[DRAFT_KEY].newValue);
 });
 
-const observer = new MutationObserver(() => loadDraft());
+const observer = new MutationObserver(() => {
+  loadDraft();
+  reportPublishedResult();
+});
 observer.observe(document.documentElement, { childList: true, subtree: true });
 loadDraft();

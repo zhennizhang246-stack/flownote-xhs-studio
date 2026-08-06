@@ -114,6 +114,7 @@ html,body{background:#f7f6fa;color:var(--ink)}body{font-family:Inter,"Microsoft 
 
 .upload-zone.dragging{border-color:#795ee0;background:linear-gradient(135deg,#f2ecff,#fff1f7);box-shadow:0 0 0 5px #8266df1b,0 20px 48px #7359cf24;transform:translateY(-2px)}
 .upload-zone.dragging .upload-icon{transform:scale(1.12);background:linear-gradient(145deg,#6659dc,#d36fc4)}
+.queue-buttons>a{display:grid;place-items:center;min-height:36px;border:1px solid #d8d4e4;border-radius:9px;background:#fff;color:#6250a2;font-size:9px;text-decoration:none}.queue-buttons>.state-pill{display:grid;place-items:center;min-height:36px}
 
 /* FLOATING GLASS NAV + CONTINUOUS LIVE PREVIEW */
 @media(min-width:1081px){

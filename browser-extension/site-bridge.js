@@ -6,6 +6,19 @@ function notifyPage(type) {
   window.postMessage({ source: BRIDGE_SOURCE, type, version: 4 }, window.location.origin);
 }
 
+function publishResultsKey(ownerKey) {
+  return `mjXhsPublishResults:${encodeURIComponent(String(ownerKey || ""))}`;
+}
+
+function notifyPublishResults(results) {
+  window.postMessage({
+    source: BRIDGE_SOURCE,
+    type: "MJ_XHS_PUBLISH_RESULTS",
+    version: 4,
+    results: Array.isArray(results) ? results : [],
+  }, window.location.origin);
+}
+
 function normalizeDraft(value) {
   if (!value || value.version !== 2 || !Number.isInteger(value.projectId)) return null;
   const coverDataUrl = String(value.coverDataUrl || "");
@@ -47,6 +60,8 @@ window.addEventListener("message", (event) => {
     activeOwnerKey = String(message.ownerKey || "").slice(0, 200);
     if (!activeOwnerKey) return;
     chrome.runtime.sendMessage({ type: "MJ_XHS_SET_ACCOUNT_CONTEXT", ownerKey: activeOwnerKey });
+    const key = publishResultsKey(activeOwnerKey);
+    chrome.storage.local.get(key, (stored) => notifyPublishResults(stored[key]));
     return;
   }
   if (message.type === "MJ_XHS_BRIDGE_PING") {
@@ -118,6 +133,12 @@ chrome.storage.onChanged.addListener((changes, area) => {
     candidates: result.candidates || [],
     error: result.error || "",
   }, window.location.origin);
+});
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local" || !activeOwnerKey) return;
+  const resultChange = changes[publishResultsKey(activeOwnerKey)];
+  if (resultChange) notifyPublishResults(resultChange.newValue);
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {

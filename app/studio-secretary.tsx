@@ -750,13 +750,33 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
   }, []);
 
   useEffect(() => {
+    async function syncPublishedResults(results: Array<{ ownerKey?: string; projectId?: number; status?: string; publishUrl?: string; publishedAt?: string }>) {
+      const matches = results.filter((result) => result.ownerKey === accountKey && Number.isInteger(result.projectId) && result.status === "published");
+      if (!matches.length) return;
+      const synced: ProjectRecord[] = [];
+      for (const result of matches) {
+        const response = await fetch(`/api/projects/${result.projectId}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ status: "published", publishUrl: String(result.publishUrl || "") }),
+        });
+        const payload = await response.json() as { project?: ProjectRecord };
+        if (response.ok && payload.project) synced.push(payload.project);
+      }
+      if (synced.length) {
+        setProjects((current) => current.map((project) => synced.find((item) => item.id === project.id) || project));
+        setSettingsNotice(`已从小红书官方发布页同步 ${synced.length} 条发布结果`);
+      }
+    }
+
     function receiveBridgeStatus(event: MessageEvent) {
       if (event.source !== window || event.origin !== window.location.origin) return;
-      const message = event.data as { source?: string; type?: string; version?: number };
+      const message = event.data as { source?: string; type?: string; version?: number; results?: Array<{ ownerKey?: string; projectId?: number; status?: string; publishUrl?: string; publishedAt?: string }> };
       if (message?.source !== "mj-xhs-bridge") return;
       if (message.version === 4 && (["MJ_XHS_BRIDGE_READY", "MJ_XHS_DRAFT_STORED", "MJ_XHS_SCHEDULE_STORED"].includes(String(message.type)))) {
         setBridgeReady(true);
       }
+      if (message.version === 4 && message.type === "MJ_XHS_PUBLISH_RESULTS") void syncPublishedResults(message.results || []);
     }
     window.addEventListener("message", receiveBridgeStatus);
     window.postMessage({ source: XHS_BRIDGE_SOURCE, type: "MJ_XHS_ACCOUNT_CONTEXT", ownerKey: accountKey }, window.location.origin);
@@ -1494,7 +1514,7 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
       <p className="notice">{settingsNotice || "可选择人工立即发布，或使用当前电脑上的 MJ 发布桥进行定时发布。"}</p>
     </section>
     <section className="dashboard-card queue-card">
-      <div className="section-heading"><div><span>PUBLISH QUEUE</span><h2>项目发布日历</h2><p>选择项目与北京时间；发布桥会同步任务，到点打开并预填小红书官方发布页。排期可随时更新或取消。</p></div><span className="counter">{scheduledProjects.length} 个已排期</span></div>
+      <div className="section-heading"><div><span>PUBLISH QUEUE</span><h2>项目发布日历</h2><p>选择项目与北京时间；发布桥会同步到小红书官方发布流程。仅在官方页面确认发布成功后，日历才显示“已发布”。</p></div><span className="counter">{scheduledProjects.filter((project) => project.status !== "published").length} 个待发布 · {scheduledProjects.filter((project) => project.status === "published").length} 个已发布</span></div>
       <div className="quick-schedule">
         <label><span>选择项目</span><select value={selectedScheduleProjectId ?? ""} onChange={(event) => setSelectedScheduleProjectId(event.target.value ? Number(event.target.value) : null)}><option value="">请选择项目</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}{["approved", "scheduled"].includes(project.status) ? "" : "（需先确认文案）"}</option>)}</select></label>
         <label><span>发布日期与时间</span><input type="datetime-local" disabled={!selectedScheduleProjectId} value={selectedScheduleProjectId ? scheduleDrafts[selectedScheduleProjectId] || nextSlot(settings) : ""} onChange={(event) => selectedScheduleProjectId && setScheduleDrafts((current) => ({ ...current, [selectedScheduleProjectId]: event.target.value }))}/></label>
@@ -1502,9 +1522,9 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
       </div>
       <div className="queue-list">
         {projects.map((project) => <div className="queue-item" key={project.id}>
-          <button className="queue-project queue-project-button" onClick={() => loadProject(project)}>{project.images?.[0] ? <img src={project.images[0].url} alt=""/> : <span>{project.name.slice(0, 1)}</span>}<div><strong>{project.name}</strong><small>{project.location || "未填写地点"} · {project.area || project.projectType || "室内设计项目"}</small><em>{project.scheduledAt ? `已同步：${new Date(project.scheduledAt).toLocaleString("zh-CN")}` : "点击打开项目"}</em></div></button>
+          <button className="queue-project queue-project-button" onClick={() => loadProject(project)}>{project.images?.[0] ? <img src={project.images[0].url} alt=""/> : <span>{project.name.slice(0, 1)}</span>}<div><strong>{project.name}</strong><small>{project.location || "未填写地点"} · {project.area || project.projectType || "室内设计项目"}</small><em>{project.status === "published" ? `已发布${project.publishedAt ? `：${new Date(project.publishedAt).toLocaleString("zh-CN")}` : ""}` : project.scheduledAt ? `已同步排期：${new Date(project.scheduledAt).toLocaleString("zh-CN")}` : "点击打开项目"}</em></div></button>
           <input type="datetime-local" value={scheduleDrafts[project.id] || nextSlot(settings)} onChange={(event) => setScheduleDrafts((current) => ({ ...current, [project.id]: event.target.value }))}/>
-          <div className="queue-buttons"><button disabled={!['approved', 'scheduled'].includes(project.status)} onClick={() => void scheduleProject(project.id)}>{project.scheduledAt ? "更新并同步" : project.status === "approved" ? "加入日历" : "需先确认"}</button>{project.scheduledAt && <button className="danger-action" onClick={() => void removeSchedule(project)}>取消定时发布</button>}</div>
+          <div className="queue-buttons">{project.status === "published" ? <><span className="state-pill published">已发布</span>{project.publishUrl && <a href={project.publishUrl} target="_blank" rel="noreferrer">查看笔记 ↗</a>}</> : <><button disabled={!['approved', 'scheduled'].includes(project.status)} onClick={() => void scheduleProject(project.id)}>{project.scheduledAt ? "更新并同步" : project.status === "approved" ? "加入日历" : "需先确认"}</button>{project.scheduledAt && <button className="danger-action" onClick={() => void removeSchedule(project)}>取消定时发布</button>}</>}</div>
         </div>)}
         {!projects.length && <div className="empty-state"><strong>还没有可排期项目</strong><p>先在创作工作台上传项目实景图，项目会自动进入这里。</p></div>}
       </div>
