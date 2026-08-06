@@ -11,7 +11,7 @@ test("ships the studio secretary product surface", async () => {
   assert.match(page, /引流笔记库/);
   assert.match(page, /确认并预填小红书发布页/);
   assert.match(page, /确认本篇并自动发布/);
-  assert.match(page, /MJ 发布桥 2.0 已连接/);
+  assert.match(page, /MJ 发布桥 2.1 已连接/);
   assert.match(page, /同步浏览器中右键收藏/);
   assert.match(page, /from=menu&target=image/);
   assert.match(page, /renderCoverDataUrl/);
@@ -49,7 +49,7 @@ test("ships a local bridge with manual prefill and single-use auto-publish autho
   const prefill = await readFile(new URL("../browser-extension/xhs-prefill.js", import.meta.url), "utf8");
   const research = await readFile(new URL("../browser-extension/xhs-research.js", import.meta.url), "utf8");
   assert.equal(manifest.manifest_version, 3);
-  assert.equal(manifest.version, "2.0.0");
+  assert.equal(manifest.version, "2.1.0");
   assert.ok(manifest.content_scripts.some((entry) => entry.matches.includes("https://creator.xiaohongshu.com/publish/*")));
   assert.match(siteBridge, /MJ_XHS_DRAFT_STORED/);
   assert.match(prefill, /DataTransfer/);

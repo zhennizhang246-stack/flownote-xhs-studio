@@ -1433,7 +1433,7 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
       <div className="phone-frame"><div className="cover-preview final-artwork-preview">{coverImage ? <img src={renderedCoverPreview || coverImage} alt="与小红书最终封面完全一致的发布预览"/> : <div className="empty-cover-placeholder">上传项目实景图后生成封面</div>}</div></div>
       <p className="final-preview-note">1080 × 1440 小红书竖版封面 · 此处直接显示最终合成图片</p>
       <div className={`bridge-status ${bridgeReady ? "connected" : ""}`}>
-        <span>{bridgeReady ? "MJ 发布桥 2.0 已连接" : "未连接最新版 MJ 发布桥"}</span>
+        <span>{bridgeReady ? "MJ 发布桥 2.1 已连接" : "未连接最新版 MJ 发布桥"}</span>
         <p>{bridgeReady ? "成品封面、项目图片、标题、正文与标签会保持统一；可选择人工发布或单篇确认后自动发布。" : "安装一次浏览器扩展，即可把已确认内容自动带入小红书官方图文发布页。"}</p>
         {!bridgeReady && <a href={XHS_BRIDGE_EXTENSION_URL} download>下载或更新 MJ 发布桥扩展</a>}
       </div>
