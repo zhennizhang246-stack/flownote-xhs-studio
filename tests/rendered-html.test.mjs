@@ -277,6 +277,20 @@ test("selects English logo presets and uploads fonts into the exported cover", a
   assert.match(css, /grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
 });
 
+test("uploads an image logo and composites it into the final cover", async () => {
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  const logos = await readFile(new URL("../app/api/logos/route.ts", import.meta.url), "utf8");
+  const project = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
+  assert.match(studio, /图片形式 Logo/);
+  assert.match(studio, /fetch\("\/api\/logos"/);
+  assert.match(studio, /context\.drawImage\(logoImage/);
+  assert.match(studio, /图片 Logo 大小/);
+  assert.match(logos, /cover-logos/);
+  assert.match(logos, /5 \* 1024 \* 1024/);
+  assert.match(project, /logoImageUrl/);
+  assert.match(project, /logoImageScale: Math\.min\(180/);
+});
+
 test("moves and resizes the cover main title and inserts emoji into body copy", async () => {
   const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
   const project = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");

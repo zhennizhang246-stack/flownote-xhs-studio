@@ -16,6 +16,9 @@ type Draft = {
     eyebrowPosition?: string;
     customFontName?: string;
     customFontUrl?: string;
+    logoImageName?: string;
+    logoImageUrl?: string;
+    logoImageScale?: number;
     titleColor?: string;
     subtitleColor?: string;
     overlayColor?: string;
@@ -79,6 +82,9 @@ function cleanDraft(value: unknown): Draft {
       eyebrowPosition: oneOf(style.eyebrowPosition, ["top", "middle", "bottom", "custom"] as const, "top"),
       customFontName: cleanText(style.customFontName, 120),
       customFontUrl: typeof style.customFontUrl === "string" && /^\/api\/fonts\/[a-f0-9-]+$/i.test(style.customFontUrl) ? style.customFontUrl : "",
+      logoImageName: cleanText(style.logoImageName, 120),
+      logoImageUrl: typeof style.logoImageUrl === "string" && /^\/api\/logos\/[a-f0-9-]+$/i.test(style.logoImageUrl) ? style.logoImageUrl : "",
+      logoImageScale: Math.min(180, Math.max(30, Number(style.logoImageScale ?? 100))),
       titleColor: color(style.titleColor, "#ffffff"),
       subtitleColor: color(style.subtitleColor, "#eee9df"),
       overlayColor: color(style.overlayColor, "#121713"),

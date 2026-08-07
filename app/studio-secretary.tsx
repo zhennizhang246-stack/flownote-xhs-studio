@@ -26,6 +26,9 @@ type CoverStyle = {
   eyebrowPosition: "top" | "middle" | "bottom" | "custom";
   customFontName?: string;
   customFontUrl?: string;
+  logoImageName?: string;
+  logoImageUrl?: string;
+  logoImageScale: number;
   titleColor: string;
   subtitleColor: string;
   overlayColor: string;
@@ -163,6 +166,7 @@ const defaultCoverStyle: CoverStyle = {
   fontFamily: "serif",
   eyebrowLogoStyle: "plain",
   eyebrowPosition: "top",
+  logoImageScale: 100,
   titleColor: "#ffffff",
   subtitleColor: "#eee9df",
   overlayColor: "#121713",
@@ -308,6 +312,9 @@ function normalizedCoverStyle(value?: Partial<CoverStyle>): CoverStyle {
     eyebrowPosition,
     customFontName: typeof value?.customFontName === "string" ? value.customFontName : undefined,
     customFontUrl: typeof value?.customFontUrl === "string" && value.customFontUrl.startsWith("/api/fonts/") ? value.customFontUrl : undefined,
+    logoImageName: typeof value?.logoImageName === "string" ? value.logoImageName : undefined,
+    logoImageUrl: typeof value?.logoImageUrl === "string" && value.logoImageUrl.startsWith("/api/logos/") ? value.logoImageUrl : undefined,
+    logoImageScale: Math.min(180, Math.max(30, Number(value?.logoImageScale ?? 100))),
     pattern,
     align,
     position,
@@ -561,6 +568,7 @@ async function renderCoverDataUrl(source: string, eyebrow: string, title: string
     }
   }
   const image = await loadImage(source);
+  const logoImage = style.logoImageUrl ? await loadImage(style.logoImageUrl).catch(() => null) : null;
   const canvas = document.createElement("canvas");
   canvas.width = 1080;
   canvas.height = 1440;
@@ -576,7 +584,14 @@ async function renderCoverDataUrl(source: string, eyebrow: string, title: string
   context.globalAlpha = 1;
   drawCoverPattern(context, style);
   const eyebrowText = eyebrow.trim().toUpperCase().slice(0, 44);
-  if (eyebrowText) {
+  if (logoImage) {
+    const logoX = style.eyebrowX / 100 * canvas.width;
+    const logoY = style.eyebrowY / 100 * canvas.height;
+    const logoWidth = Math.min(760, 320 * style.logoImageScale / 100);
+    const logoHeight = logoWidth * logoImage.naturalHeight / Math.max(1, logoImage.naturalWidth);
+    context.globalAlpha = style.eyebrowOpacity / 100;
+    context.drawImage(logoImage, logoX, logoY, logoWidth, logoHeight);
+  } else if (eyebrowText) {
     context.textAlign = "left";
     const eyebrowFamily = style.eyebrowLogoStyle === "editorial" ? 'Georgia, "Times New Roman", serif' : coverFontStacks[style.fontFamily];
     context.font = `${style.eyebrowWeight} ${style.eyebrowSize}px ${eyebrowFamily}`;
@@ -734,6 +749,26 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
       },
     }));
     setNotice(`已上传并应用字体：${payload.name}`);
+  };
+  const uploadCoverLogo = async (event: ChangeEvent<HTMLInputElement>) => {
+    const logo = event.target.files?.[0];
+    event.target.value = "";
+    if (!logo) return;
+    if (!/\.(?:png|jpe?g|webp)$/i.test(logo.name) || logo.size > 5 * 1024 * 1024) {
+      setNotice("请选择 5MB 以内的 PNG、JPG 或 WebP Logo 图片");
+      return;
+    }
+    const formData = new FormData();
+    formData.append("logo", logo);
+    const response = await fetch("/api/logos", { method: "POST", body: formData });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({})) as { error?: string };
+      setNotice(payload.error || "Logo 图片上传失败");
+      return;
+    }
+    const payload = await response.json() as { url: string; name: string };
+    setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), logoImageName: payload.name, logoImageUrl: payload.url } }));
+    setNotice(`已应用图片 Logo：${payload.name}`);
   };
   const [renderedCoverPreview, setRenderedCoverPreview] = useState("");
   const [phase, setPhase] = useState<"ready" | "uploading" | "analyzing" | "done">("ready");
@@ -1559,12 +1594,13 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
         <div className="generation-basis"><small>统一生成依据 · 实景图视觉档案</small><strong>{draft.detectedSpaceType || meta.projectType || meta.category}</strong><p>{draft.designSummary || "上传实景图后，系统会先归纳空间、材质、色彩、采光、可见动线与空间情绪，再统一生成全部内容。"}</p></div>
         <div className="title-options"><small>5 个爆款标题公式 · 点击选择</small>{draft.titleOptions.map((title, index) => <button className={draft.title === title ? "active" : ""} key={`${title}-${index}`} onClick={() => setDraft((current) => ({ ...current, title }))}><span>0{index + 1}</span>{title}<em>{draft.title === title ? "已选择" : "选择"}</em></button>)}</div>
         <div className="eyebrow-logo-editor">
-          <label><small>封面英文栏目（留空则封面不显示英文）</small><input placeholder="选填；可手动输入英文或从右侧选择 Logo" value={draft.coverEyebrow} maxLength={44} onChange={(event) => setDraft((current) => ({ ...current, coverEyebrow: event.target.value.toUpperCase(), coverStyle: { ...normalizedCoverStyle(current.coverStyle), eyebrowLogoStyle: "plain" } }))}/></label>
+          <label><small>封面英文栏目（留空则封面不显示英文）</small><input placeholder="选填；可手动输入英文或选择 Logo" value={draft.coverEyebrow} maxLength={44} onChange={(event) => setDraft((current) => ({ ...current, coverEyebrow: event.target.value.toUpperCase(), coverStyle: { ...normalizedCoverStyle(current.coverStyle), eyebrowLogoStyle: "plain", logoImageName: undefined, logoImageUrl: undefined } }))}/></label>
           <label><small>固定英文 Logo 样式</small><select value={eyebrowLogoPresets.find((preset) => preset.value === draft.coverEyebrow && preset.style === normalizedCoverStyle(draft.coverStyle).eyebrowLogoStyle)?.value || "manual"} onChange={(event) => {
             if (event.target.value === "manual") return;
             const preset = eyebrowLogoPresets.find((item) => item.value === event.target.value);
-            if (preset) setDraft((current) => ({ ...current, coverEyebrow: preset.value, coverStyle: { ...normalizedCoverStyle(current.coverStyle), eyebrowLogoStyle: preset.style } }));
+            if (preset) setDraft((current) => ({ ...current, coverEyebrow: preset.value, coverStyle: { ...normalizedCoverStyle(current.coverStyle), eyebrowLogoStyle: preset.style, logoImageName: undefined, logoImageUrl: undefined } }));
           }}><option value="manual">手动输入 / 自定义</option>{eyebrowLogoPresets.map((preset) => <option key={`${preset.value}-${preset.style}`} value={preset.value}>{preset.label}</option>)}</select></label>
+          <label className="logo-image-upload"><small>图片形式 Logo</small><span><input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => void uploadCoverLogo(event)}/><b>{normalizedCoverStyle(draft.coverStyle).logoImageName || "上传透明 PNG / JPG / WebP"}</b></span>{normalizedCoverStyle(draft.coverStyle).logoImageUrl && <button type="button" onClick={() => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), logoImageName: undefined, logoImageUrl: undefined } }))}>移除图片 Logo</button>}</label>
         </div>
         <div className="cover-copy-fields">
           <label><small>封面主标题</small><input value={draft.coverTitle} onChange={(event) => setDraft((current) => ({ ...current, coverTitle: event.target.value }))}/></label>
@@ -1601,6 +1637,7 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
             <label className="range-control"><small>英文垂直位置 · {normalizedCoverStyle(draft.coverStyle).eyebrowY}%</small><input type="range" min="2" max="92" value={normalizedCoverStyle(draft.coverStyle).eyebrowY} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), eyebrowPosition: "custom", eyebrowY: Number(event.target.value) } }))}/></label>
             <label className="range-control"><small>英文字号 · {normalizedCoverStyle(draft.coverStyle).eyebrowSize}</small><input type="range" min="16" max="48" value={normalizedCoverStyle(draft.coverStyle).eyebrowSize} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), eyebrowSize: Number(event.target.value) } }))}/></label>
             <label className="range-control"><small>英文栏目粗细 · {normalizedCoverStyle(draft.coverStyle).eyebrowWeight}</small><input type="range" min="100" max="900" step="100" value={normalizedCoverStyle(draft.coverStyle).eyebrowWeight} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), eyebrowWeight: Number(event.target.value) } }))}/></label>
+            <label className="range-control"><small>图片 Logo 大小 · {normalizedCoverStyle(draft.coverStyle).logoImageScale}%</small><input type="range" min="30" max="180" value={normalizedCoverStyle(draft.coverStyle).logoImageScale} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), logoImageScale: Number(event.target.value) } }))}/></label>
             <label className="range-control"><small>英文透明度 · {normalizedCoverStyle(draft.coverStyle).eyebrowOpacity}%</small><input type="range" min="10" max="100" value={normalizedCoverStyle(draft.coverStyle).eyebrowOpacity} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), eyebrowOpacity: Number(event.target.value) } }))}/></label>
             <label className="line-toggle"><small>英文栏目横线</small><span><input type="checkbox" checked={normalizedCoverStyle(draft.coverStyle).showEyebrowLine} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), showEyebrowLine: event.target.checked } }))}/> 显示横线</span></label>
             <label className="range-control"><small>副标题字号 · {normalizedCoverStyle(draft.coverStyle).subtitleSize}</small><input type="range" min="18" max="54" value={normalizedCoverStyle(draft.coverStyle).subtitleSize} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), subtitleSize: Number(event.target.value) } }))}/></label>
