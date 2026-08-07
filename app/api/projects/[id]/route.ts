@@ -12,6 +12,9 @@ type Draft = {
   coverSubtitle: string;
   coverStyle?: {
     fontFamily?: string;
+    eyebrowLogoStyle?: string;
+    customFontName?: string;
+    customFontUrl?: string;
     titleColor?: string;
     subtitleColor?: string;
     overlayColor?: string;
@@ -61,11 +64,14 @@ function cleanDraft(value: unknown): Draft {
   const draft = {
     title: cleanText(input.title, 80),
     titleOptions: cleanList(input.titleOptions, 5, 80),
-    coverEyebrow: cleanText(input.coverEyebrow, 44).toUpperCase() || "ORIGINAL DESIGN · INTERIOR",
+    coverEyebrow: cleanText(input.coverEyebrow, 44).toUpperCase(),
     coverTitle: cleanText(input.coverTitle, 30),
     coverSubtitle: cleanText(input.coverSubtitle, 60),
     coverStyle: {
-      fontFamily: oneOf(style.fontFamily, ["serif", "sans", "kai"] as const, "serif"),
+      fontFamily: oneOf(style.fontFamily, ["serif", "sans", "kai", "inter", "noto", "custom"] as const, "serif"),
+      eyebrowLogoStyle: oneOf(style.eyebrowLogoStyle, ["plain", "wordmark", "monogram", "editorial"] as const, "plain"),
+      customFontName: cleanText(style.customFontName, 120),
+      customFontUrl: typeof style.customFontUrl === "string" && /^\/api\/fonts\/[a-f0-9-]+$/i.test(style.customFontUrl) ? style.customFontUrl : "",
       titleColor: color(style.titleColor, "#ffffff"),
       subtitleColor: color(style.subtitleColor, "#eee9df"),
       overlayColor: color(style.overlayColor, "#121713"),

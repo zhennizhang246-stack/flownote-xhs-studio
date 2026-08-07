@@ -236,9 +236,29 @@ test("resizes cover decorations, English eyebrow, and subtitle in the final artw
   assert.match(studio, /英文字号 · \{normalizedCoverStyle\(draft\.coverStyle\)\.eyebrowSize\}/);
   assert.match(studio, /副标题字号 · \{normalizedCoverStyle\(draft\.coverStyle\)\.subtitleSize\}/);
   assert.match(studio, /context\.scale\(patternScale, patternScale\)/);
-  assert.match(studio, /700 \$\{style\.eyebrowSize\}px/);
+  assert.match(studio, /eyebrowWeight/);
   assert.match(project, /patternScale: Math\.min\(160/);
   assert.match(project, /eyebrowSize: Math\.min\(48/);
+});
+
+test("selects English logo presets and uploads fonts into the exported cover", async () => {
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  const project = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
+  const fonts = await readFile(new URL("../app/api/fonts/route.ts", import.meta.url), "utf8");
+  const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  assert.match(studio, /固定英文 Logo 样式/);
+  assert.match(studio, /WAOOOOOOOC!ESION/);
+  assert.match(studio, /上传封面字体/);
+  assert.match(studio, /new FontFace\("MJ Custom Cover"/);
+  assert.match(studio, /customFontUrl/);
+  assert.match(studio, /fetch\("\/api\/fonts"/);
+  assert.match(project, /eyebrowLogoStyle/);
+  assert.match(project, /customFontUrl/);
+  assert.match(fonts, /PROJECT_MEDIA\.put/);
+  assert.match(fonts, /8 \* 1024 \* 1024/);
+  assert.match(project, /coverEyebrow: cleanText\(input\.coverEyebrow, 44\)\.toUpperCase\(\),/);
+  assert.match(css, /NotoSansSC-Regular\.woff2/);
+  assert.match(css, /Inter-var-2\.ttf/);
 });
 
 test("moves and resizes the cover main title and inserts emoji into body copy", async () => {

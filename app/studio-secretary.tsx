@@ -21,7 +21,10 @@ type Draft = {
   mode?: string;
 };
 type CoverStyle = {
-  fontFamily: "serif" | "sans" | "kai";
+  fontFamily: "serif" | "sans" | "kai" | "inter" | "noto" | "custom";
+  eyebrowLogoStyle: "plain" | "wordmark" | "monogram" | "editorial";
+  customFontName?: string;
+  customFontUrl?: string;
   titleColor: string;
   subtitleColor: string;
   overlayColor: string;
@@ -152,6 +155,7 @@ type Tab = "creator" | "assets" | "calendar" | "research";
 
 const defaultCoverStyle: CoverStyle = {
   fontFamily: "serif",
+  eyebrowLogoStyle: "plain",
   titleColor: "#ffffff",
   subtitleColor: "#eee9df",
   overlayColor: "#121713",
@@ -256,7 +260,17 @@ const coverFontStacks: Record<CoverStyle["fontFamily"], string> = {
   serif: 'Georgia, "Songti SC", serif',
   sans: 'system-ui, "Microsoft YaHei", sans-serif',
   kai: '"KaiTi", "STKaiti", serif',
+  inter: '"Inter Cover", Inter, Arial, sans-serif',
+  noto: '"Noto Sans SC Cover", "Microsoft YaHei", sans-serif',
+  custom: '"MJ Custom Cover", "Noto Sans SC Cover", sans-serif',
 };
+const eyebrowLogoPresets = [
+  { value: "", label: "不显示英文 Logo", style: "plain" },
+  { value: "WAOOOOOOOC!ESION", label: "Waooooooooc!esion 字标", style: "wordmark" },
+  { value: "MJ", label: "MJ 字母徽标", style: "monogram" },
+  { value: "ORIGINAL DESIGN · INTERIOR", label: "原创室内设计栏目", style: "editorial" },
+  { value: "STUDIO SECRETARY", label: "Studio Secretary 字标", style: "wordmark" },
+] as const;
 const bodyEmojiGroups = [
   "💛💚💙💜🧡🖤❤💔💖💝💘💞💓💕💗❣🌸🌺🌷🎀💟",
   "🌵🌲🎄🌳🌴🌿🍀☘🌱🍃🎋🌾🎍🌼🏵🌻🌹💐🥀🍂🍁",
@@ -268,7 +282,8 @@ const bodyEmojiGroups = [
 
 function normalizedCoverStyle(value?: Partial<CoverStyle>): CoverStyle {
   const color = (candidate: unknown, fallback: string) => /^#[0-9a-f]{6}$/i.test(String(candidate || "")) ? String(candidate) : fallback;
-  const fontFamily = ["serif", "sans", "kai"].includes(String(value?.fontFamily)) ? value?.fontFamily as CoverStyle["fontFamily"] : defaultCoverStyle.fontFamily;
+  const fontFamily = ["serif", "sans", "kai", "inter", "noto", "custom"].includes(String(value?.fontFamily)) ? value?.fontFamily as CoverStyle["fontFamily"] : defaultCoverStyle.fontFamily;
+  const eyebrowLogoStyle = ["plain", "wordmark", "monogram", "editorial"].includes(String(value?.eyebrowLogoStyle)) ? value?.eyebrowLogoStyle as CoverStyle["eyebrowLogoStyle"] : defaultCoverStyle.eyebrowLogoStyle;
   const pattern = ["none", "frame", "grid", "dots", "corners", "polka", "textile", "gradient", "blue-white-dots", "ad-badge", "ad-ribbon", "editorial-bars", "spotlight"].includes(String(value?.pattern)) ? value?.pattern as CoverStyle["pattern"] : defaultCoverStyle.pattern;
   const align = ["left", "center"].includes(String(value?.align)) ? value?.align as CoverStyle["align"] : defaultCoverStyle.align;
   const position = ["top", "middle", "bottom"].includes(String(value?.position)) ? value?.position as CoverStyle["position"] : defaultCoverStyle.position;
@@ -276,6 +291,9 @@ function normalizedCoverStyle(value?: Partial<CoverStyle>): CoverStyle {
   return {
     ...defaultCoverStyle,
     fontFamily,
+    eyebrowLogoStyle,
+    customFontName: typeof value?.customFontName === "string" ? value.customFontName : undefined,
+    customFontUrl: typeof value?.customFontUrl === "string" && value.customFontUrl.startsWith("/api/fonts/") ? value.customFontUrl : undefined,
     pattern,
     align,
     position,
@@ -514,6 +532,15 @@ function drawCoverPattern(context: CanvasRenderingContext2D, style: CoverStyle) 
 
 async function renderCoverDataUrl(source: string, eyebrow: string, title: string, subtitle: string, inputStyle?: Partial<CoverStyle>) {
   const style = normalizedCoverStyle(inputStyle);
+  if (style.fontFamily === "custom" && style.customFontUrl && "FontFace" in window) {
+    try {
+      const face = new FontFace("MJ Custom Cover", `url(${style.customFontUrl})`);
+      await face.load();
+      document.fonts.add(face);
+    } catch {
+      // Keep rendering with the bundled fallback font when a browser rejects an uploaded font.
+    }
+  }
   const image = await loadImage(source);
   const canvas = document.createElement("canvas");
   canvas.width = 1080;
@@ -532,7 +559,10 @@ async function renderCoverDataUrl(source: string, eyebrow: string, title: string
   const eyebrowText = eyebrow.trim().toUpperCase().slice(0, 44);
   if (eyebrowText) {
     context.textAlign = "left";
-    context.font = `700 ${style.eyebrowSize}px Georgia, "Times New Roman", serif`;
+    const eyebrowWeight = style.eyebrowLogoStyle === "monogram" ? 900 : style.eyebrowLogoStyle === "wordmark" ? 500 : 700;
+    const eyebrowFamily = style.eyebrowLogoStyle === "editorial" ? 'Georgia, "Times New Roman", serif' : coverFontStacks[style.fontFamily];
+    context.font = `${eyebrowWeight} ${style.eyebrowSize}px ${eyebrowFamily}`;
+    context.letterSpacing = style.eyebrowLogoStyle === "wordmark" ? "-1px" : style.eyebrowLogoStyle === "monogram" ? "4px" : "1px";
     context.fillStyle = style.titleColor;
     const eyebrowX = style.eyebrowX / 100 * canvas.width;
     const eyebrowY = style.eyebrowY / 100 * canvas.height;
@@ -565,7 +595,7 @@ async function renderCoverDataUrl(source: string, eyebrow: string, title: string
   const lineHeight = style.titleSize * 1.15;
   const renderedLines = style.titleDirection === "vertical" ? chars.slice(0, 8) : lines.slice(0, 3);
   renderedLines.forEach((text, index) => context.fillText(text, anchorX, titleBase + index * lineHeight));
-  context.font = `${style.subtitleSize}px system-ui, "Microsoft YaHei", sans-serif`;
+  context.font = `${style.subtitleSize}px ${coverFontStacks[style.fontFamily]}`;
   context.fillStyle = style.subtitleColor;
   const subtitleX = anchorX + style.subtitleOffsetX / 100 * canvas.width;
   const subtitleY = Math.min(1380, titleBase + renderedLines.length * lineHeight + 42 + style.subtitleOffsetY / 100 * canvas.height);
@@ -651,6 +681,38 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
       textarea?.focus();
       textarea?.setSelectionRange(start + emoji.length, start + emoji.length);
     });
+  };
+  const uploadCoverFont = async (event: ChangeEvent<HTMLInputElement>) => {
+    const font = event.target.files?.[0];
+    event.target.value = "";
+    if (!font) return;
+    if (!/\.(?:woff2?|ttf|otf)$/i.test(font.name)) {
+      setNotice("请选择 WOFF、WOFF2、TTF 或 OTF 字体文件");
+      return;
+    }
+    if (font.size > 8 * 1024 * 1024) {
+      setNotice("字体文件请控制在 8MB 以内");
+      return;
+    }
+    const formData = new FormData();
+    formData.append("font", font);
+    const response = await fetch("/api/fonts", { method: "POST", body: formData });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({})) as { error?: string };
+      setNotice(payload.error || "字体上传失败，请稍后重试");
+      return;
+    }
+    const payload = await response.json() as { url: string; name: string };
+    setDraft((current) => ({
+      ...current,
+      coverStyle: {
+        ...normalizedCoverStyle(current.coverStyle),
+        fontFamily: "custom",
+        customFontName: payload.name,
+        customFontUrl: payload.url,
+      },
+    }));
+    setNotice(`已上传并应用字体：${payload.name}`);
   };
   const [renderedCoverPreview, setRenderedCoverPreview] = useState("");
   const [phase, setPhase] = useState<"ready" | "uploading" | "analyzing" | "done">("ready");
@@ -1475,13 +1537,21 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
       <div className="copy-column">
         <div className="generation-basis"><small>统一生成依据 · 实景图视觉档案</small><strong>{draft.detectedSpaceType || meta.projectType || meta.category}</strong><p>{draft.designSummary || "上传实景图后，系统会先归纳空间、材质、色彩、采光、可见动线与空间情绪，再统一生成全部内容。"}</p></div>
         <div className="title-options"><small>5 个爆款标题公式 · 点击选择</small>{draft.titleOptions.map((title, index) => <button className={draft.title === title ? "active" : ""} key={`${title}-${index}`} onClick={() => setDraft((current) => ({ ...current, title }))}><span>0{index + 1}</span>{title}<em>{draft.title === title ? "已选择" : "选择"}</em></button>)}</div>
-        <label><small>封面英文栏目（留空则封面不显示英文）</small><input placeholder="选填；请输入希望展示的英文" value={draft.coverEyebrow} maxLength={44} onChange={(event) => setDraft((current) => ({ ...current, coverEyebrow: event.target.value.toUpperCase() }))}/></label>
+        <div className="eyebrow-logo-editor">
+          <label><small>封面英文栏目（留空则封面不显示英文）</small><input placeholder="选填；可手动输入英文或从右侧选择 Logo" value={draft.coverEyebrow} maxLength={44} onChange={(event) => setDraft((current) => ({ ...current, coverEyebrow: event.target.value.toUpperCase(), coverStyle: { ...normalizedCoverStyle(current.coverStyle), eyebrowLogoStyle: "plain" } }))}/></label>
+          <label><small>固定英文 Logo 样式</small><select value={eyebrowLogoPresets.find((preset) => preset.value === draft.coverEyebrow && preset.style === normalizedCoverStyle(draft.coverStyle).eyebrowLogoStyle)?.value || "manual"} onChange={(event) => {
+            if (event.target.value === "manual") return;
+            const preset = eyebrowLogoPresets.find((item) => item.value === event.target.value);
+            if (preset) setDraft((current) => ({ ...current, coverEyebrow: preset.value, coverStyle: { ...normalizedCoverStyle(current.coverStyle), eyebrowLogoStyle: preset.style } }));
+          }}><option value="manual">手动输入 / 自定义</option>{eyebrowLogoPresets.map((preset) => <option key={`${preset.value}-${preset.style}`} value={preset.value}>{preset.label}</option>)}</select></label>
+        </div>
         <label><small>封面主标题</small><input value={draft.coverTitle} onChange={(event) => setDraft((current) => ({ ...current, coverTitle: event.target.value }))}/></label>
         <label><small>封面副标题</small><input value={draft.coverSubtitle} onChange={(event) => setDraft((current) => ({ ...current, coverSubtitle: event.target.value }))}/></label>
         <div className="cover-designer">
           <div className="cover-designer-heading"><div><small>COVER DESIGNER</small><strong>封面样式编辑</strong></div><button onClick={() => setDraft((current) => ({ ...current, coverStyle: defaultCoverStyle }))}>恢复默认</button></div>
           <div className="cover-control-grid">
-            <label><small>标题字体</small><select value={normalizedCoverStyle(draft.coverStyle).fontFamily} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), fontFamily: event.target.value as CoverStyle["fontFamily"] } }))}><option value="serif">宋体 / 衬线</option><option value="sans">黑体 / 无衬线</option><option value="kai">楷体</option></select></label>
+            <label><small>封面字体</small><select value={normalizedCoverStyle(draft.coverStyle).fontFamily} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), fontFamily: event.target.value as CoverStyle["fontFamily"] } }))}><option value="serif">宋体 / 衬线</option><option value="sans">系统黑体</option><option value="kai">楷体</option><option value="inter">Inter 英文字体</option><option value="noto">Noto Sans SC</option>{normalizedCoverStyle(draft.coverStyle).customFontUrl && <option value="custom">已上传：{normalizedCoverStyle(draft.coverStyle).customFontName}</option>}</select></label>
+            <label className="font-upload-control"><small>上传封面字体</small><span><input type="file" accept=".woff,.woff2,.ttf,.otf,font/woff,font/woff2,font/ttf,font/otf" onChange={(event) => void uploadCoverFont(event)}/><b>{normalizedCoverStyle(draft.coverStyle).customFontName || "选择字体文件"}</b></span></label>
             <label><small>广告封面装饰</small><select value={normalizedCoverStyle(draft.coverStyle).pattern} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), pattern: event.target.value as CoverStyle["pattern"] } }))}><option value="none">无图案</option><option value="ad-badge">广告圆形角标</option><option value="ad-ribbon">广告斜切色带</option><option value="editorial-bars">杂志编辑线条</option><option value="spotlight">广告聚光色块</option><option value="frame">细线边框</option><option value="grid">建筑网格</option><option value="dots">圆点阵列</option><option value="corners">四角标记</option><option value="polka">波点</option><option value="textile">面料肌理</option><option value="gradient">柔和渐变</option><option value="blue-white-dots">蓝白波点</option></select></label>
             <label><small>文字位置</small><select value={normalizedCoverStyle(draft.coverStyle).position} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), position: event.target.value as CoverStyle["position"] } }))}><option value="top">顶部</option><option value="middle">居中</option><option value="bottom">底部</option></select></label>
             <label><small>文字对齐</small><select value={normalizedCoverStyle(draft.coverStyle).align} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), align: event.target.value as CoverStyle["align"] } }))}><option value="left">左对齐</option><option value="center">居中</option></select></label>
