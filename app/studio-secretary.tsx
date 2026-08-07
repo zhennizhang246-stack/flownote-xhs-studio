@@ -23,6 +23,7 @@ type Draft = {
 type CoverStyle = {
   fontFamily: "serif" | "sans" | "kai" | "inter" | "noto" | "custom";
   eyebrowLogoStyle: "plain" | "wordmark" | "monogram" | "editorial";
+  eyebrowPosition: "top" | "middle" | "bottom" | "custom";
   customFontName?: string;
   customFontUrl?: string;
   titleColor: string;
@@ -156,6 +157,7 @@ type Tab = "creator" | "assets" | "calendar" | "research";
 const defaultCoverStyle: CoverStyle = {
   fontFamily: "serif",
   eyebrowLogoStyle: "plain",
+  eyebrowPosition: "top",
   titleColor: "#ffffff",
   subtitleColor: "#eee9df",
   overlayColor: "#121713",
@@ -284,6 +286,7 @@ function normalizedCoverStyle(value?: Partial<CoverStyle>): CoverStyle {
   const color = (candidate: unknown, fallback: string) => /^#[0-9a-f]{6}$/i.test(String(candidate || "")) ? String(candidate) : fallback;
   const fontFamily = ["serif", "sans", "kai", "inter", "noto", "custom"].includes(String(value?.fontFamily)) ? value?.fontFamily as CoverStyle["fontFamily"] : defaultCoverStyle.fontFamily;
   const eyebrowLogoStyle = ["plain", "wordmark", "monogram", "editorial"].includes(String(value?.eyebrowLogoStyle)) ? value?.eyebrowLogoStyle as CoverStyle["eyebrowLogoStyle"] : defaultCoverStyle.eyebrowLogoStyle;
+  const eyebrowPosition = ["top", "middle", "bottom", "custom"].includes(String(value?.eyebrowPosition)) ? value?.eyebrowPosition as CoverStyle["eyebrowPosition"] : defaultCoverStyle.eyebrowPosition;
   const pattern = ["none", "frame", "grid", "dots", "corners", "polka", "textile", "gradient", "blue-white-dots", "ad-badge", "ad-ribbon", "editorial-bars", "spotlight"].includes(String(value?.pattern)) ? value?.pattern as CoverStyle["pattern"] : defaultCoverStyle.pattern;
   const align = ["left", "center"].includes(String(value?.align)) ? value?.align as CoverStyle["align"] : defaultCoverStyle.align;
   const position = ["top", "middle", "bottom"].includes(String(value?.position)) ? value?.position as CoverStyle["position"] : defaultCoverStyle.position;
@@ -292,6 +295,7 @@ function normalizedCoverStyle(value?: Partial<CoverStyle>): CoverStyle {
     ...defaultCoverStyle,
     fontFamily,
     eyebrowLogoStyle,
+    eyebrowPosition,
     customFontName: typeof value?.customFontName === "string" ? value.customFontName : undefined,
     customFontUrl: typeof value?.customFontUrl === "string" && value.customFontUrl.startsWith("/api/fonts/") ? value.customFontUrl : undefined,
     pattern,
@@ -310,7 +314,7 @@ function normalizedCoverStyle(value?: Partial<CoverStyle>): CoverStyle {
     patternOffsetY: Math.min(25, Math.max(-25, Number(value?.patternOffsetY ?? defaultCoverStyle.patternOffsetY))),
     patternScale: Math.min(160, Math.max(50, Number(value?.patternScale ?? defaultCoverStyle.patternScale))),
     eyebrowX: Math.min(50, Math.max(2, Number(value?.eyebrowX ?? defaultCoverStyle.eyebrowX))),
-    eyebrowY: Math.min(35, Math.max(2, Number(value?.eyebrowY ?? defaultCoverStyle.eyebrowY))),
+    eyebrowY: Math.min(92, Math.max(2, Number(value?.eyebrowY ?? defaultCoverStyle.eyebrowY))),
     eyebrowSize: Math.min(48, Math.max(16, Number(value?.eyebrowSize ?? defaultCoverStyle.eyebrowSize))),
     eyebrowOpacity: Math.min(100, Math.max(10, Number(value?.eyebrowOpacity ?? defaultCoverStyle.eyebrowOpacity))),
     showEyebrowLine: typeof value?.showEyebrowLine === "boolean" ? value.showEyebrowLine : defaultCoverStyle.showEyebrowLine,
@@ -1555,7 +1559,12 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
             <label><small>封面字体</small><select value={normalizedCoverStyle(draft.coverStyle).fontFamily} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), fontFamily: event.target.value as CoverStyle["fontFamily"] } }))}><option value="serif">宋体 / 衬线</option><option value="sans">系统黑体</option><option value="kai">楷体</option><option value="inter">Inter 英文字体</option><option value="noto">Noto Sans SC</option>{normalizedCoverStyle(draft.coverStyle).customFontUrl && <option value="custom">已上传：{normalizedCoverStyle(draft.coverStyle).customFontName}</option>}</select></label>
             <label className="font-upload-control"><small>上传封面字体</small><span><input type="file" accept=".woff,.woff2,.ttf,.otf,font/woff,font/woff2,font/ttf,font/otf" onChange={(event) => void uploadCoverFont(event)}/><b>{normalizedCoverStyle(draft.coverStyle).customFontName || "选择字体文件"}</b></span></label>
             <label><small>广告封面装饰</small><select value={normalizedCoverStyle(draft.coverStyle).pattern} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), pattern: event.target.value as CoverStyle["pattern"] } }))}><option value="none">无图案</option><option value="ad-badge">广告圆形角标</option><option value="ad-ribbon">广告斜切色带</option><option value="editorial-bars">杂志编辑线条</option><option value="spotlight">广告聚光色块</option><option value="frame">细线边框</option><option value="grid">建筑网格</option><option value="dots">圆点阵列</option><option value="corners">四角标记</option><option value="polka">波点</option><option value="textile">面料肌理</option><option value="gradient">柔和渐变</option><option value="blue-white-dots">蓝白波点</option></select></label>
-            <label><small>文字位置</small><select value={normalizedCoverStyle(draft.coverStyle).position} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), position: event.target.value as CoverStyle["position"] } }))}><option value="top">顶部</option><option value="middle">居中</option><option value="bottom">底部</option></select></label>
+            <label><small>主标题位置</small><select value={normalizedCoverStyle(draft.coverStyle).position} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), position: event.target.value as CoverStyle["position"] } }))}><option value="top">顶部</option><option value="middle">居中</option><option value="bottom">底部</option></select></label>
+            <label><small>英文栏目位置</small><select value={normalizedCoverStyle(draft.coverStyle).eyebrowPosition} onChange={(event) => {
+              const eyebrowPosition = event.target.value as CoverStyle["eyebrowPosition"];
+              const eyebrowY = eyebrowPosition === "top" ? 5.8 : eyebrowPosition === "middle" ? 48 : eyebrowPosition === "bottom" ? 88 : normalizedCoverStyle(draft.coverStyle).eyebrowY;
+              setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), eyebrowPosition, eyebrowY } }));
+            }}><option value="top">顶部</option><option value="middle">居中</option><option value="bottom">底部</option><option value="custom">自由调整</option></select></label>
             <label><small>文字对齐</small><select value={normalizedCoverStyle(draft.coverStyle).align} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), align: event.target.value as CoverStyle["align"] } }))}><option value="left">左对齐</option><option value="center">居中</option></select></label>
             <label><small>主标题排版</small><select value={normalizedCoverStyle(draft.coverStyle).titleDirection} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), titleDirection: event.target.value as CoverStyle["titleDirection"] } }))}><option value="horizontal">横向海报排版</option><option value="vertical">竖向中文排版</option></select></label>
             <label className="color-control"><small>标题颜色</small><input type="color" value={normalizedCoverStyle(draft.coverStyle).titleColor} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), titleColor: event.target.value } }))}/></label>
@@ -1570,7 +1579,7 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
             <label className="range-control"><small>图案垂直位置 · {normalizedCoverStyle(draft.coverStyle).patternOffsetY}</small><input type="range" min="-25" max="25" value={normalizedCoverStyle(draft.coverStyle).patternOffsetY} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), patternOffsetY: Number(event.target.value) } }))}/></label>
             <label className="range-control"><small>图案大小 · {normalizedCoverStyle(draft.coverStyle).patternScale}%</small><input type="range" min="50" max="160" value={normalizedCoverStyle(draft.coverStyle).patternScale} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), patternScale: Number(event.target.value) } }))}/></label>
             <label className="range-control"><small>英文水平位置 · {normalizedCoverStyle(draft.coverStyle).eyebrowX}%</small><input type="range" min="2" max="50" value={normalizedCoverStyle(draft.coverStyle).eyebrowX} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), eyebrowX: Number(event.target.value) } }))}/></label>
-            <label className="range-control"><small>英文垂直位置 · {normalizedCoverStyle(draft.coverStyle).eyebrowY}%</small><input type="range" min="2" max="35" value={normalizedCoverStyle(draft.coverStyle).eyebrowY} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), eyebrowY: Number(event.target.value) } }))}/></label>
+            <label className="range-control"><small>英文垂直位置 · {normalizedCoverStyle(draft.coverStyle).eyebrowY}%</small><input type="range" min="2" max="92" value={normalizedCoverStyle(draft.coverStyle).eyebrowY} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), eyebrowPosition: "custom", eyebrowY: Number(event.target.value) } }))}/></label>
             <label className="range-control"><small>英文字号 · {normalizedCoverStyle(draft.coverStyle).eyebrowSize}</small><input type="range" min="16" max="48" value={normalizedCoverStyle(draft.coverStyle).eyebrowSize} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), eyebrowSize: Number(event.target.value) } }))}/></label>
             <label className="range-control"><small>英文透明度 · {normalizedCoverStyle(draft.coverStyle).eyebrowOpacity}%</small><input type="range" min="10" max="100" value={normalizedCoverStyle(draft.coverStyle).eyebrowOpacity} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), eyebrowOpacity: Number(event.target.value) } }))}/></label>
             <label className="line-toggle"><small>英文栏目横线</small><span><input type="checkbox" checked={normalizedCoverStyle(draft.coverStyle).showEyebrowLine} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), showEyebrowLine: event.target.checked } }))}/> 显示横线</span></label>

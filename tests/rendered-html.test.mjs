@@ -209,11 +209,15 @@ test("moves cover decorations and controls English eyebrow opacity and line visi
   assert.match(studio, /图案垂直位置/);
   assert.match(studio, /英文水平位置/);
   assert.match(studio, /英文垂直位置/);
+  assert.match(studio, /英文栏目位置/);
+  assert.match(studio, /eyebrowPosition === "middle" \? 48/);
   assert.match(studio, /英文透明度/);
   assert.match(studio, /英文栏目横线/);
   assert.match(studio, /if \(style\.showEyebrowLine\)/);
   assert.match(project, /patternOffsetX/);
   assert.match(project, /eyebrowOpacity/);
+  assert.match(project, /eyebrowPosition/);
+  assert.match(project, /eyebrowY: Math\.min\(92/);
   assert.match(project, /showEyebrowLine/);
 });
 
