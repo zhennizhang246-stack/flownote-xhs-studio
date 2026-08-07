@@ -1545,8 +1545,10 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
             if (preset) setDraft((current) => ({ ...current, coverEyebrow: preset.value, coverStyle: { ...normalizedCoverStyle(current.coverStyle), eyebrowLogoStyle: preset.style } }));
           }}><option value="manual">手动输入 / 自定义</option>{eyebrowLogoPresets.map((preset) => <option key={`${preset.value}-${preset.style}`} value={preset.value}>{preset.label}</option>)}</select></label>
         </div>
-        <label><small>封面主标题</small><input value={draft.coverTitle} onChange={(event) => setDraft((current) => ({ ...current, coverTitle: event.target.value }))}/></label>
-        <label><small>封面副标题</small><input value={draft.coverSubtitle} onChange={(event) => setDraft((current) => ({ ...current, coverSubtitle: event.target.value }))}/></label>
+        <div className="cover-copy-fields">
+          <label><small>封面主标题</small><input value={draft.coverTitle} onChange={(event) => setDraft((current) => ({ ...current, coverTitle: event.target.value }))}/></label>
+          <label><small>封面副标题</small><input value={draft.coverSubtitle} onChange={(event) => setDraft((current) => ({ ...current, coverSubtitle: event.target.value }))}/></label>
+        </div>
         <div className="cover-designer">
           <div className="cover-designer-heading"><div><small>COVER DESIGNER</small><strong>封面样式编辑</strong></div><button onClick={() => setDraft((current) => ({ ...current, coverStyle: defaultCoverStyle }))}>恢复默认</button></div>
           <div className="cover-control-grid">

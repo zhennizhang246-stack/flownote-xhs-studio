@@ -259,6 +259,9 @@ test("selects English logo presets and uploads fonts into the exported cover", a
   assert.match(project, /coverEyebrow: cleanText\(input\.coverEyebrow, 44\)\.toUpperCase\(\),/);
   assert.match(css, /NotoSansSC-Regular\.woff2/);
   assert.match(css, /Inter-var-2\.ttf/);
+  assert.match(studio, /className="cover-copy-fields"/);
+  assert.match(css, /copy-column>\.eyebrow-logo-editor/);
+  assert.match(css, /grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
 });
 
 test("moves and resizes the cover main title and inserts emoji into body copy", async () => {
