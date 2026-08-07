@@ -13,6 +13,7 @@ type Draft = {
   coverSubtitle: string;
   coverStyle?: CoverStyle;
   body: string;
+  bodyOptions: string[];
   tags: string[];
   highlights: string[];
   riskNotes: string[];
@@ -20,7 +21,14 @@ type Draft = {
   mode?: string;
 };
 type CoverStyle = {
-  fontFamily: "serif" | "sans" | "kai";
+  fontFamily: "serif" | "sans" | "kai" | "inter" | "noto" | "custom";
+  eyebrowLogoStyle: "plain" | "wordmark" | "monogram" | "editorial";
+  eyebrowPosition: "top" | "middle" | "bottom" | "custom";
+  customFontName?: string;
+  customFontUrl?: string;
+  logoImageName?: string;
+  logoImageUrl?: string;
+  logoImageScale: number;
   titleColor: string;
   subtitleColor: string;
   overlayColor: string;
@@ -28,6 +36,8 @@ type CoverStyle = {
   pattern: "none" | "frame" | "grid" | "dots" | "corners" | "polka" | "textile" | "gradient" | "blue-white-dots" | "ad-badge" | "ad-ribbon" | "editorial-bars" | "spotlight";
   patternColor: string;
   titleSize: number;
+  titleWeight: number;
+  titleOpacity: number;
   titleOffsetX: number;
   titleOffsetY: number;
   titleDirection: "horizontal" | "vertical";
@@ -39,9 +49,12 @@ type CoverStyle = {
   eyebrowX: number;
   eyebrowY: number;
   eyebrowSize: number;
+  eyebrowWeight: number;
   eyebrowOpacity: number;
   showEyebrowLine: boolean;
   subtitleSize: number;
+  subtitleWeight: number;
+  subtitleOpacity: number;
   subtitleOffsetX: number;
   subtitleOffsetY: number;
 };
@@ -151,6 +164,9 @@ type Tab = "creator" | "assets" | "calendar" | "research";
 
 const defaultCoverStyle: CoverStyle = {
   fontFamily: "serif",
+  eyebrowLogoStyle: "plain",
+  eyebrowPosition: "top",
+  logoImageScale: 100,
   titleColor: "#ffffff",
   subtitleColor: "#eee9df",
   overlayColor: "#121713",
@@ -158,6 +174,8 @@ const defaultCoverStyle: CoverStyle = {
   pattern: "frame",
   patternColor: "#ffffff",
   titleSize: 88,
+  titleWeight: 700,
+  titleOpacity: 100,
   titleOffsetX: 0,
   titleOffsetY: 0,
   titleDirection: "horizontal",
@@ -169,9 +187,12 @@ const defaultCoverStyle: CoverStyle = {
   eyebrowX: 7.6,
   eyebrowY: 5.8,
   eyebrowSize: 26,
+  eyebrowWeight: 700,
   eyebrowOpacity: 100,
   showEyebrowLine: true,
   subtitleSize: 28,
+  subtitleWeight: 500,
+  subtitleOpacity: 100,
   subtitleOffsetX: 0,
   subtitleOffsetY: 0,
 };
@@ -183,6 +204,7 @@ const emptyDraft: Draft = {
   coverSubtitle: "",
   coverStyle: defaultCoverStyle,
   body: "",
+  bodyOptions: ["", "", "", ""],
   tags: [],
   highlights: [],
   riskNotes: [],
@@ -217,6 +239,9 @@ const navItems: Array<{ id: Tab; number: string; label: string }> = [
 const projectCategories = ["全部项目", "商业项目", "住宅项目", "办公项目", "酒店项目", "展厅陈列项目", "其他项目"];
 const spaceTypes = ["客厅", "餐厅", "厨房", "客餐厨一体", "卧室", "儿童房", "书房", "衣帽间", "卫浴空间", "玄关", "整屋住宅", "办公室", "设计工作室", "酒店大堂", "酒店客房", "民宿", "零售店铺", "餐饮空间", "咖啡空间", "商业展厅", "艺术展陈"];
 const MAX_PROJECT_IMAGES = 10;
+const splitTitleGraphemes = (value: string) => Array.from(new Intl.Segmenter("zh-CN", { granularity: "grapheme" }).segment(value), (part) => part.segment);
+const truncateTitle = (value: string) => splitTitleGraphemes(value.trimStart()).slice(0, 20).join("");
+const titleEmojiOptions = ["✨", "🔥", "😭", "🤌", "🌿", "📸", "💙", "🏠"];
 const toDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
   const reader = new FileReader();
   reader.onload = () => resolve(String(reader.result));
@@ -254,7 +279,17 @@ const coverFontStacks: Record<CoverStyle["fontFamily"], string> = {
   serif: 'Georgia, "Songti SC", serif',
   sans: 'system-ui, "Microsoft YaHei", sans-serif',
   kai: '"KaiTi", "STKaiti", serif',
+  inter: '"Inter Cover", Inter, Arial, sans-serif',
+  noto: '"Noto Sans SC Cover", "Microsoft YaHei", sans-serif',
+  custom: '"MJ Custom Cover", "Noto Sans SC Cover", sans-serif',
 };
+const eyebrowLogoPresets = [
+  { value: "", label: "不显示英文 Logo", style: "plain" },
+  { value: "WAOOOOOOOC!ESION", label: "Waooooooooc!esion 字标", style: "wordmark" },
+  { value: "MJ", label: "MJ 字母徽标", style: "monogram" },
+  { value: "ORIGINAL DESIGN · INTERIOR", label: "原创室内设计栏目", style: "editorial" },
+  { value: "STUDIO SECRETARY", label: "Studio Secretary 字标", style: "wordmark" },
+] as const;
 const bodyEmojiGroups = [
   "💛💚💙💜🧡🖤❤💔💖💝💘💞💓💕💗❣🌸🌺🌷🎀💟",
   "🌵🌲🎄🌳🌴🌿🍀☘🌱🍃🎋🌾🎍🌼🏵🌻🌹💐🥀🍂🍁",
@@ -266,7 +301,9 @@ const bodyEmojiGroups = [
 
 function normalizedCoverStyle(value?: Partial<CoverStyle>): CoverStyle {
   const color = (candidate: unknown, fallback: string) => /^#[0-9a-f]{6}$/i.test(String(candidate || "")) ? String(candidate) : fallback;
-  const fontFamily = ["serif", "sans", "kai"].includes(String(value?.fontFamily)) ? value?.fontFamily as CoverStyle["fontFamily"] : defaultCoverStyle.fontFamily;
+  const fontFamily = ["serif", "sans", "kai", "inter", "noto", "custom"].includes(String(value?.fontFamily)) ? value?.fontFamily as CoverStyle["fontFamily"] : defaultCoverStyle.fontFamily;
+  const eyebrowLogoStyle = ["plain", "wordmark", "monogram", "editorial"].includes(String(value?.eyebrowLogoStyle)) ? value?.eyebrowLogoStyle as CoverStyle["eyebrowLogoStyle"] : defaultCoverStyle.eyebrowLogoStyle;
+  const eyebrowPosition = ["top", "middle", "bottom", "custom"].includes(String(value?.eyebrowPosition)) ? value?.eyebrowPosition as CoverStyle["eyebrowPosition"] : defaultCoverStyle.eyebrowPosition;
   const pattern = ["none", "frame", "grid", "dots", "corners", "polka", "textile", "gradient", "blue-white-dots", "ad-badge", "ad-ribbon", "editorial-bars", "spotlight"].includes(String(value?.pattern)) ? value?.pattern as CoverStyle["pattern"] : defaultCoverStyle.pattern;
   const align = ["left", "center"].includes(String(value?.align)) ? value?.align as CoverStyle["align"] : defaultCoverStyle.align;
   const position = ["top", "middle", "bottom"].includes(String(value?.position)) ? value?.position as CoverStyle["position"] : defaultCoverStyle.position;
@@ -274,6 +311,13 @@ function normalizedCoverStyle(value?: Partial<CoverStyle>): CoverStyle {
   return {
     ...defaultCoverStyle,
     fontFamily,
+    eyebrowLogoStyle,
+    eyebrowPosition,
+    customFontName: typeof value?.customFontName === "string" ? value.customFontName : undefined,
+    customFontUrl: typeof value?.customFontUrl === "string" && value.customFontUrl.startsWith("/api/fonts/") ? value.customFontUrl : undefined,
+    logoImageName: typeof value?.logoImageName === "string" ? value.logoImageName : undefined,
+    logoImageUrl: typeof value?.logoImageUrl === "string" && value.logoImageUrl.startsWith("/api/logos/") ? value.logoImageUrl : undefined,
+    logoImageScale: Math.min(180, Math.max(30, Number(value?.logoImageScale ?? 100))),
     pattern,
     align,
     position,
@@ -284,17 +328,22 @@ function normalizedCoverStyle(value?: Partial<CoverStyle>): CoverStyle {
     patternColor: color(value?.patternColor, defaultCoverStyle.patternColor),
     overlayOpacity: Math.min(90, Math.max(0, Number(value?.overlayOpacity ?? defaultCoverStyle.overlayOpacity))),
     titleSize: Math.min(120, Math.max(52, Number(value?.titleSize ?? defaultCoverStyle.titleSize))),
+    titleWeight: Math.min(900, Math.max(100, Number(value?.titleWeight ?? defaultCoverStyle.titleWeight))),
+    titleOpacity: Math.min(100, Math.max(10, Number(value?.titleOpacity ?? defaultCoverStyle.titleOpacity))),
     titleOffsetX: Math.min(35, Math.max(-35, Number(value?.titleOffsetX ?? defaultCoverStyle.titleOffsetX))),
     titleOffsetY: Math.min(30, Math.max(-30, Number(value?.titleOffsetY ?? defaultCoverStyle.titleOffsetY))),
     patternOffsetX: Math.min(25, Math.max(-25, Number(value?.patternOffsetX ?? defaultCoverStyle.patternOffsetX))),
     patternOffsetY: Math.min(25, Math.max(-25, Number(value?.patternOffsetY ?? defaultCoverStyle.patternOffsetY))),
     patternScale: Math.min(160, Math.max(50, Number(value?.patternScale ?? defaultCoverStyle.patternScale))),
     eyebrowX: Math.min(50, Math.max(2, Number(value?.eyebrowX ?? defaultCoverStyle.eyebrowX))),
-    eyebrowY: Math.min(35, Math.max(2, Number(value?.eyebrowY ?? defaultCoverStyle.eyebrowY))),
+    eyebrowY: Math.min(92, Math.max(2, Number(value?.eyebrowY ?? defaultCoverStyle.eyebrowY))),
     eyebrowSize: Math.min(48, Math.max(16, Number(value?.eyebrowSize ?? defaultCoverStyle.eyebrowSize))),
+    eyebrowWeight: Math.min(900, Math.max(100, Number(value?.eyebrowWeight ?? defaultCoverStyle.eyebrowWeight))),
     eyebrowOpacity: Math.min(100, Math.max(10, Number(value?.eyebrowOpacity ?? defaultCoverStyle.eyebrowOpacity))),
     showEyebrowLine: typeof value?.showEyebrowLine === "boolean" ? value.showEyebrowLine : defaultCoverStyle.showEyebrowLine,
     subtitleSize: Math.min(54, Math.max(18, Number(value?.subtitleSize ?? defaultCoverStyle.subtitleSize))),
+    subtitleWeight: Math.min(900, Math.max(100, Number(value?.subtitleWeight ?? defaultCoverStyle.subtitleWeight))),
+    subtitleOpacity: Math.min(100, Math.max(10, Number(value?.subtitleOpacity ?? defaultCoverStyle.subtitleOpacity))),
     subtitleOffsetX: Math.min(30, Math.max(-30, Number(value?.subtitleOffsetX ?? defaultCoverStyle.subtitleOffsetX))),
     subtitleOffsetY: Math.min(25, Math.max(-20, Number(value?.subtitleOffsetY ?? defaultCoverStyle.subtitleOffsetY))),
   };
@@ -512,7 +561,17 @@ function drawCoverPattern(context: CanvasRenderingContext2D, style: CoverStyle) 
 
 async function renderCoverDataUrl(source: string, eyebrow: string, title: string, subtitle: string, inputStyle?: Partial<CoverStyle>) {
   const style = normalizedCoverStyle(inputStyle);
+  if (style.fontFamily === "custom" && style.customFontUrl && "FontFace" in window) {
+    try {
+      const face = new FontFace("MJ Custom Cover", `url(${style.customFontUrl})`);
+      await face.load();
+      document.fonts.add(face);
+    } catch {
+      // Keep rendering with the bundled fallback font when a browser rejects an uploaded font.
+    }
+  }
   const image = await loadImage(source);
+  const logoImage = style.logoImageUrl ? await loadImage(style.logoImageUrl).catch(() => null) : null;
   const canvas = document.createElement("canvas");
   canvas.width = 1080;
   canvas.height = 1440;
@@ -527,22 +586,34 @@ async function renderCoverDataUrl(source: string, eyebrow: string, title: string
   context.fillRect(0, 0, canvas.width, canvas.height);
   context.globalAlpha = 1;
   drawCoverPattern(context, style);
-  context.textAlign = "left";
-  context.font = `700 ${style.eyebrowSize}px Georgia, "Times New Roman", serif`;
-  context.fillStyle = style.titleColor;
-  const eyebrowX = style.eyebrowX / 100 * canvas.width;
-  const eyebrowY = style.eyebrowY / 100 * canvas.height;
-  context.globalAlpha = style.eyebrowOpacity / 100;
-  context.fillText((eyebrow || "ORIGINAL DESIGN · INTERIOR").toUpperCase().slice(0, 44), eyebrowX, eyebrowY);
-  if (style.showEyebrowLine) {
-    context.globalAlpha = style.eyebrowOpacity / 100 * 0.72;
-    context.fillRect(eyebrowX, eyebrowY + style.eyebrowSize, Math.max(180, canvas.width - eyebrowX - 82), 2);
+  const eyebrowText = eyebrow.trim().toUpperCase().slice(0, 44);
+  if (logoImage) {
+    const logoX = style.eyebrowX / 100 * canvas.width;
+    const logoY = style.eyebrowY / 100 * canvas.height;
+    const logoWidth = Math.min(760, 320 * style.logoImageScale / 100);
+    const logoHeight = logoWidth * logoImage.naturalHeight / Math.max(1, logoImage.naturalWidth);
+    context.globalAlpha = style.eyebrowOpacity / 100;
+    context.drawImage(logoImage, logoX, logoY, logoWidth, logoHeight);
+  } else if (eyebrowText) {
+    context.textAlign = "left";
+    const eyebrowFamily = style.eyebrowLogoStyle === "editorial" ? 'Georgia, "Times New Roman", serif' : coverFontStacks[style.fontFamily];
+    context.font = `${style.eyebrowWeight} ${style.eyebrowSize}px ${eyebrowFamily}`;
+    context.letterSpacing = style.eyebrowLogoStyle === "wordmark" ? "-1px" : style.eyebrowLogoStyle === "monogram" ? "4px" : "1px";
+    context.fillStyle = style.titleColor;
+    const eyebrowX = style.eyebrowX / 100 * canvas.width;
+    const eyebrowY = style.eyebrowY / 100 * canvas.height;
+    context.globalAlpha = style.eyebrowOpacity / 100;
+    context.fillText(eyebrowText, eyebrowX, eyebrowY);
+    if (style.showEyebrowLine) {
+      context.globalAlpha = style.eyebrowOpacity / 100 * 0.72;
+      context.fillRect(eyebrowX, eyebrowY + style.eyebrowSize, Math.max(180, canvas.width - eyebrowX - 82), 2);
+    }
   }
   context.globalAlpha = 1;
   context.textAlign = style.align;
   const anchorX = (style.align === "center" ? canvas.width / 2 : 82) + style.titleOffsetX / 100 * canvas.width;
   context.fillStyle = style.titleColor;
-  context.font = `${style.titleSize}px ${coverFontStacks[style.fontFamily]}`;
+  context.font = `${style.titleWeight} ${style.titleSize}px ${coverFontStacks[style.fontFamily]}`;
   const chars = [...title.trim()];
   const lines: string[] = [];
   let line = "";
@@ -559,12 +630,15 @@ async function renderCoverDataUrl(source: string, eyebrow: string, title: string
   const titleBase = (style.position === "top" ? 270 : style.position === "middle" ? 720 : 1110) + style.titleOffsetY / 100 * canvas.height;
   const lineHeight = style.titleSize * 1.15;
   const renderedLines = style.titleDirection === "vertical" ? chars.slice(0, 8) : lines.slice(0, 3);
+  context.globalAlpha = style.titleOpacity / 100;
   renderedLines.forEach((text, index) => context.fillText(text, anchorX, titleBase + index * lineHeight));
-  context.font = `${style.subtitleSize}px system-ui, "Microsoft YaHei", sans-serif`;
+  context.font = `${style.subtitleWeight} ${style.subtitleSize}px ${coverFontStacks[style.fontFamily]}`;
   context.fillStyle = style.subtitleColor;
+  context.globalAlpha = style.subtitleOpacity / 100;
   const subtitleX = anchorX + style.subtitleOffsetX / 100 * canvas.width;
   const subtitleY = Math.min(1380, titleBase + renderedLines.length * lineHeight + 42 + style.subtitleOffsetY / 100 * canvas.height);
   context.fillText(subtitle.trim(), subtitleX, subtitleY);
+  context.globalAlpha = 1;
   return canvas.toDataURL("image/jpeg", 0.92);
 }
 
@@ -609,17 +683,18 @@ function localFallback(meta: ProjectMeta, existingProjects: ProjectRecord[] = []
     project.draft?.body,
   ]).map((value) => String(value || "").replace(/\s+/g, "").trim()).filter(Boolean));
   const unique = (value: string, index: number) => used.has(value.replace(/\s+/g, "").trim()) ? `${value} · ${projectName}${index + 1}` : value;
-  const titleOptions = creative.titles.map(unique);
+  const titleOptions = creative.titles.map(unique).map(truncateTitle);
   const coverTitle = unique(creative.cover, 3);
   const body = unique(creative.body, 4);
   return {
     title: titleOptions[0],
     titleOptions,
-    coverEyebrow: creative.eyebrow,
+    coverEyebrow: "",
     coverTitle,
     coverSubtitle: `${location} · ${area} ${meta.projectType || "空间设计"}`,
     coverStyle: defaultCoverStyle,
     body,
+    bodyOptions: [body, `${body}\n\n你更关注这个空间的材质表达吗？`, `${body}\n\n如果置身其中，你会先停在哪个区域？`, `${body}\n\n建议先收藏，再从色彩、采光和动线逐项拆解。`],
     tags: creative.tags,
     highlights: ["从上传图片提取视觉基调", "依据画面选择竖版封面", "正文避免虚构未知项目事实"],
     riskNotes: ["当前为本地差异化预览；AI 调用恢复后才能完成逐张实景图语义识别"],
@@ -645,6 +720,58 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
       textarea?.focus();
       textarea?.setSelectionRange(start + emoji.length, start + emoji.length);
     });
+  };
+  const uploadCoverFont = async (event: ChangeEvent<HTMLInputElement>) => {
+    const font = event.target.files?.[0];
+    event.target.value = "";
+    if (!font) return;
+    if (!/\.(?:woff2?|ttf|otf)$/i.test(font.name)) {
+      setNotice("请选择 WOFF、WOFF2、TTF 或 OTF 字体文件");
+      return;
+    }
+    if (font.size > 8 * 1024 * 1024) {
+      setNotice("字体文件请控制在 8MB 以内");
+      return;
+    }
+    const formData = new FormData();
+    formData.append("font", font);
+    const response = await fetch("/api/fonts", { method: "POST", body: formData });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({})) as { error?: string };
+      setNotice(payload.error || "字体上传失败，请稍后重试");
+      return;
+    }
+    const payload = await response.json() as { url: string; name: string };
+    setDraft((current) => ({
+      ...current,
+      coverStyle: {
+        ...normalizedCoverStyle(current.coverStyle),
+        fontFamily: "custom",
+        customFontName: payload.name,
+        customFontUrl: payload.url,
+      },
+    }));
+    setNotice(`已上传并应用字体：${payload.name}`);
+  };
+  const uploadCoverLogo = async (event: ChangeEvent<HTMLInputElement>) => {
+    const logo = event.target.files?.[0];
+    event.target.value = "";
+    if (!logo) return;
+    if (!/\.(?:png|jpe?g|webp)$/i.test(logo.name) || logo.size > 5 * 1024 * 1024) {
+      setNotice("请选择 5MB 以内的 PNG、JPG 或 WebP Logo 图片");
+      return;
+    }
+    const formData = new FormData();
+    formData.append("logo", logo);
+    const response = await fetch("/api/logos", { method: "POST", body: formData });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({})) as { error?: string };
+      setNotice(payload.error || "Logo 图片上传失败");
+      return;
+    }
+    const payload = await response.json() as { url: string; name: string };
+    setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), logoImageName: payload.name, logoImageUrl: payload.url } }));
+    setNotice(`已应用图片 Logo：${payload.name}`);
   };
   const [renderedCoverPreview, setRenderedCoverPreview] = useState("");
   const [phase, setPhase] = useState<"ready" | "uploading" | "analyzing" | "done">("ready");
@@ -679,6 +806,9 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
   const [profileUrl, setProfileUrl] = useState(() => (
     typeof window === "undefined" ? "" : window.localStorage.getItem(`mj-xhs-profile-url:${accountKey}`) || ""
   ));
+  const [xhsWorkspace, setXhsWorkspace] = useState<{ linked: boolean; profileUrl: string; workspaceKey: string }>({ linked: false, profileUrl: "", workspaceKey: "" });
+  const [xhsWorkspaceNotice, setXhsWorkspaceNotice] = useState("");
+  const bridgeWorkspaceKey = xhsWorkspace.workspaceKey || accountKey;
 
   const coverImage = previews[draft.coverIndex ?? 0] || "";
   const phaseLabel = {
@@ -725,17 +855,24 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
   useEffect(() => {
     async function loadWorkspace() {
       try {
-        const [projectResponse, settingsResponse, researchResponse] = await Promise.all([
+        const [projectResponse, settingsResponse, researchResponse, workspaceResponse] = await Promise.all([
           fetch("/api/projects"),
           fetch("/api/settings"),
           fetch("/api/research"),
+          fetch("/api/xhs-workspace"),
         ]);
         const projectPayload = projectResponse.ok ? await projectResponse.json() as { projects: ProjectRecord[] } : { projects: [] };
         const settingsPayload = settingsResponse.ok ? await settingsResponse.json() as { settings: AutomationSettings } : { settings: defaultSettings };
         const researchPayload = researchResponse.ok ? await researchResponse.json() as { references: ResearchReference[] } : { references: [] };
+        const workspacePayload = workspaceResponse.ok ? await workspaceResponse.json() as { linked: boolean; profileUrl: string; workspaceKey: string } : { linked: false, profileUrl: "", workspaceKey: "" };
         setProjects(projectPayload.projects);
         setSettings(settingsPayload.settings);
         setReferences(researchPayload.references);
+        setXhsWorkspace(workspacePayload);
+        if (workspacePayload.profileUrl) {
+          setProfileUrl(workspacePayload.profileUrl);
+          window.localStorage.setItem(`mj-xhs-profile-url:${accountKey}`, workspacePayload.profileUrl);
+        }
         setScheduleDrafts(Object.fromEntries(projectPayload.projects.map((project) => [
           project.id,
           project.scheduledAt ? dateTimeInput(new Date(project.scheduledAt)) : nextSlot(settingsPayload.settings),
@@ -750,19 +887,55 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
   }, []);
 
   useEffect(() => {
+    async function syncPublishedResults(results: Array<{ ownerKey?: string; projectId?: number; status?: string; publishUrl?: string; publishedAt?: string }>) {
+      const matches = results.filter((result) => result.ownerKey === bridgeWorkspaceKey && Number.isInteger(result.projectId) && result.status === "published");
+      if (!matches.length) return;
+      const synced: ProjectRecord[] = [];
+      for (const result of matches) {
+        const response = await fetch(`/api/projects/${result.projectId}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ status: "published", publishUrl: String(result.publishUrl || "") }),
+        });
+        const payload = await response.json() as { project?: ProjectRecord };
+        if (response.ok && payload.project) synced.push(payload.project);
+      }
+      if (synced.length) {
+        setProjects((current) => current.map((project) => synced.find((item) => item.id === project.id) || project));
+        setSettingsNotice(`已从小红书官方发布页同步 ${synced.length} 条发布结果`);
+      }
+    }
+
     function receiveBridgeStatus(event: MessageEvent) {
       if (event.source !== window || event.origin !== window.location.origin) return;
-      const message = event.data as { source?: string; type?: string; version?: number };
+      const message = event.data as { source?: string; type?: string; version?: number; results?: Array<{ ownerKey?: string; projectId?: number; status?: string; publishUrl?: string; publishedAt?: string }> };
       if (message?.source !== "mj-xhs-bridge") return;
       if (message.version === 4 && (["MJ_XHS_BRIDGE_READY", "MJ_XHS_DRAFT_STORED", "MJ_XHS_SCHEDULE_STORED"].includes(String(message.type)))) {
         setBridgeReady(true);
       }
+      if (message.version === 4 && message.type === "MJ_XHS_PUBLISH_RESULTS") void syncPublishedResults(message.results || []);
     }
     window.addEventListener("message", receiveBridgeStatus);
-    window.postMessage({ source: XHS_BRIDGE_SOURCE, type: "MJ_XHS_ACCOUNT_CONTEXT", ownerKey: accountKey }, window.location.origin);
+    window.postMessage({ source: XHS_BRIDGE_SOURCE, type: "MJ_XHS_ACCOUNT_CONTEXT", ownerKey: bridgeWorkspaceKey }, window.location.origin);
     window.postMessage({ source: XHS_BRIDGE_SOURCE, type: "MJ_XHS_BRIDGE_PING" }, window.location.origin);
     return () => window.removeEventListener("message", receiveBridgeStatus);
-  }, [accountKey]);
+  }, [bridgeWorkspaceKey]);
+
+  async function bindXhsWorkspace() {
+    setXhsWorkspaceNotice("正在确认小红书共享工作区…");
+    const response = await fetch("/api/xhs-workspace", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ profileUrl, bridgeConfirmed: bridgeReady }),
+    });
+    const payload = await response.json() as { error?: string; linked?: boolean; profileUrl?: string; workspaceKey?: string };
+    if (!response.ok || !payload.linked) {
+      setXhsWorkspaceNotice(payload.error || "小红书工作区绑定失败");
+      return;
+    }
+    setXhsWorkspaceNotice("已绑定同一小红书共享项目库，正在刷新云端资料…");
+    window.location.reload();
+  }
 
   useEffect(() => {
     if (!deviceKey) return;
@@ -947,7 +1120,7 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
     }));
     const payload: XhsBridgeDraft = {
       version: 2,
-      ownerKey: accountKey,
+      ownerKey: bridgeWorkspaceKey,
       projectId: project.id,
       projectName: project.name,
       title: projectDraft.title.trim(),
@@ -1004,7 +1177,7 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
       return;
     }
     setScheduleDrafts((current) => ({ ...current, [project.id]: nextSlot(settings) }));
-    window.postMessage({ source: XHS_BRIDGE_SOURCE, type: "MJ_XHS_CANCEL_SCHEDULE", ownerKey: accountKey, projectId: project.id }, window.location.origin);
+    window.postMessage({ source: XHS_BRIDGE_SOURCE, type: "MJ_XHS_CANCEL_SCHEDULE", ownerKey: bridgeWorkspaceKey, projectId: project.id }, window.location.origin);
     setNotice(`“${project.name}”已从发布日历移除，项目仍保存在资产库中`);
     await refreshProjects();
   }
@@ -1035,6 +1208,7 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
   }
 
   function loadProject(project: ProjectRecord) {
+    const loadedTitleOptions = (project.draft?.titleOptions?.length === 5 ? project.draft.titleOptions : [project.draft?.title || "", ...(project.draft?.titleOptions || []).filter((title) => title !== project.draft?.title), "", "", "", ""].slice(0, 5)).map(truncateTitle);
     setCurrentProjectId(project.id);
     setMeta({
       name: project.name,
@@ -1045,7 +1219,7 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
       audience: project.audience,
       brief: project.brief,
     });
-    setDraft({ ...emptyDraft, ...project.draft, coverStyle: normalizedCoverStyle(project.draft?.coverStyle), titleOptions: project.draft?.titleOptions?.length === 5 ? project.draft.titleOptions : [project.draft?.title || "", ...(project.draft?.titleOptions || []).filter((title) => title !== project.draft?.title), "", "", "", ""].slice(0, 5), tags: project.draft?.tags || [], highlights: project.draft?.highlights || [], riskNotes: project.draft?.riskNotes || [] });
+    setDraft({ ...emptyDraft, ...project.draft, title: truncateTitle(project.draft?.title || ""), coverStyle: normalizedCoverStyle(project.draft?.coverStyle), titleOptions: loadedTitleOptions, tags: project.draft?.tags || [], highlights: project.draft?.highlights || [], riskNotes: project.draft?.riskNotes || [] });
     setPreviews(project.images?.map((image) => image.url) || []);
     setFiles([]);
     setPhase("done");
@@ -1136,7 +1310,7 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
     const createdAt = new Date();
     const bridgeDraft: XhsBridgeDraft = {
       version: 2,
-      ownerKey: accountKey,
+      ownerKey: bridgeWorkspaceKey,
       projectId: currentProjectId,
       projectName: meta.name,
       title: draft.title.trim(),
@@ -1399,7 +1573,7 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
           <label className="wide"><span>已知设计信息（选填）</span><textarea placeholder="可留空；AI 会从实景图识别空间、材质、色彩、采光与动线" value={meta.brief} onChange={(event) => updateMeta("brief", event.target.value)}/></label>
         </div>
         <button className="primary-action" disabled={phase === "uploading" || phase === "analyzing"}><span>{phase === "analyzing" ? "正在逐张识别图片并生成全部内容…" : "生成封面＋正文与标题"}</span><span>→</span></button>
-        <p className="notice">{notice}</p>
+        <p className="notice">{notice}　<a href="/content/xhs-copywriting-library.md" target="_blank" rel="noreferrer">查看已启用的 MD 文案库 ↗</a></p>
       </form>
     </section>
     <section className="preview-panel">
@@ -1407,7 +1581,7 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
       <div className="phone-frame"><div className="cover-preview final-artwork-preview">{coverImage ? <img src={renderedCoverPreview || coverImage} alt="与小红书最终封面完全一致的发布预览"/> : <div className="empty-cover-placeholder">上传项目实景图后生成封面</div>}</div></div>
       <p className="final-preview-note">1080 × 1440 小红书竖版封面 · 此处直接显示最终合成图片</p>
       <div className={`bridge-status ${bridgeReady ? "connected" : ""}`}>
-        <span>{bridgeReady ? "MJ 发布桥 2.0 已连接" : "未连接最新版 MJ 发布桥"}</span>
+        <span>{bridgeReady ? "MJ 发布桥 2.2 已连接" : "未连接最新版 MJ 发布桥"}</span>
         <p>{bridgeReady ? "成品封面、项目图片、标题、正文与标签会保持统一；可选择人工发布或单篇确认后自动发布。" : "安装一次浏览器扩展，即可把已确认内容自动带入小红书官方图文发布页。"}</p>
         {!bridgeReady && <a href={XHS_BRIDGE_EXTENSION_URL} download>下载或更新 MJ 发布桥扩展</a>}
       </div>
@@ -1419,18 +1593,35 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
       </div>
     </section>
     <section className="editorial-card editor-mode">
-      <div className="editorial-title"><span>EDITABLE COPY</span><label><small>已选择的笔记标题</small><textarea value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}/></label><div className="fact-row">{facts.map((fact) => <span key={fact}>{fact}</span>)}</div></div>
+      <div className="editorial-title"><span>EDITABLE COPY</span><label><small>已选择的笔记标题 · {splitTitleGraphemes(draft.title).length}/20 字</small><textarea value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: truncateTitle(event.target.value) }))}/></label><div className="fact-row">{facts.map((fact) => <span key={fact}>{fact}</span>)}</div></div>
       <div className="copy-column">
-        <div className="title-options"><small>5 个爆款标题公式 · 点击选择</small>{draft.titleOptions.map((title, index) => <button className={draft.title === title ? "active" : ""} key={`${title}-${index}`} onClick={() => setDraft((current) => ({ ...current, title }))}><span>0{index + 1}</span>{title}<em>{draft.title === title ? "已选择" : "选择"}</em></button>)}</div>
-        <label><small>封面英文栏目</small><input value={draft.coverEyebrow} maxLength={44} onChange={(event) => setDraft((current) => ({ ...current, coverEyebrow: event.target.value.toUpperCase() }))}/></label>
-        <label><small>封面主标题</small><input value={draft.coverTitle} onChange={(event) => setDraft((current) => ({ ...current, coverTitle: event.target.value }))}/></label>
-        <label><small>封面副标题</small><input value={draft.coverSubtitle} onChange={(event) => setDraft((current) => ({ ...current, coverSubtitle: event.target.value }))}/></label>
+        <div className="generation-basis"><small>统一生成依据 · 实景图视觉档案</small><strong>{draft.detectedSpaceType || meta.projectType || meta.category}</strong><p>{draft.designSummary || "上传实景图后，系统会先归纳空间、材质、色彩、采光、可见动线与空间情绪，再统一生成全部内容。"}</p></div>
+        <div className="title-options"><small>5 个爆款标题公式 · 每条不超过 20 字 · 点击选择</small>{draft.titleOptions.map((title, index) => <button className={draft.title === title ? "active" : ""} key={`${title}-${index}`} onClick={() => setDraft((current) => ({ ...current, title: truncateTitle(title) }))}><span>0{index + 1}</span>{title}<em>{draft.title === title ? "已选择" : "选择"}</em></button>)}<div className="title-emoji-row"><small>标题 Emoji</small>{titleEmojiOptions.map((emoji) => <button type="button" key={emoji} onClick={() => setDraft((current) => ({ ...current, title: truncateTitle(`${current.title}${emoji}`) }))}>{emoji}</button>)}</div></div>
+        <div className="eyebrow-logo-editor">
+          <label><small>封面英文栏目（留空则封面不显示英文）</small><input placeholder="选填；可手动输入英文或选择 Logo" value={draft.coverEyebrow} maxLength={44} onChange={(event) => setDraft((current) => ({ ...current, coverEyebrow: event.target.value.toUpperCase(), coverStyle: { ...normalizedCoverStyle(current.coverStyle), eyebrowLogoStyle: "plain", logoImageName: undefined, logoImageUrl: undefined } }))}/></label>
+          <label><small>固定英文 Logo 样式</small><select value={eyebrowLogoPresets.find((preset) => preset.value === draft.coverEyebrow && preset.style === normalizedCoverStyle(draft.coverStyle).eyebrowLogoStyle)?.value || "manual"} onChange={(event) => {
+            if (event.target.value === "manual") return;
+            const preset = eyebrowLogoPresets.find((item) => item.value === event.target.value);
+            if (preset) setDraft((current) => ({ ...current, coverEyebrow: preset.value, coverStyle: { ...normalizedCoverStyle(current.coverStyle), eyebrowLogoStyle: preset.style, logoImageName: undefined, logoImageUrl: undefined } }));
+          }}><option value="manual">手动输入 / 自定义</option>{eyebrowLogoPresets.map((preset) => <option key={`${preset.value}-${preset.style}`} value={preset.value}>{preset.label}</option>)}</select></label>
+          <label className="logo-image-upload"><small>图片形式 Logo</small><span><input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => void uploadCoverLogo(event)}/><b>{normalizedCoverStyle(draft.coverStyle).logoImageName || "上传透明 PNG / JPG / WebP"}</b></span>{normalizedCoverStyle(draft.coverStyle).logoImageUrl && <button type="button" onClick={() => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), logoImageName: undefined, logoImageUrl: undefined } }))}>移除图片 Logo</button>}</label>
+        </div>
+        <div className="cover-copy-fields">
+          <label><small>封面主标题</small><input value={draft.coverTitle} onChange={(event) => setDraft((current) => ({ ...current, coverTitle: event.target.value }))}/></label>
+          <label><small>封面副标题</small><input value={draft.coverSubtitle} onChange={(event) => setDraft((current) => ({ ...current, coverSubtitle: event.target.value }))}/></label>
+        </div>
         <div className="cover-designer">
           <div className="cover-designer-heading"><div><small>COVER DESIGNER</small><strong>封面样式编辑</strong></div><button onClick={() => setDraft((current) => ({ ...current, coverStyle: defaultCoverStyle }))}>恢复默认</button></div>
           <div className="cover-control-grid">
-            <label><small>标题字体</small><select value={normalizedCoverStyle(draft.coverStyle).fontFamily} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), fontFamily: event.target.value as CoverStyle["fontFamily"] } }))}><option value="serif">宋体 / 衬线</option><option value="sans">黑体 / 无衬线</option><option value="kai">楷体</option></select></label>
+            <label><small>封面字体</small><select value={normalizedCoverStyle(draft.coverStyle).fontFamily} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), fontFamily: event.target.value as CoverStyle["fontFamily"] } }))}><option value="serif">宋体 / 衬线</option><option value="sans">系统黑体</option><option value="kai">楷体</option><option value="inter">Inter 英文字体</option><option value="noto">Noto Sans SC</option>{normalizedCoverStyle(draft.coverStyle).customFontUrl && <option value="custom">已上传：{normalizedCoverStyle(draft.coverStyle).customFontName}</option>}</select></label>
+            <label className="font-upload-control"><small>上传封面字体</small><span><input type="file" accept=".woff,.woff2,.ttf,.otf,font/woff,font/woff2,font/ttf,font/otf" onChange={(event) => void uploadCoverFont(event)}/><b>{normalizedCoverStyle(draft.coverStyle).customFontName || "选择字体文件"}</b></span></label>
             <label><small>广告封面装饰</small><select value={normalizedCoverStyle(draft.coverStyle).pattern} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), pattern: event.target.value as CoverStyle["pattern"] } }))}><option value="none">无图案</option><option value="ad-badge">广告圆形角标</option><option value="ad-ribbon">广告斜切色带</option><option value="editorial-bars">杂志编辑线条</option><option value="spotlight">广告聚光色块</option><option value="frame">细线边框</option><option value="grid">建筑网格</option><option value="dots">圆点阵列</option><option value="corners">四角标记</option><option value="polka">波点</option><option value="textile">面料肌理</option><option value="gradient">柔和渐变</option><option value="blue-white-dots">蓝白波点</option></select></label>
-            <label><small>文字位置</small><select value={normalizedCoverStyle(draft.coverStyle).position} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), position: event.target.value as CoverStyle["position"] } }))}><option value="top">顶部</option><option value="middle">居中</option><option value="bottom">底部</option></select></label>
+            <label><small>主标题位置</small><select value={normalizedCoverStyle(draft.coverStyle).position} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), position: event.target.value as CoverStyle["position"] } }))}><option value="top">顶部</option><option value="middle">居中</option><option value="bottom">底部</option></select></label>
+            <label><small>英文栏目位置</small><select value={normalizedCoverStyle(draft.coverStyle).eyebrowPosition} onChange={(event) => {
+              const eyebrowPosition = event.target.value as CoverStyle["eyebrowPosition"];
+              const eyebrowY = eyebrowPosition === "top" ? 5.8 : eyebrowPosition === "middle" ? 48 : eyebrowPosition === "bottom" ? 88 : normalizedCoverStyle(draft.coverStyle).eyebrowY;
+              setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), eyebrowPosition, eyebrowY } }));
+            }}><option value="top">顶部</option><option value="middle">居中</option><option value="bottom">底部</option><option value="custom">自由调整</option></select></label>
             <label><small>文字对齐</small><select value={normalizedCoverStyle(draft.coverStyle).align} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), align: event.target.value as CoverStyle["align"] } }))}><option value="left">左对齐</option><option value="center">居中</option></select></label>
             <label><small>主标题排版</small><select value={normalizedCoverStyle(draft.coverStyle).titleDirection} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), titleDirection: event.target.value as CoverStyle["titleDirection"] } }))}><option value="horizontal">横向海报排版</option><option value="vertical">竖向中文排版</option></select></label>
             <label className="color-control"><small>标题颜色</small><input type="color" value={normalizedCoverStyle(draft.coverStyle).titleColor} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), titleColor: event.target.value } }))}/></label>
@@ -1438,6 +1629,8 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
             <label className="color-control"><small>图案颜色</small><input type="color" value={normalizedCoverStyle(draft.coverStyle).patternColor} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), patternColor: event.target.value } }))}/></label>
             <label className="color-control"><small>遮罩颜色</small><input type="color" value={normalizedCoverStyle(draft.coverStyle).overlayColor} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), overlayColor: event.target.value } }))}/></label>
             <label className="range-control"><small>标题字号 · {normalizedCoverStyle(draft.coverStyle).titleSize}</small><input type="range" min="52" max="120" value={normalizedCoverStyle(draft.coverStyle).titleSize} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), titleSize: Number(event.target.value) } }))}/></label>
+            <label className="range-control"><small>主标题粗细 · {normalizedCoverStyle(draft.coverStyle).titleWeight}</small><input type="range" min="100" max="900" step="100" value={normalizedCoverStyle(draft.coverStyle).titleWeight} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), titleWeight: Number(event.target.value) } }))}/></label>
+            <label className="range-control"><small>主标题透明度 · {normalizedCoverStyle(draft.coverStyle).titleOpacity}%</small><input type="range" min="10" max="100" value={normalizedCoverStyle(draft.coverStyle).titleOpacity} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), titleOpacity: Number(event.target.value) } }))}/></label>
             <label className="range-control"><small>主标题水平位置 · {normalizedCoverStyle(draft.coverStyle).titleOffsetX}</small><input type="range" min="-35" max="35" value={normalizedCoverStyle(draft.coverStyle).titleOffsetX} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), titleOffsetX: Number(event.target.value) } }))}/></label>
             <label className="range-control"><small>主标题垂直位置 · {normalizedCoverStyle(draft.coverStyle).titleOffsetY}</small><input type="range" min="-30" max="30" value={normalizedCoverStyle(draft.coverStyle).titleOffsetY} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), titleOffsetY: Number(event.target.value) } }))}/></label>
             <label className="range-control"><small>遮罩强度 · {normalizedCoverStyle(draft.coverStyle).overlayOpacity}%</small><input type="range" min="0" max="90" value={normalizedCoverStyle(draft.coverStyle).overlayOpacity} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), overlayOpacity: Number(event.target.value) } }))}/></label>
@@ -1445,15 +1638,20 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
             <label className="range-control"><small>图案垂直位置 · {normalizedCoverStyle(draft.coverStyle).patternOffsetY}</small><input type="range" min="-25" max="25" value={normalizedCoverStyle(draft.coverStyle).patternOffsetY} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), patternOffsetY: Number(event.target.value) } }))}/></label>
             <label className="range-control"><small>图案大小 · {normalizedCoverStyle(draft.coverStyle).patternScale}%</small><input type="range" min="50" max="160" value={normalizedCoverStyle(draft.coverStyle).patternScale} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), patternScale: Number(event.target.value) } }))}/></label>
             <label className="range-control"><small>英文水平位置 · {normalizedCoverStyle(draft.coverStyle).eyebrowX}%</small><input type="range" min="2" max="50" value={normalizedCoverStyle(draft.coverStyle).eyebrowX} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), eyebrowX: Number(event.target.value) } }))}/></label>
-            <label className="range-control"><small>英文垂直位置 · {normalizedCoverStyle(draft.coverStyle).eyebrowY}%</small><input type="range" min="2" max="35" value={normalizedCoverStyle(draft.coverStyle).eyebrowY} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), eyebrowY: Number(event.target.value) } }))}/></label>
+            <label className="range-control"><small>英文垂直位置 · {normalizedCoverStyle(draft.coverStyle).eyebrowY}%</small><input type="range" min="2" max="92" value={normalizedCoverStyle(draft.coverStyle).eyebrowY} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), eyebrowPosition: "custom", eyebrowY: Number(event.target.value) } }))}/></label>
             <label className="range-control"><small>英文字号 · {normalizedCoverStyle(draft.coverStyle).eyebrowSize}</small><input type="range" min="16" max="48" value={normalizedCoverStyle(draft.coverStyle).eyebrowSize} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), eyebrowSize: Number(event.target.value) } }))}/></label>
+            <label className="range-control"><small>英文栏目粗细 · {normalizedCoverStyle(draft.coverStyle).eyebrowWeight}</small><input type="range" min="100" max="900" step="100" value={normalizedCoverStyle(draft.coverStyle).eyebrowWeight} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), eyebrowWeight: Number(event.target.value) } }))}/></label>
+            <label className="range-control"><small>图片 Logo 大小 · {normalizedCoverStyle(draft.coverStyle).logoImageScale}%</small><input type="range" min="30" max="180" value={normalizedCoverStyle(draft.coverStyle).logoImageScale} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), logoImageScale: Number(event.target.value) } }))}/></label>
             <label className="range-control"><small>英文透明度 · {normalizedCoverStyle(draft.coverStyle).eyebrowOpacity}%</small><input type="range" min="10" max="100" value={normalizedCoverStyle(draft.coverStyle).eyebrowOpacity} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), eyebrowOpacity: Number(event.target.value) } }))}/></label>
             <label className="line-toggle"><small>英文栏目横线</small><span><input type="checkbox" checked={normalizedCoverStyle(draft.coverStyle).showEyebrowLine} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), showEyebrowLine: event.target.checked } }))}/> 显示横线</span></label>
             <label className="range-control"><small>副标题字号 · {normalizedCoverStyle(draft.coverStyle).subtitleSize}</small><input type="range" min="18" max="54" value={normalizedCoverStyle(draft.coverStyle).subtitleSize} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), subtitleSize: Number(event.target.value) } }))}/></label>
+            <label className="range-control"><small>副标题粗细 · {normalizedCoverStyle(draft.coverStyle).subtitleWeight}</small><input type="range" min="100" max="900" step="100" value={normalizedCoverStyle(draft.coverStyle).subtitleWeight} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), subtitleWeight: Number(event.target.value) } }))}/></label>
+            <label className="range-control"><small>副标题透明度 · {normalizedCoverStyle(draft.coverStyle).subtitleOpacity}%</small><input type="range" min="10" max="100" value={normalizedCoverStyle(draft.coverStyle).subtitleOpacity} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), subtitleOpacity: Number(event.target.value) } }))}/></label>
             <label className="range-control"><small>副标题水平位置 · {normalizedCoverStyle(draft.coverStyle).subtitleOffsetX}</small><input type="range" min="-30" max="30" value={normalizedCoverStyle(draft.coverStyle).subtitleOffsetX} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), subtitleOffsetX: Number(event.target.value) } }))}/></label>
             <label className="range-control"><small>副标题垂直位置 · {normalizedCoverStyle(draft.coverStyle).subtitleOffsetY}</small><input type="range" min="-20" max="25" value={normalizedCoverStyle(draft.coverStyle).subtitleOffsetY} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), subtitleOffsetY: Number(event.target.value) } }))}/></label>
           </div>
         </div>
+        <div className="body-options"><small>4 套图片识别正文 · 点击选择</small>{draft.bodyOptions.map((body, index) => <button type="button" className={draft.body === body ? "active" : ""} key={`${index}-${body.slice(0, 12)}`} onClick={() => setDraft((current) => ({ ...current, body }))}><span>0{index + 1}</span><p>{body || `正文方案 ${index + 1}`}</p><em>{draft.body === body ? "已选择" : "选择"}</em></button>)}</div>
         <div className="body-compose"><label><small>正文</small><textarea ref={bodyTextareaRef} className="body-editor" value={draft.body} onChange={(event) => setDraft((current) => ({ ...current, body: event.target.value }))}/></label><details className="emoji-picker"><summary>Emoji 表情大全</summary><p>先点击正文任意位置，再点击表情即可插入光标处</p><div>{bodyEmojiGroups.flatMap((group) => Array.from(group).filter((emoji) => emoji !== "️")).map((emoji, index) => <button type="button" key={`${emoji}-${index}`} onMouseDown={(event) => event.preventDefault()} onClick={() => insertBodyEmoji(emoji)} aria-label={`插入 ${emoji}`}>{emoji}</button>)}</div></details></div>
         <label><small>话题标签（用逗号或空格分隔）</small><input value={draft.tags.join("，")} onChange={(event) => setDraft((current) => ({ ...current, tags: event.target.value.split(/[，,\s#]+/).filter(Boolean).slice(0, 12) }))}/></label>
         <div className="editor-actions"><button type="button" onClick={() => void saveProject("drafted")}>保存到资产库</button><button type="button" className="approve-action" onClick={() => void saveProject("approved")}>确认并同步保存</button><button type="button" onClick={() => void approveAndSchedule()}>确认并加入三天队列</button></div>
@@ -1494,7 +1692,7 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
       <p className="notice">{settingsNotice || "可选择人工立即发布，或使用当前电脑上的 MJ 发布桥进行定时发布。"}</p>
     </section>
     <section className="dashboard-card queue-card">
-      <div className="section-heading"><div><span>PUBLISH QUEUE</span><h2>项目发布日历</h2><p>选择项目与北京时间；发布桥会同步任务，到点打开并预填小红书官方发布页。排期可随时更新或取消。</p></div><span className="counter">{scheduledProjects.length} 个已排期</span></div>
+      <div className="section-heading"><div><span>PUBLISH QUEUE</span><h2>项目发布日历</h2><p>选择项目与北京时间；发布桥会同步到小红书官方发布流程。仅在官方页面确认发布成功后，日历才显示“已发布”。</p></div><span className="counter">{scheduledProjects.filter((project) => project.status !== "published").length} 个待发布 · {scheduledProjects.filter((project) => project.status === "published").length} 个已发布</span></div>
       <div className="quick-schedule">
         <label><span>选择项目</span><select value={selectedScheduleProjectId ?? ""} onChange={(event) => setSelectedScheduleProjectId(event.target.value ? Number(event.target.value) : null)}><option value="">请选择项目</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}{["approved", "scheduled"].includes(project.status) ? "" : "（需先确认文案）"}</option>)}</select></label>
         <label><span>发布日期与时间</span><input type="datetime-local" disabled={!selectedScheduleProjectId} value={selectedScheduleProjectId ? scheduleDrafts[selectedScheduleProjectId] || nextSlot(settings) : ""} onChange={(event) => selectedScheduleProjectId && setScheduleDrafts((current) => ({ ...current, [selectedScheduleProjectId]: event.target.value }))}/></label>
@@ -1502,9 +1700,9 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
       </div>
       <div className="queue-list">
         {projects.map((project) => <div className="queue-item" key={project.id}>
-          <button className="queue-project queue-project-button" onClick={() => loadProject(project)}>{project.images?.[0] ? <img src={project.images[0].url} alt=""/> : <span>{project.name.slice(0, 1)}</span>}<div><strong>{project.name}</strong><small>{project.location || "未填写地点"} · {project.area || project.projectType || "室内设计项目"}</small><em>{project.scheduledAt ? `已同步：${new Date(project.scheduledAt).toLocaleString("zh-CN")}` : "点击打开项目"}</em></div></button>
+          <button className="queue-project queue-project-button" onClick={() => loadProject(project)}>{project.images?.[0] ? <img src={project.images[0].url} alt=""/> : <span>{project.name.slice(0, 1)}</span>}<div><strong>{project.name}</strong><small>{project.location || "未填写地点"} · {project.area || project.projectType || "室内设计项目"}</small><em>{project.status === "published" ? `已发布${project.publishedAt ? `：${new Date(project.publishedAt).toLocaleString("zh-CN")}` : ""}` : project.scheduledAt ? `已同步排期：${new Date(project.scheduledAt).toLocaleString("zh-CN")}` : "点击打开项目"}</em></div></button>
           <input type="datetime-local" value={scheduleDrafts[project.id] || nextSlot(settings)} onChange={(event) => setScheduleDrafts((current) => ({ ...current, [project.id]: event.target.value }))}/>
-          <div className="queue-buttons"><button disabled={!['approved', 'scheduled'].includes(project.status)} onClick={() => void scheduleProject(project.id)}>{project.scheduledAt ? "更新并同步" : project.status === "approved" ? "加入日历" : "需先确认"}</button>{project.scheduledAt && <button className="danger-action" onClick={() => void removeSchedule(project)}>取消定时发布</button>}</div>
+          <div className="queue-buttons">{project.status === "published" ? <><span className="state-pill published">已发布</span>{project.publishUrl && <a href={project.publishUrl} target="_blank" rel="noreferrer">查看笔记 ↗</a>}</> : <><button disabled={!['approved', 'scheduled'].includes(project.status)} onClick={() => void scheduleProject(project.id)}>{project.scheduledAt ? "更新并同步" : project.status === "approved" ? "加入日历" : "需先确认"}</button>{project.scheduledAt && <button className="danger-action" onClick={() => void removeSchedule(project)}>取消定时发布</button>}</>}</div>
         </div>)}
         {!projects.length && <div className="empty-state"><strong>还没有可排期项目</strong><p>先在创作工作台上传项目实景图，项目会自动进入这里。</p></div>}
       </div>
@@ -1573,12 +1771,12 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
       <p className="sidebar-note">图片、事实、排期与参考均按项目归档。正式发布前保留人工确认。</p>
     </aside>
     <section className="workspace">
-      <header className="topbar"><div><p className="kicker">XIAOHONGSHU CREATIVE SERVICE</p><h1>小红书创作服务平台</h1><p className="account-workspace">{isSiteOwner ? "网站作者专属工作区" : "新账户独立工作区"}：{accountName}</p><p className="account-privacy">仅当前登录账户可查看本工作区资料，其他账户无法访问。</p></div><div className="topbar-actions"><a className="web-mode-link" href="/web/" target="_blank" rel="noreferrer">网页展示模式 ↗</a><span className={`status-chip ${phase}`}>{phaseLabel}</span><a className="account-signout" href="/signout-with-chatgpt?return_to=%2Fwechat">退出工作区</a><a className="avatar" href="https://www.xiaohongshu.com/" target="_blank" rel="noreferrer" aria-label="登录当前浏览器的小红书账户">XHS</a></div></header>
+      <header className="topbar"><div><p className="kicker">XIAOHONGSHU CREATIVE SERVICE</p><h1>小红书创作服务平台</h1><p className="account-workspace">{xhsWorkspace.linked ? "同一小红书账号共享工作区" : isSiteOwner ? "网站作者专属工作区" : "新账户独立工作区"}：{accountName}</p><p className="account-privacy">{xhsWorkspace.linked ? "仅绑定同一小红书主页的新项目与排期会同步；网站作者原有历史项目不会显示。" : "绑定小红书共享工作区前，仅当前 GPT 登录账户可查看资料。"}</p></div><div className="topbar-actions"><a className="web-mode-link" href="/web/" target="_blank" rel="noreferrer">网页展示模式 ↗</a><span className={`status-chip ${phase}`}>{phaseLabel}</span><a className="account-signout" href="/signout-with-chatgpt?return_to=%2Fwechat">退出工作区</a><a className="avatar" href="https://www.xiaohongshu.com/" target="_blank" rel="noreferrer" aria-label="登录当前浏览器的小红书账户">XHS</a></div></header>
       {!isSiteOwner && <section className="new-user-sync-card" aria-label="新账户功能同步状态">
-        <div><small>NEW ACCOUNT · FEATURES SYNCED</small><strong>新账户功能已同步</strong><p>你已拥有与主站一致的创作能力，但项目、引流笔记、排期和小红书会话只属于当前账户。</p></div>
-        <ul><li><span>01</span>实景图识别与多模型文案</li><li><span>02</span>封面、5 个标题与标签生成</li><li><span>03</span>右键收藏引流笔记并解析</li><li><span>04</span>三台电脑共享本账户项目库</li></ul>
+        <div><small>NEW ACCOUNT · FEATURES SYNCED</small><strong>新账户功能已同步</strong><p>绑定前资料只属于当前 GPT 账户；绑定同一小红书主页后，仅共享绑定后创建的新项目和排期，作者历史资料仍保持私有。</p></div>
+        <ul><li><span>01</span>实景图识别与多模型文案</li><li><span>02</span>封面、5 个标题与标签生成</li><li><span>03</span>右键收藏引流笔记并解析</li><li><span>04</span>同一小红书账号共享新项目库</li></ul>
       </section>}
-      <div className={`xhs-session-banner ${bridgeReady ? "connected" : ""}`}><div><strong>{bridgeReady ? "当前电脑已连接共享创作工作区" : "请扫码登录当前电脑的小红书"}</strong><p>同一平台账户最多绑定 3 台电脑，项目库、文案和发布排期实时共享；每台电脑只需在小红书官方页面扫码登录，不传输密码或登录状态。</p><label><span>当前小红书主页链接</span><input value={profileUrl} onChange={(event) => { const value = event.target.value.trim(); setProfileUrl(value); window.localStorage.setItem(`mj-xhs-profile-url:${accountKey}`, value); }} placeholder="扫码登录后复制同一个小红书主页链接"/></label></div><div>{!bridgeReady && <a href={XHS_BRIDGE_EXTENSION_URL} download>下载发布桥</a>}<a href="https://www.xiaohongshu.com/" target="_blank" rel="noreferrer">打开小红书扫码登录 ↗</a></div></div>
+      <div className={`xhs-session-banner ${bridgeReady ? "connected" : ""}`}><div><strong>{xhsWorkspace.linked ? "已进入同一小红书账号共享项目库" : bridgeReady ? "发布桥已连接，可绑定小红书共享项目库" : "请扫码登录当前电脑的小红书"}</strong><p>不同 GPT 账户绑定同一个小红书主页后，共享绑定之后创建的项目资产库、文案和发布排期；网站作者绑定前的历史项目保持私有，不会迁移或显示。</p><label><span>当前小红书主页链接</span><input value={profileUrl} onChange={(event) => { const value = event.target.value.trim(); setProfileUrl(value); window.localStorage.setItem(`mj-xhs-profile-url:${accountKey}`, value); }} placeholder="扫码登录后复制同一个小红书主页链接"/></label>{xhsWorkspaceNotice && <em>{xhsWorkspaceNotice}</em>}</div><div>{!bridgeReady && <a href={XHS_BRIDGE_EXTENSION_URL} download>下载发布桥</a>}<a href="https://www.xiaohongshu.com/" target="_blank" rel="noreferrer">打开小红书扫码登录 ↗</a><button type="button" onClick={() => void bindXhsWorkspace()} disabled={!bridgeReady || !profileUrl}>{xhsWorkspace.linked ? "重新确认共享工作区" : "绑定同一小红书项目库"}</button></div></div>
       <section className="device-workspace-card" aria-label="共享设备管理"><div><small>MULTI-DEVICE WORKSPACE</small><strong>共享电脑 {devices.length} / 3</strong><p>三台电脑共享同一项目资产库与发布日历，小红书扫码会话分别保存在各自浏览器。</p>{deviceNotice && <em>{deviceNotice}</em>}</div><div className="device-list">{devices.map((device) => <article key={device.deviceKey} className={device.deviceKey === deviceKey ? "current" : ""}><span>{device.bridgeConnected ? "●" : "○"}</span><div><strong>{device.deviceName}{device.deviceKey === deviceKey ? "（当前）" : ""}</strong><small>{device.bridgeConnected ? "发布桥已连接" : "等待扫码或连接发布桥"} · {new Date(device.lastSeenAt).toLocaleString("zh-CN")}</small></div>{device.deviceKey !== deviceKey && <button onClick={() => void removeDevice(device.deviceKey)}>移除</button>}</article>)}</div></section>
       {activeTab === "creator" && creatorView}
       {activeTab === "assets" && assetView}

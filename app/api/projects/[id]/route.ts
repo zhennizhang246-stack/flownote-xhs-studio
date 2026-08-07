@@ -12,6 +12,13 @@ type Draft = {
   coverSubtitle: string;
   coverStyle?: {
     fontFamily?: string;
+    eyebrowLogoStyle?: string;
+    eyebrowPosition?: string;
+    customFontName?: string;
+    customFontUrl?: string;
+    logoImageName?: string;
+    logoImageUrl?: string;
+    logoImageScale?: number;
     titleColor?: string;
     subtitleColor?: string;
     overlayColor?: string;
@@ -19,6 +26,8 @@ type Draft = {
     pattern?: string;
     patternColor?: string;
     titleSize?: number;
+    titleWeight?: number;
+    titleOpacity?: number;
     titleOffsetX?: number;
     titleOffsetY?: number;
     titleDirection?: string;
@@ -30,9 +39,12 @@ type Draft = {
     eyebrowX?: number;
     eyebrowY?: number;
     eyebrowSize?: number;
+    eyebrowWeight?: number;
     eyebrowOpacity?: number;
     showEyebrowLine?: boolean;
     subtitleSize?: number;
+    subtitleWeight?: number;
+    subtitleOpacity?: number;
     subtitleOffsetX?: number;
     subtitleOffsetY?: number;
   };
@@ -45,6 +57,7 @@ type Draft = {
 };
 
 const validStatuses = new Set(["drafted", "approved", "scheduled", "published"]);
+const truncateTitle = (value: unknown) => Array.from(new Intl.Segmenter("zh-CN", { granularity: "grapheme" }).segment(String(value || "").trim()), (part) => part.segment).slice(0, 20).join("");
 
 function cleanDraft(value: unknown): Draft {
   if (!value || typeof value !== "object") throw new Error("文案内容无效");
@@ -59,13 +72,20 @@ function cleanDraft(value: unknown): Draft {
     options.includes(String(value) as T) ? String(value) as T : fallback
   );
   const draft = {
-    title: cleanText(input.title, 80),
-    titleOptions: cleanList(input.titleOptions, 5, 80),
-    coverEyebrow: cleanText(input.coverEyebrow, 44).toUpperCase() || "ORIGINAL DESIGN · INTERIOR",
+    title: truncateTitle(input.title),
+    titleOptions: cleanList(input.titleOptions, 5, 80).map(truncateTitle),
+    coverEyebrow: cleanText(input.coverEyebrow, 44).toUpperCase(),
     coverTitle: cleanText(input.coverTitle, 30),
     coverSubtitle: cleanText(input.coverSubtitle, 60),
     coverStyle: {
-      fontFamily: oneOf(style.fontFamily, ["serif", "sans", "kai"] as const, "serif"),
+      fontFamily: oneOf(style.fontFamily, ["serif", "sans", "kai", "inter", "noto", "custom"] as const, "serif"),
+      eyebrowLogoStyle: oneOf(style.eyebrowLogoStyle, ["plain", "wordmark", "monogram", "editorial"] as const, "plain"),
+      eyebrowPosition: oneOf(style.eyebrowPosition, ["top", "middle", "bottom", "custom"] as const, "top"),
+      customFontName: cleanText(style.customFontName, 120),
+      customFontUrl: typeof style.customFontUrl === "string" && /^\/api\/fonts\/[a-f0-9-]+$/i.test(style.customFontUrl) ? style.customFontUrl : "",
+      logoImageName: cleanText(style.logoImageName, 120),
+      logoImageUrl: typeof style.logoImageUrl === "string" && /^\/api\/logos\/[a-f0-9-]+$/i.test(style.logoImageUrl) ? style.logoImageUrl : "",
+      logoImageScale: Math.min(180, Math.max(30, Number(style.logoImageScale ?? 100))),
       titleColor: color(style.titleColor, "#ffffff"),
       subtitleColor: color(style.subtitleColor, "#eee9df"),
       overlayColor: color(style.overlayColor, "#121713"),
@@ -73,6 +93,8 @@ function cleanDraft(value: unknown): Draft {
       pattern: oneOf(style.pattern, ["none", "frame", "grid", "dots", "corners", "polka", "textile", "gradient", "blue-white-dots", "ad-badge", "ad-ribbon", "editorial-bars", "spotlight"] as const, "frame"),
       patternColor: color(style.patternColor, "#ffffff"),
       titleSize: Math.min(120, Math.max(52, Number(style.titleSize ?? 88))),
+      titleWeight: Math.min(900, Math.max(100, Number(style.titleWeight ?? 700))),
+      titleOpacity: Math.min(100, Math.max(10, Number(style.titleOpacity ?? 100))),
       titleOffsetX: Math.min(35, Math.max(-35, Number(style.titleOffsetX ?? 0))),
       titleOffsetY: Math.min(30, Math.max(-30, Number(style.titleOffsetY ?? 0))),
       titleDirection: oneOf(style.titleDirection, ["horizontal", "vertical"] as const, "horizontal"),
@@ -82,11 +104,14 @@ function cleanDraft(value: unknown): Draft {
       patternOffsetY: Math.min(25, Math.max(-25, Number(style.patternOffsetY ?? 0))),
       patternScale: Math.min(160, Math.max(50, Number(style.patternScale ?? 100))),
       eyebrowX: Math.min(50, Math.max(2, Number(style.eyebrowX ?? 7.6))),
-      eyebrowY: Math.min(35, Math.max(2, Number(style.eyebrowY ?? 5.8))),
+      eyebrowY: Math.min(92, Math.max(2, Number(style.eyebrowY ?? 5.8))),
       eyebrowSize: Math.min(48, Math.max(16, Number(style.eyebrowSize ?? 26))),
+      eyebrowWeight: Math.min(900, Math.max(100, Number(style.eyebrowWeight ?? 700))),
       eyebrowOpacity: Math.min(100, Math.max(10, Number(style.eyebrowOpacity ?? 100))),
       showEyebrowLine: typeof style.showEyebrowLine === "boolean" ? style.showEyebrowLine : true,
       subtitleSize: Math.min(54, Math.max(18, Number(style.subtitleSize ?? 28))),
+      subtitleWeight: Math.min(900, Math.max(100, Number(style.subtitleWeight ?? 500))),
+      subtitleOpacity: Math.min(100, Math.max(10, Number(style.subtitleOpacity ?? 100))),
       subtitleOffsetX: Math.min(30, Math.max(-30, Number(style.subtitleOffsetX ?? 0))),
       subtitleOffsetY: Math.min(25, Math.max(-20, Number(style.subtitleOffsetY ?? 0))),
     },
@@ -98,7 +123,7 @@ function cleanDraft(value: unknown): Draft {
     mode: cleanText(input.mode, 30) || "人工编辑",
   };
   if (!draft.titleOptions.includes(draft.title)) draft.titleOptions = [draft.title, ...draft.titleOptions].filter(Boolean).slice(0, 5);
-  while (draft.titleOptions.length < 5) draft.titleOptions.push(`${draft.title}｜备选${draft.titleOptions.length + 1}`);
+  while (draft.titleOptions.length < 5) draft.titleOptions.push(truncateTitle(`${draft.title}｜备选${draft.titleOptions.length + 1}`));
   if (!draft.title || !draft.coverTitle || !draft.body) throw new Error("标题、封面标题和正文不能为空");
   return draft;
 }

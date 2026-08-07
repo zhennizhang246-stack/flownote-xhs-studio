@@ -216,6 +216,19 @@ chrome.runtime.onMessage.addListener((message) => {
     chrome.storage.local.remove(scheduleKey(ownerKey, projectId));
     return false;
   }
+  if (message?.type === "MJ_XHS_PUBLISH_RESULT") {
+    const result = message.result || {};
+    const ownerKey = String(result.ownerKey || "").slice(0, 200);
+    const projectId = Number(result.projectId);
+    if (!ownerKey || !Number.isInteger(projectId) || result.status !== "published") return false;
+    const key = `mjXhsPublishResults:${encodedOwner(ownerKey)}`;
+    chrome.storage.local.get(key, (stored) => {
+      const existing = Array.isArray(stored[key]) ? stored[key] : [];
+      const next = [result, ...existing.filter((item) => Number(item?.projectId) !== projectId)].slice(0, 50);
+      chrome.storage.local.set({ [key]: next });
+    });
+    return false;
+  }
   return false;
 });
 

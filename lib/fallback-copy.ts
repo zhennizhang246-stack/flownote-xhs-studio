@@ -23,6 +23,14 @@ const sceneLines = {
     "推门像误入江南，直接不想走了🍃", "城市避世天花板，待一天都不无聊", "老空间改完太绝了，东方美学拉满",
     "偷得浮生半日闲，治愈所有内耗", "一脚踏进水墨画里，步步是景",
   ],
+  exhibition: [
+    "看展像逛艺术大片，随手拍都出片📸", "这哪里是展厅，明明是视觉盛宴", "品牌审美直接拉满，逛完被狠狠种草",
+    "原来陈列也能做成艺术品✨", "逛完直接刷新审美认知",
+  ],
+  architecture: [
+    "老建筑活过来了，这才是城市的浪漫啊✨", "建筑的温度，都藏在细节里", "好的建筑，真的能让人停下脚步",
+    "钢筋水泥里的温柔，谁懂啊", "这才是有记忆点的城市地标",
+  ],
 } as const;
 
 function hash(text: string) {
@@ -39,7 +47,9 @@ function infer(facts: ProjectFacts) {
   const source = `${facts.category} ${facts.projectType} ${facts.brief}`;
   if (/办公|企业|工作室|联合办公/.test(source)) return { scene: "office" as const, space: clean(facts.projectType) || "办公空间", place: "城市办公场景" };
   if (/民宿|庭院|院落|老宅|度假|酒店/.test(source)) return { scene: "retreat" as const, space: clean(facts.projectType) || "度假空间", place: "城市里" };
-  if (/商业|咖啡|烘焙|买手|餐饮|门店|展厅|零售/.test(source)) return { scene: "commercial" as const, space: clean(facts.projectType) || "商业空间", place: "街角" };
+  if (/展厅|展陈|陈列|艺术馆|科技馆|品牌展示/.test(source)) return { scene: "exhibition" as const, space: clean(facts.projectType) || "展厅空间", place: "城市展场" };
+  if (/建筑|外立面|街区|公共空间|城市更新/.test(source)) return { scene: "architecture" as const, space: clean(facts.projectType) || "建筑空间", place: "城市街区" };
+  if (/商业|咖啡|烘焙|买手|餐饮|门店|零售/.test(source)) return { scene: "commercial" as const, space: clean(facts.projectType) || "商业空间", place: "街角" };
   return { scene: "residential" as const, space: clean(facts.projectType) || "住宅空间", place: "日常里" };
 }
 
@@ -52,7 +62,7 @@ function inferStyle(facts: ProjectFacts) {
 }
 
 function tagsFor(scene: ReturnType<typeof infer>["scene"], style: string, location: string) {
-  const vertical = scene === "commercial" ? ["商业空间设计", "门店设计"] : scene === "office" ? ["办公空间设计", "办公室装修"] : scene === "retreat" ? ["民宿设计", "庭院设计"] : ["住宅设计", "家装设计"];
+  const vertical = scene === "commercial" ? ["商业空间设计", "门店设计"] : scene === "office" ? ["办公空间设计", "办公室装修"] : scene === "retreat" ? ["酒店设计", "民宿设计"] : scene === "exhibition" ? ["展厅设计", "陈列设计"] : scene === "architecture" ? ["建筑设计", "城市更新"] : ["住宅设计", "家装设计"];
   return ["室内设计", "装修灵感", style, `${style}设计`, "空间美学", ...vertical, ...(location ? [`${location}设计`] : [])].slice(0, 8);
 }
 
@@ -63,7 +73,7 @@ export function createFallbackDraft(facts: ProjectFacts, imageCount: number, rea
   const lines = sceneLines[profile.scene];
   const first = lines[seed % lines.length];
   const second = lines[(seed + 2) % lines.length];
-  const memory = profile.scene === "office" ? "松弛感" : profile.scene === "commercial" ? "氛围感" : profile.scene === "retreat" ? "避世感" : "治愈感";
+  const memory = profile.scene === "office" ? "松弛感" : profile.scene === "commercial" ? "氛围感" : profile.scene === "retreat" ? "避世感" : profile.scene === "exhibition" ? "叙事感" : profile.scene === "architecture" ? "秩序感" : "治愈感";
   const visual = clean(facts.brief).slice(0, 24) || "空间氛围与生活感";
   const titleOptions = [
     `谁懂啊！这${profile.space}一走进去就像开了滤镜`,
@@ -73,16 +83,23 @@ export function createFallbackDraft(facts: ProjectFacts, imageCount: number, rea
     `建议收藏！${style}${profile.space}抄作业模板`,
   ];
   const body = `第一眼就被这组空间氛围拿捏了✨\n${visual}成为画面记忆点，整体克制却很有情绪。\n${first}\n${second}\n你最想把哪一处灵感搬进自己的项目？`;
+  const bodyOptions = [
+    body,
+    `这组${profile.space}把${style}做得很克制✨\n从已知信息看，${visual}是最清晰的设计线索，空间重点落在尺度、秩序与使用体验。\n${first}\n你更想继续看材质还是动线解析？`,
+    `推门进入${profile.space}，情绪一下慢了下来🌿\n${visual}串起画面，也让日常使用多了一层故事感。\n${second}\n如果是你，会先停在哪个角落？`,
+    `建议收藏这组${style}${profile.space}📌\n可借鉴的重点有三处：明确视觉中心、控制色彩关系、让陈设服务真实场景。\n${first}\n哪一点最值得你抄作业？`,
+  ].map((item) => item.slice(0, 180));
   return {
     title: titleOptions[seed % titleOptions.length],
     titleOptions,
-    coverEyebrow: "ORIGINAL DESIGN · INTERIOR",
+    coverEyebrow: "",
     coverTitle: `${memory}才是顶级情绪价值`,
     coverSubtitle: `${style}・${visual}`,
     coverStyle: { fontFamily: "serif", titleColor: "#ffffff", subtitleColor: "#eee9df", overlayColor: "#121713", overlayOpacity: 58, pattern: "frame", patternColor: "#ffffff", titleSize: 88, align: "left", position: "bottom" },
-    body: body.slice(0, 150),
+    body: bodyOptions[0],
+    bodyOptions,
     tags: tagsFor(profile.scene, style, clean(facts.location)),
-    highlights: ["5 套点击标题公式", "150 字以内短正文", "按空间分类匹配网感梗句", "8 个搜索标签配比"],
+    highlights: ["5 套点击标题公式", "120-180 字短正文", "按六类空间匹配网感梗句", "8 个搜索标签配比"],
     riskNotes: [`${reason}，已启用网站内置备用创作引擎`, "备用模式只使用项目分区与已知信息，不猜测未知材质"],
     coverIndex: Math.max(0, Math.min(imageCount - 1, seed % Math.max(imageCount, 1))),
     mode: "网站内置爆款文案引擎 · 免 API 额度",
