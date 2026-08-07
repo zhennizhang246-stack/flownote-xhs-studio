@@ -23,6 +23,8 @@ type Draft = {
     pattern?: string;
     patternColor?: string;
     titleSize?: number;
+    titleWeight?: number;
+    titleOpacity?: number;
     titleOffsetX?: number;
     titleOffsetY?: number;
     titleDirection?: string;
@@ -34,9 +36,12 @@ type Draft = {
     eyebrowX?: number;
     eyebrowY?: number;
     eyebrowSize?: number;
+    eyebrowWeight?: number;
     eyebrowOpacity?: number;
     showEyebrowLine?: boolean;
     subtitleSize?: number;
+    subtitleWeight?: number;
+    subtitleOpacity?: number;
     subtitleOffsetX?: number;
     subtitleOffsetY?: number;
   };
@@ -81,6 +86,8 @@ function cleanDraft(value: unknown): Draft {
       pattern: oneOf(style.pattern, ["none", "frame", "grid", "dots", "corners", "polka", "textile", "gradient", "blue-white-dots", "ad-badge", "ad-ribbon", "editorial-bars", "spotlight"] as const, "frame"),
       patternColor: color(style.patternColor, "#ffffff"),
       titleSize: Math.min(120, Math.max(52, Number(style.titleSize ?? 88))),
+      titleWeight: Math.min(900, Math.max(100, Number(style.titleWeight ?? 700))),
+      titleOpacity: Math.min(100, Math.max(10, Number(style.titleOpacity ?? 100))),
       titleOffsetX: Math.min(35, Math.max(-35, Number(style.titleOffsetX ?? 0))),
       titleOffsetY: Math.min(30, Math.max(-30, Number(style.titleOffsetY ?? 0))),
       titleDirection: oneOf(style.titleDirection, ["horizontal", "vertical"] as const, "horizontal"),
@@ -92,9 +99,12 @@ function cleanDraft(value: unknown): Draft {
       eyebrowX: Math.min(50, Math.max(2, Number(style.eyebrowX ?? 7.6))),
       eyebrowY: Math.min(92, Math.max(2, Number(style.eyebrowY ?? 5.8))),
       eyebrowSize: Math.min(48, Math.max(16, Number(style.eyebrowSize ?? 26))),
+      eyebrowWeight: Math.min(900, Math.max(100, Number(style.eyebrowWeight ?? 700))),
       eyebrowOpacity: Math.min(100, Math.max(10, Number(style.eyebrowOpacity ?? 100))),
       showEyebrowLine: typeof style.showEyebrowLine === "boolean" ? style.showEyebrowLine : true,
       subtitleSize: Math.min(54, Math.max(18, Number(style.subtitleSize ?? 28))),
+      subtitleWeight: Math.min(900, Math.max(100, Number(style.subtitleWeight ?? 500))),
+      subtitleOpacity: Math.min(100, Math.max(10, Number(style.subtitleOpacity ?? 100))),
       subtitleOffsetX: Math.min(30, Math.max(-30, Number(style.subtitleOffsetX ?? 0))),
       subtitleOffsetY: Math.min(25, Math.max(-20, Number(style.subtitleOffsetY ?? 0))),
     },

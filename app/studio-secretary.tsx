@@ -33,6 +33,8 @@ type CoverStyle = {
   pattern: "none" | "frame" | "grid" | "dots" | "corners" | "polka" | "textile" | "gradient" | "blue-white-dots" | "ad-badge" | "ad-ribbon" | "editorial-bars" | "spotlight";
   patternColor: string;
   titleSize: number;
+  titleWeight: number;
+  titleOpacity: number;
   titleOffsetX: number;
   titleOffsetY: number;
   titleDirection: "horizontal" | "vertical";
@@ -44,9 +46,12 @@ type CoverStyle = {
   eyebrowX: number;
   eyebrowY: number;
   eyebrowSize: number;
+  eyebrowWeight: number;
   eyebrowOpacity: number;
   showEyebrowLine: boolean;
   subtitleSize: number;
+  subtitleWeight: number;
+  subtitleOpacity: number;
   subtitleOffsetX: number;
   subtitleOffsetY: number;
 };
@@ -165,6 +170,8 @@ const defaultCoverStyle: CoverStyle = {
   pattern: "frame",
   patternColor: "#ffffff",
   titleSize: 88,
+  titleWeight: 700,
+  titleOpacity: 100,
   titleOffsetX: 0,
   titleOffsetY: 0,
   titleDirection: "horizontal",
@@ -176,9 +183,12 @@ const defaultCoverStyle: CoverStyle = {
   eyebrowX: 7.6,
   eyebrowY: 5.8,
   eyebrowSize: 26,
+  eyebrowWeight: 700,
   eyebrowOpacity: 100,
   showEyebrowLine: true,
   subtitleSize: 28,
+  subtitleWeight: 500,
+  subtitleOpacity: 100,
   subtitleOffsetX: 0,
   subtitleOffsetY: 0,
 };
@@ -308,6 +318,8 @@ function normalizedCoverStyle(value?: Partial<CoverStyle>): CoverStyle {
     patternColor: color(value?.patternColor, defaultCoverStyle.patternColor),
     overlayOpacity: Math.min(90, Math.max(0, Number(value?.overlayOpacity ?? defaultCoverStyle.overlayOpacity))),
     titleSize: Math.min(120, Math.max(52, Number(value?.titleSize ?? defaultCoverStyle.titleSize))),
+    titleWeight: Math.min(900, Math.max(100, Number(value?.titleWeight ?? defaultCoverStyle.titleWeight))),
+    titleOpacity: Math.min(100, Math.max(10, Number(value?.titleOpacity ?? defaultCoverStyle.titleOpacity))),
     titleOffsetX: Math.min(35, Math.max(-35, Number(value?.titleOffsetX ?? defaultCoverStyle.titleOffsetX))),
     titleOffsetY: Math.min(30, Math.max(-30, Number(value?.titleOffsetY ?? defaultCoverStyle.titleOffsetY))),
     patternOffsetX: Math.min(25, Math.max(-25, Number(value?.patternOffsetX ?? defaultCoverStyle.patternOffsetX))),
@@ -316,9 +328,12 @@ function normalizedCoverStyle(value?: Partial<CoverStyle>): CoverStyle {
     eyebrowX: Math.min(50, Math.max(2, Number(value?.eyebrowX ?? defaultCoverStyle.eyebrowX))),
     eyebrowY: Math.min(92, Math.max(2, Number(value?.eyebrowY ?? defaultCoverStyle.eyebrowY))),
     eyebrowSize: Math.min(48, Math.max(16, Number(value?.eyebrowSize ?? defaultCoverStyle.eyebrowSize))),
+    eyebrowWeight: Math.min(900, Math.max(100, Number(value?.eyebrowWeight ?? defaultCoverStyle.eyebrowWeight))),
     eyebrowOpacity: Math.min(100, Math.max(10, Number(value?.eyebrowOpacity ?? defaultCoverStyle.eyebrowOpacity))),
     showEyebrowLine: typeof value?.showEyebrowLine === "boolean" ? value.showEyebrowLine : defaultCoverStyle.showEyebrowLine,
     subtitleSize: Math.min(54, Math.max(18, Number(value?.subtitleSize ?? defaultCoverStyle.subtitleSize))),
+    subtitleWeight: Math.min(900, Math.max(100, Number(value?.subtitleWeight ?? defaultCoverStyle.subtitleWeight))),
+    subtitleOpacity: Math.min(100, Math.max(10, Number(value?.subtitleOpacity ?? defaultCoverStyle.subtitleOpacity))),
     subtitleOffsetX: Math.min(30, Math.max(-30, Number(value?.subtitleOffsetX ?? defaultCoverStyle.subtitleOffsetX))),
     subtitleOffsetY: Math.min(25, Math.max(-20, Number(value?.subtitleOffsetY ?? defaultCoverStyle.subtitleOffsetY))),
   };
@@ -563,9 +578,8 @@ async function renderCoverDataUrl(source: string, eyebrow: string, title: string
   const eyebrowText = eyebrow.trim().toUpperCase().slice(0, 44);
   if (eyebrowText) {
     context.textAlign = "left";
-    const eyebrowWeight = style.eyebrowLogoStyle === "monogram" ? 900 : style.eyebrowLogoStyle === "wordmark" ? 500 : 700;
     const eyebrowFamily = style.eyebrowLogoStyle === "editorial" ? 'Georgia, "Times New Roman", serif' : coverFontStacks[style.fontFamily];
-    context.font = `${eyebrowWeight} ${style.eyebrowSize}px ${eyebrowFamily}`;
+    context.font = `${style.eyebrowWeight} ${style.eyebrowSize}px ${eyebrowFamily}`;
     context.letterSpacing = style.eyebrowLogoStyle === "wordmark" ? "-1px" : style.eyebrowLogoStyle === "monogram" ? "4px" : "1px";
     context.fillStyle = style.titleColor;
     const eyebrowX = style.eyebrowX / 100 * canvas.width;
@@ -581,7 +595,7 @@ async function renderCoverDataUrl(source: string, eyebrow: string, title: string
   context.textAlign = style.align;
   const anchorX = (style.align === "center" ? canvas.width / 2 : 82) + style.titleOffsetX / 100 * canvas.width;
   context.fillStyle = style.titleColor;
-  context.font = `${style.titleSize}px ${coverFontStacks[style.fontFamily]}`;
+  context.font = `${style.titleWeight} ${style.titleSize}px ${coverFontStacks[style.fontFamily]}`;
   const chars = [...title.trim()];
   const lines: string[] = [];
   let line = "";
@@ -598,12 +612,15 @@ async function renderCoverDataUrl(source: string, eyebrow: string, title: string
   const titleBase = (style.position === "top" ? 270 : style.position === "middle" ? 720 : 1110) + style.titleOffsetY / 100 * canvas.height;
   const lineHeight = style.titleSize * 1.15;
   const renderedLines = style.titleDirection === "vertical" ? chars.slice(0, 8) : lines.slice(0, 3);
+  context.globalAlpha = style.titleOpacity / 100;
   renderedLines.forEach((text, index) => context.fillText(text, anchorX, titleBase + index * lineHeight));
-  context.font = `${style.subtitleSize}px ${coverFontStacks[style.fontFamily]}`;
+  context.font = `${style.subtitleWeight} ${style.subtitleSize}px ${coverFontStacks[style.fontFamily]}`;
   context.fillStyle = style.subtitleColor;
+  context.globalAlpha = style.subtitleOpacity / 100;
   const subtitleX = anchorX + style.subtitleOffsetX / 100 * canvas.width;
   const subtitleY = Math.min(1380, titleBase + renderedLines.length * lineHeight + 42 + style.subtitleOffsetY / 100 * canvas.height);
   context.fillText(subtitle.trim(), subtitleX, subtitleY);
+  context.globalAlpha = 1;
   return canvas.toDataURL("image/jpeg", 0.92);
 }
 
@@ -1572,6 +1589,8 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
             <label className="color-control"><small>图案颜色</small><input type="color" value={normalizedCoverStyle(draft.coverStyle).patternColor} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), patternColor: event.target.value } }))}/></label>
             <label className="color-control"><small>遮罩颜色</small><input type="color" value={normalizedCoverStyle(draft.coverStyle).overlayColor} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), overlayColor: event.target.value } }))}/></label>
             <label className="range-control"><small>标题字号 · {normalizedCoverStyle(draft.coverStyle).titleSize}</small><input type="range" min="52" max="120" value={normalizedCoverStyle(draft.coverStyle).titleSize} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), titleSize: Number(event.target.value) } }))}/></label>
+            <label className="range-control"><small>主标题粗细 · {normalizedCoverStyle(draft.coverStyle).titleWeight}</small><input type="range" min="100" max="900" step="100" value={normalizedCoverStyle(draft.coverStyle).titleWeight} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), titleWeight: Number(event.target.value) } }))}/></label>
+            <label className="range-control"><small>主标题透明度 · {normalizedCoverStyle(draft.coverStyle).titleOpacity}%</small><input type="range" min="10" max="100" value={normalizedCoverStyle(draft.coverStyle).titleOpacity} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), titleOpacity: Number(event.target.value) } }))}/></label>
             <label className="range-control"><small>主标题水平位置 · {normalizedCoverStyle(draft.coverStyle).titleOffsetX}</small><input type="range" min="-35" max="35" value={normalizedCoverStyle(draft.coverStyle).titleOffsetX} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), titleOffsetX: Number(event.target.value) } }))}/></label>
             <label className="range-control"><small>主标题垂直位置 · {normalizedCoverStyle(draft.coverStyle).titleOffsetY}</small><input type="range" min="-30" max="30" value={normalizedCoverStyle(draft.coverStyle).titleOffsetY} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), titleOffsetY: Number(event.target.value) } }))}/></label>
             <label className="range-control"><small>遮罩强度 · {normalizedCoverStyle(draft.coverStyle).overlayOpacity}%</small><input type="range" min="0" max="90" value={normalizedCoverStyle(draft.coverStyle).overlayOpacity} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), overlayOpacity: Number(event.target.value) } }))}/></label>
@@ -1581,9 +1600,12 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
             <label className="range-control"><small>英文水平位置 · {normalizedCoverStyle(draft.coverStyle).eyebrowX}%</small><input type="range" min="2" max="50" value={normalizedCoverStyle(draft.coverStyle).eyebrowX} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), eyebrowX: Number(event.target.value) } }))}/></label>
             <label className="range-control"><small>英文垂直位置 · {normalizedCoverStyle(draft.coverStyle).eyebrowY}%</small><input type="range" min="2" max="92" value={normalizedCoverStyle(draft.coverStyle).eyebrowY} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), eyebrowPosition: "custom", eyebrowY: Number(event.target.value) } }))}/></label>
             <label className="range-control"><small>英文字号 · {normalizedCoverStyle(draft.coverStyle).eyebrowSize}</small><input type="range" min="16" max="48" value={normalizedCoverStyle(draft.coverStyle).eyebrowSize} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), eyebrowSize: Number(event.target.value) } }))}/></label>
+            <label className="range-control"><small>英文栏目粗细 · {normalizedCoverStyle(draft.coverStyle).eyebrowWeight}</small><input type="range" min="100" max="900" step="100" value={normalizedCoverStyle(draft.coverStyle).eyebrowWeight} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), eyebrowWeight: Number(event.target.value) } }))}/></label>
             <label className="range-control"><small>英文透明度 · {normalizedCoverStyle(draft.coverStyle).eyebrowOpacity}%</small><input type="range" min="10" max="100" value={normalizedCoverStyle(draft.coverStyle).eyebrowOpacity} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), eyebrowOpacity: Number(event.target.value) } }))}/></label>
             <label className="line-toggle"><small>英文栏目横线</small><span><input type="checkbox" checked={normalizedCoverStyle(draft.coverStyle).showEyebrowLine} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), showEyebrowLine: event.target.checked } }))}/> 显示横线</span></label>
             <label className="range-control"><small>副标题字号 · {normalizedCoverStyle(draft.coverStyle).subtitleSize}</small><input type="range" min="18" max="54" value={normalizedCoverStyle(draft.coverStyle).subtitleSize} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), subtitleSize: Number(event.target.value) } }))}/></label>
+            <label className="range-control"><small>副标题粗细 · {normalizedCoverStyle(draft.coverStyle).subtitleWeight}</small><input type="range" min="100" max="900" step="100" value={normalizedCoverStyle(draft.coverStyle).subtitleWeight} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), subtitleWeight: Number(event.target.value) } }))}/></label>
+            <label className="range-control"><small>副标题透明度 · {normalizedCoverStyle(draft.coverStyle).subtitleOpacity}%</small><input type="range" min="10" max="100" value={normalizedCoverStyle(draft.coverStyle).subtitleOpacity} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), subtitleOpacity: Number(event.target.value) } }))}/></label>
             <label className="range-control"><small>副标题水平位置 · {normalizedCoverStyle(draft.coverStyle).subtitleOffsetX}</small><input type="range" min="-30" max="30" value={normalizedCoverStyle(draft.coverStyle).subtitleOffsetX} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), subtitleOffsetX: Number(event.target.value) } }))}/></label>
             <label className="range-control"><small>副标题垂直位置 · {normalizedCoverStyle(draft.coverStyle).subtitleOffsetY}</small><input type="range" min="-20" max="25" value={normalizedCoverStyle(draft.coverStyle).subtitleOffsetY} onChange={(event) => setDraft((current) => ({ ...current, coverStyle: { ...normalizedCoverStyle(current.coverStyle), subtitleOffsetY: Number(event.target.value) } }))}/></label>
           </div>

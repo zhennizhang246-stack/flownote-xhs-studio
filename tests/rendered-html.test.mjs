@@ -239,10 +239,19 @@ test("resizes cover decorations, English eyebrow, and subtitle in the final artw
   assert.match(studio, /图案大小 · \{normalizedCoverStyle\(draft\.coverStyle\)\.patternScale\}%/);
   assert.match(studio, /英文字号 · \{normalizedCoverStyle\(draft\.coverStyle\)\.eyebrowSize\}/);
   assert.match(studio, /副标题字号 · \{normalizedCoverStyle\(draft\.coverStyle\)\.subtitleSize\}/);
+  assert.match(studio, /主标题粗细/);
+  assert.match(studio, /主标题透明度/);
+  assert.match(studio, /英文栏目粗细/);
+  assert.match(studio, /副标题粗细/);
+  assert.match(studio, /副标题透明度/);
   assert.match(studio, /context\.scale\(patternScale, patternScale\)/);
   assert.match(studio, /eyebrowWeight/);
   assert.match(project, /patternScale: Math\.min\(160/);
   assert.match(project, /eyebrowSize: Math\.min\(48/);
+  assert.match(project, /titleWeight: Math\.min\(900/);
+  assert.match(project, /subtitleOpacity: Math\.min\(100/);
+  assert.match(studio, /context\.globalAlpha = style\.titleOpacity \/ 100/);
+  assert.match(studio, /context\.globalAlpha = style\.subtitleOpacity \/ 100/);
 });
 
 test("selects English logo presets and uploads fonts into the exported cover", async () => {
