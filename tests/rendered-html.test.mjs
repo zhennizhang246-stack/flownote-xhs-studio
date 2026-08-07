@@ -22,7 +22,7 @@ test("ships the studio secretary product surface", async () => {
   assert.match(page, /办公项目/);
   assert.match(page, /酒店项目/);
   assert.match(page, /展厅陈列项目/);
-  assert.match(page, /5 个爆款标题公式 · 点击选择/);
+  assert.match(page, /5 个爆款标题公式 · 每条不超过 20 字 · 点击选择/);
   assert.match(page, /确认并同步保存/);
   assert.match(page, /©2026/);
   assert.match(page, /由 MJ 制作/);
@@ -130,6 +130,19 @@ test("generates and persists five selectable title options", async () => {
   assert.match(generate, /titleOptions 必须有 5 项/);
   assert.match(generate, /draft\.titleOptions = options/);
   assert.match(project, /titleOptions/);
+});
+
+test("limits every viral title to twenty visible characters and supports emoji", async () => {
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  const generate = await readFile(new URL("../app/api/generate/route.ts", import.meta.url), "utf8");
+  const project = await readFile(new URL("../app/api/projects/[id]/route.ts", import.meta.url), "utf8");
+  assert.match(studio, /Intl\.Segmenter/);
+  assert.match(studio, /slice\(0, 20\)/);
+  assert.match(studio, /每条不超过 20 字/);
+  assert.match(studio, /标题 Emoji/);
+  assert.match(generate, /20 个可见字符以内/);
+  assert.match(generate, /options\.map\(truncateTitle\)/);
+  assert.match(project, /titleOptions: cleanList\(input\.titleOptions, 5, 80\)\.map\(truncateTitle\)/);
 });
 
 test("falls back to an embedded viral-copy engine when visual API quota is unavailable", async () => {

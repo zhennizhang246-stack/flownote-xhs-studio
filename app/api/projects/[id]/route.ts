@@ -57,6 +57,7 @@ type Draft = {
 };
 
 const validStatuses = new Set(["drafted", "approved", "scheduled", "published"]);
+const truncateTitle = (value: unknown) => Array.from(new Intl.Segmenter("zh-CN", { granularity: "grapheme" }).segment(String(value || "").trim()), (part) => part.segment).slice(0, 20).join("");
 
 function cleanDraft(value: unknown): Draft {
   if (!value || typeof value !== "object") throw new Error("文案内容无效");
@@ -71,8 +72,8 @@ function cleanDraft(value: unknown): Draft {
     options.includes(String(value) as T) ? String(value) as T : fallback
   );
   const draft = {
-    title: cleanText(input.title, 80),
-    titleOptions: cleanList(input.titleOptions, 5, 80),
+    title: truncateTitle(input.title),
+    titleOptions: cleanList(input.titleOptions, 5, 80).map(truncateTitle),
     coverEyebrow: cleanText(input.coverEyebrow, 44).toUpperCase(),
     coverTitle: cleanText(input.coverTitle, 30),
     coverSubtitle: cleanText(input.coverSubtitle, 60),
@@ -122,7 +123,7 @@ function cleanDraft(value: unknown): Draft {
     mode: cleanText(input.mode, 30) || "人工编辑",
   };
   if (!draft.titleOptions.includes(draft.title)) draft.titleOptions = [draft.title, ...draft.titleOptions].filter(Boolean).slice(0, 5);
-  while (draft.titleOptions.length < 5) draft.titleOptions.push(`${draft.title}｜备选${draft.titleOptions.length + 1}`);
+  while (draft.titleOptions.length < 5) draft.titleOptions.push(truncateTitle(`${draft.title}｜备选${draft.titleOptions.length + 1}`));
   if (!draft.title || !draft.coverTitle || !draft.body) throw new Error("标题、封面标题和正文不能为空");
   return draft;
 }

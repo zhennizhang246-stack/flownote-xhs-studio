@@ -239,6 +239,9 @@ const navItems: Array<{ id: Tab; number: string; label: string }> = [
 const projectCategories = ["全部项目", "商业项目", "住宅项目", "办公项目", "酒店项目", "展厅陈列项目", "其他项目"];
 const spaceTypes = ["客厅", "餐厅", "厨房", "客餐厨一体", "卧室", "儿童房", "书房", "衣帽间", "卫浴空间", "玄关", "整屋住宅", "办公室", "设计工作室", "酒店大堂", "酒店客房", "民宿", "零售店铺", "餐饮空间", "咖啡空间", "商业展厅", "艺术展陈"];
 const MAX_PROJECT_IMAGES = 10;
+const splitTitleGraphemes = (value: string) => Array.from(new Intl.Segmenter("zh-CN", { granularity: "grapheme" }).segment(value), (part) => part.segment);
+const truncateTitle = (value: string) => splitTitleGraphemes(value.trimStart()).slice(0, 20).join("");
+const titleEmojiOptions = ["✨", "🔥", "😭", "🤌", "🌿", "📸", "💙", "🏠"];
 const toDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
   const reader = new FileReader();
   reader.onload = () => resolve(String(reader.result));
@@ -680,7 +683,7 @@ function localFallback(meta: ProjectMeta, existingProjects: ProjectRecord[] = []
     project.draft?.body,
   ]).map((value) => String(value || "").replace(/\s+/g, "").trim()).filter(Boolean));
   const unique = (value: string, index: number) => used.has(value.replace(/\s+/g, "").trim()) ? `${value} · ${projectName}${index + 1}` : value;
-  const titleOptions = creative.titles.map(unique);
+  const titleOptions = creative.titles.map(unique).map(truncateTitle);
   const coverTitle = unique(creative.cover, 3);
   const body = unique(creative.body, 4);
   return {
@@ -1205,6 +1208,7 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
   }
 
   function loadProject(project: ProjectRecord) {
+    const loadedTitleOptions = (project.draft?.titleOptions?.length === 5 ? project.draft.titleOptions : [project.draft?.title || "", ...(project.draft?.titleOptions || []).filter((title) => title !== project.draft?.title), "", "", "", ""].slice(0, 5)).map(truncateTitle);
     setCurrentProjectId(project.id);
     setMeta({
       name: project.name,
@@ -1215,7 +1219,7 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
       audience: project.audience,
       brief: project.brief,
     });
-    setDraft({ ...emptyDraft, ...project.draft, coverStyle: normalizedCoverStyle(project.draft?.coverStyle), titleOptions: project.draft?.titleOptions?.length === 5 ? project.draft.titleOptions : [project.draft?.title || "", ...(project.draft?.titleOptions || []).filter((title) => title !== project.draft?.title), "", "", "", ""].slice(0, 5), tags: project.draft?.tags || [], highlights: project.draft?.highlights || [], riskNotes: project.draft?.riskNotes || [] });
+    setDraft({ ...emptyDraft, ...project.draft, title: truncateTitle(project.draft?.title || ""), coverStyle: normalizedCoverStyle(project.draft?.coverStyle), titleOptions: loadedTitleOptions, tags: project.draft?.tags || [], highlights: project.draft?.highlights || [], riskNotes: project.draft?.riskNotes || [] });
     setPreviews(project.images?.map((image) => image.url) || []);
     setFiles([]);
     setPhase("done");
@@ -1589,10 +1593,10 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
       </div>
     </section>
     <section className="editorial-card editor-mode">
-      <div className="editorial-title"><span>EDITABLE COPY</span><label><small>已选择的笔记标题</small><textarea value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}/></label><div className="fact-row">{facts.map((fact) => <span key={fact}>{fact}</span>)}</div></div>
+      <div className="editorial-title"><span>EDITABLE COPY</span><label><small>已选择的笔记标题 · {splitTitleGraphemes(draft.title).length}/20 字</small><textarea value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: truncateTitle(event.target.value) }))}/></label><div className="fact-row">{facts.map((fact) => <span key={fact}>{fact}</span>)}</div></div>
       <div className="copy-column">
         <div className="generation-basis"><small>统一生成依据 · 实景图视觉档案</small><strong>{draft.detectedSpaceType || meta.projectType || meta.category}</strong><p>{draft.designSummary || "上传实景图后，系统会先归纳空间、材质、色彩、采光、可见动线与空间情绪，再统一生成全部内容。"}</p></div>
-        <div className="title-options"><small>5 个爆款标题公式 · 点击选择</small>{draft.titleOptions.map((title, index) => <button className={draft.title === title ? "active" : ""} key={`${title}-${index}`} onClick={() => setDraft((current) => ({ ...current, title }))}><span>0{index + 1}</span>{title}<em>{draft.title === title ? "已选择" : "选择"}</em></button>)}</div>
+        <div className="title-options"><small>5 个爆款标题公式 · 每条不超过 20 字 · 点击选择</small>{draft.titleOptions.map((title, index) => <button className={draft.title === title ? "active" : ""} key={`${title}-${index}`} onClick={() => setDraft((current) => ({ ...current, title: truncateTitle(title) }))}><span>0{index + 1}</span>{title}<em>{draft.title === title ? "已选择" : "选择"}</em></button>)}<div className="title-emoji-row"><small>标题 Emoji</small>{titleEmojiOptions.map((emoji) => <button type="button" key={emoji} onClick={() => setDraft((current) => ({ ...current, title: truncateTitle(`${current.title}${emoji}`) }))}>{emoji}</button>)}</div></div>
         <div className="eyebrow-logo-editor">
           <label><small>封面英文栏目（留空则封面不显示英文）</small><input placeholder="选填；可手动输入英文或选择 Logo" value={draft.coverEyebrow} maxLength={44} onChange={(event) => setDraft((current) => ({ ...current, coverEyebrow: event.target.value.toUpperCase(), coverStyle: { ...normalizedCoverStyle(current.coverStyle), eyebrowLogoStyle: "plain", logoImageName: undefined, logoImageUrl: undefined } }))}/></label>
           <label><small>固定英文 Logo 样式</small><select value={eyebrowLogoPresets.find((preset) => preset.value === draft.coverEyebrow && preset.style === normalizedCoverStyle(draft.coverStyle).eyebrowLogoStyle)?.value || "manual"} onChange={(event) => {
