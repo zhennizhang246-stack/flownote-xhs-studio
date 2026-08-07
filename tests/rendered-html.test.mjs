@@ -11,7 +11,7 @@ test("ships the studio secretary product surface", async () => {
   assert.match(page, /引流笔记库/);
   assert.match(page, /确认并预填小红书发布页/);
   assert.match(page, /确认本篇并自动发布/);
-  assert.match(page, /MJ 发布桥 2.1 已连接/);
+  assert.match(page, /MJ 发布桥 2.2 已连接/);
   assert.match(page, /同步浏览器中右键收藏/);
   assert.match(page, /from=menu&target=image/);
   assert.match(page, /renderCoverDataUrl/);
@@ -49,7 +49,7 @@ test("ships a local bridge with manual prefill and single-use auto-publish autho
   const prefill = await readFile(new URL("../browser-extension/xhs-prefill.js", import.meta.url), "utf8");
   const research = await readFile(new URL("../browser-extension/xhs-research.js", import.meta.url), "utf8");
   assert.equal(manifest.manifest_version, 3);
-  assert.equal(manifest.version, "2.1.0");
+  assert.equal(manifest.version, "2.2.0");
   assert.ok(manifest.content_scripts.some((entry) => entry.matches.includes("https://creator.xiaohongshu.com/publish/*")));
   assert.match(siteBridge, /MJ_XHS_DRAFT_STORED/);
   assert.match(prefill, /DataTransfer/);
@@ -81,8 +81,8 @@ test("binds at most three computers to one isolated cloud workspace", async () =
   assert.match(schema, /idx_account_devices_owner_key/);
   assert.match(studio, /共享电脑 \{devices\.length\} \/ 3/);
   assert.match(studio, /打开小红书扫码登录/);
-  assert.match(studio, /项目库、文案和发布排期实时共享/);
-  assert.match(sharedContent, /最多绑定三台电脑/);
+  assert.match(studio, /xhsWorkspace\.linked/);
+  assert.match(sharedContent, /三台电脑共享发布/);
 });
 
 test("uses Node CI instead of applying Deno lint rules to the Node app", async () => {
@@ -468,7 +468,7 @@ test("publishes a sign-in-gated multi-account workspace without sharing Xiaohong
   assert.match(studio, /请扫码登录当前电脑的小红书/);
   assert.match(studio, /网站作者专属工作区/);
   assert.match(studio, /新账户独立工作区/);
-  assert.match(studio, /其他账户无法访问/);
+  assert.match(studio, /绑定小红书共享工作区前/);
   assert.match(studio, /mj-xhs-profile-url/);
   assert.doesNotMatch(studio, /60f6318b0000000001015907/);
   assert.match(account, /PRIMARY_OWNER_EMAIL/);
@@ -485,8 +485,25 @@ test("syncs the latest creator features into isolated new-user workspaces", asyn
   assert.match(studio, /新账户功能已同步/);
   assert.match(studio, /实景图识别与多模型文案/);
   assert.match(studio, /右键收藏引流笔记并解析/);
-  assert.match(studio, /只属于当前账户/);
+  assert.match(studio, /同一小红书账号共享新项目库/);
   assert.match(css, /\.new-user-sync-card/);
+});
+
+test("shares only new projects across GPT accounts bound to the same Xiaohongshu profile", async () => {
+  const schema = await readFile(new URL("../db/schema.ts", import.meta.url), "utf8");
+  const account = await readFile(new URL("../lib/account.ts", import.meta.url), "utf8");
+  const workspace = await readFile(new URL("../app/api/xhs-workspace/route.ts", import.meta.url), "utf8");
+  const studio = await readFile(new URL("../app/studio-secretary.tsx", import.meta.url), "utf8");
+  const migration = await readFile(new URL("../drizzle/0007_luxuriant_scarecrow.sql", import.meta.url), "utf8");
+  assert.match(schema, /xhsWorkspaceLinks/);
+  assert.match(account, /link\?\.workspaceKey \|\| userEmail/);
+  assert.match(workspace, /requireRawAccountEmail/);
+  assert.match(workspace, /bridgeConfirmed/);
+  assert.match(workspace, /\/user\/profile\//);
+  assert.match(studio, /绑定同一小红书项目库/);
+  assert.match(studio, /网站作者绑定前的历史项目保持私有/);
+  assert.match(studio, /window\.location\.reload\(\)/);
+  assert.match(migration, /CREATE TABLE `xhs_workspace_links`/);
 });
 
 test("publishes a WeChat share page synchronized with the main site content", async () => {

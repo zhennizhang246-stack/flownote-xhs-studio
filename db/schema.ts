@@ -56,6 +56,16 @@ export const accountDevices = sqliteTable("account_devices", {
   index("idx_account_devices_owner_seen").on(table.ownerEmail, table.lastSeenAt),
 ]);
 
+export const xhsWorkspaceLinks = sqliteTable("xhs_workspace_links", {
+  userEmail: text("user_email").primaryKey(),
+  workspaceKey: text("workspace_key").notNull(),
+  profileUrl: text("profile_url").notNull(),
+  linkedAt: text("linked_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [
+  index("idx_xhs_workspace_links_workspace").on(table.workspaceKey),
+]);
+
 export const researchReferences = sqliteTable("research_references", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   ownerEmail: text("owner_email").notNull().default(""),

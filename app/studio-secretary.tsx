@@ -685,6 +685,9 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
   const [profileUrl, setProfileUrl] = useState(() => (
     typeof window === "undefined" ? "" : window.localStorage.getItem(`mj-xhs-profile-url:${accountKey}`) || ""
   ));
+  const [xhsWorkspace, setXhsWorkspace] = useState<{ linked: boolean; profileUrl: string; workspaceKey: string }>({ linked: false, profileUrl: "", workspaceKey: "" });
+  const [xhsWorkspaceNotice, setXhsWorkspaceNotice] = useState("");
+  const bridgeWorkspaceKey = xhsWorkspace.workspaceKey || accountKey;
 
   const coverImage = previews[draft.coverIndex ?? 0] || "";
   const phaseLabel = {
@@ -731,17 +734,24 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
   useEffect(() => {
     async function loadWorkspace() {
       try {
-        const [projectResponse, settingsResponse, researchResponse] = await Promise.all([
+        const [projectResponse, settingsResponse, researchResponse, workspaceResponse] = await Promise.all([
           fetch("/api/projects"),
           fetch("/api/settings"),
           fetch("/api/research"),
+          fetch("/api/xhs-workspace"),
         ]);
         const projectPayload = projectResponse.ok ? await projectResponse.json() as { projects: ProjectRecord[] } : { projects: [] };
         const settingsPayload = settingsResponse.ok ? await settingsResponse.json() as { settings: AutomationSettings } : { settings: defaultSettings };
         const researchPayload = researchResponse.ok ? await researchResponse.json() as { references: ResearchReference[] } : { references: [] };
+        const workspacePayload = workspaceResponse.ok ? await workspaceResponse.json() as { linked: boolean; profileUrl: string; workspaceKey: string } : { linked: false, profileUrl: "", workspaceKey: "" };
         setProjects(projectPayload.projects);
         setSettings(settingsPayload.settings);
         setReferences(researchPayload.references);
+        setXhsWorkspace(workspacePayload);
+        if (workspacePayload.profileUrl) {
+          setProfileUrl(workspacePayload.profileUrl);
+          window.localStorage.setItem(`mj-xhs-profile-url:${accountKey}`, workspacePayload.profileUrl);
+        }
         setScheduleDrafts(Object.fromEntries(projectPayload.projects.map((project) => [
           project.id,
           project.scheduledAt ? dateTimeInput(new Date(project.scheduledAt)) : nextSlot(settingsPayload.settings),
@@ -757,7 +767,7 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
 
   useEffect(() => {
     async function syncPublishedResults(results: Array<{ ownerKey?: string; projectId?: number; status?: string; publishUrl?: string; publishedAt?: string }>) {
-      const matches = results.filter((result) => result.ownerKey === accountKey && Number.isInteger(result.projectId) && result.status === "published");
+      const matches = results.filter((result) => result.ownerKey === bridgeWorkspaceKey && Number.isInteger(result.projectId) && result.status === "published");
       if (!matches.length) return;
       const synced: ProjectRecord[] = [];
       for (const result of matches) {
@@ -785,10 +795,26 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
       if (message.version === 4 && message.type === "MJ_XHS_PUBLISH_RESULTS") void syncPublishedResults(message.results || []);
     }
     window.addEventListener("message", receiveBridgeStatus);
-    window.postMessage({ source: XHS_BRIDGE_SOURCE, type: "MJ_XHS_ACCOUNT_CONTEXT", ownerKey: accountKey }, window.location.origin);
+    window.postMessage({ source: XHS_BRIDGE_SOURCE, type: "MJ_XHS_ACCOUNT_CONTEXT", ownerKey: bridgeWorkspaceKey }, window.location.origin);
     window.postMessage({ source: XHS_BRIDGE_SOURCE, type: "MJ_XHS_BRIDGE_PING" }, window.location.origin);
     return () => window.removeEventListener("message", receiveBridgeStatus);
-  }, [accountKey]);
+  }, [bridgeWorkspaceKey]);
+
+  async function bindXhsWorkspace() {
+    setXhsWorkspaceNotice("正在确认小红书共享工作区…");
+    const response = await fetch("/api/xhs-workspace", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ profileUrl, bridgeConfirmed: bridgeReady }),
+    });
+    const payload = await response.json() as { error?: string; linked?: boolean; profileUrl?: string; workspaceKey?: string };
+    if (!response.ok || !payload.linked) {
+      setXhsWorkspaceNotice(payload.error || "小红书工作区绑定失败");
+      return;
+    }
+    setXhsWorkspaceNotice("已绑定同一小红书共享项目库，正在刷新云端资料…");
+    window.location.reload();
+  }
 
   useEffect(() => {
     if (!deviceKey) return;
@@ -973,7 +999,7 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
     }));
     const payload: XhsBridgeDraft = {
       version: 2,
-      ownerKey: accountKey,
+      ownerKey: bridgeWorkspaceKey,
       projectId: project.id,
       projectName: project.name,
       title: projectDraft.title.trim(),
@@ -1030,7 +1056,7 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
       return;
     }
     setScheduleDrafts((current) => ({ ...current, [project.id]: nextSlot(settings) }));
-    window.postMessage({ source: XHS_BRIDGE_SOURCE, type: "MJ_XHS_CANCEL_SCHEDULE", ownerKey: accountKey, projectId: project.id }, window.location.origin);
+    window.postMessage({ source: XHS_BRIDGE_SOURCE, type: "MJ_XHS_CANCEL_SCHEDULE", ownerKey: bridgeWorkspaceKey, projectId: project.id }, window.location.origin);
     setNotice(`“${project.name}”已从发布日历移除，项目仍保存在资产库中`);
     await refreshProjects();
   }
@@ -1162,7 +1188,7 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
     const createdAt = new Date();
     const bridgeDraft: XhsBridgeDraft = {
       version: 2,
-      ownerKey: accountKey,
+      ownerKey: bridgeWorkspaceKey,
       projectId: currentProjectId,
       projectName: meta.name,
       title: draft.title.trim(),
@@ -1433,7 +1459,7 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
       <div className="phone-frame"><div className="cover-preview final-artwork-preview">{coverImage ? <img src={renderedCoverPreview || coverImage} alt="与小红书最终封面完全一致的发布预览"/> : <div className="empty-cover-placeholder">上传项目实景图后生成封面</div>}</div></div>
       <p className="final-preview-note">1080 × 1440 小红书竖版封面 · 此处直接显示最终合成图片</p>
       <div className={`bridge-status ${bridgeReady ? "connected" : ""}`}>
-        <span>{bridgeReady ? "MJ 发布桥 2.1 已连接" : "未连接最新版 MJ 发布桥"}</span>
+        <span>{bridgeReady ? "MJ 发布桥 2.2 已连接" : "未连接最新版 MJ 发布桥"}</span>
         <p>{bridgeReady ? "成品封面、项目图片、标题、正文与标签会保持统一；可选择人工发布或单篇确认后自动发布。" : "安装一次浏览器扩展，即可把已确认内容自动带入小红书官方图文发布页。"}</p>
         {!bridgeReady && <a href={XHS_BRIDGE_EXTENSION_URL} download>下载或更新 MJ 发布桥扩展</a>}
       </div>
@@ -1601,12 +1627,12 @@ export function StudioSecretary({ accountKey, accountName, isSiteOwner }: { acco
       <p className="sidebar-note">图片、事实、排期与参考均按项目归档。正式发布前保留人工确认。</p>
     </aside>
     <section className="workspace">
-      <header className="topbar"><div><p className="kicker">XIAOHONGSHU CREATIVE SERVICE</p><h1>小红书创作服务平台</h1><p className="account-workspace">{isSiteOwner ? "网站作者专属工作区" : "新账户独立工作区"}：{accountName}</p><p className="account-privacy">仅当前登录账户可查看本工作区资料，其他账户无法访问。</p></div><div className="topbar-actions"><a className="web-mode-link" href="/web/" target="_blank" rel="noreferrer">网页展示模式 ↗</a><span className={`status-chip ${phase}`}>{phaseLabel}</span><a className="account-signout" href="/signout-with-chatgpt?return_to=%2Fwechat">退出工作区</a><a className="avatar" href="https://www.xiaohongshu.com/" target="_blank" rel="noreferrer" aria-label="登录当前浏览器的小红书账户">XHS</a></div></header>
+      <header className="topbar"><div><p className="kicker">XIAOHONGSHU CREATIVE SERVICE</p><h1>小红书创作服务平台</h1><p className="account-workspace">{xhsWorkspace.linked ? "同一小红书账号共享工作区" : isSiteOwner ? "网站作者专属工作区" : "新账户独立工作区"}：{accountName}</p><p className="account-privacy">{xhsWorkspace.linked ? "仅绑定同一小红书主页的新项目与排期会同步；网站作者原有历史项目不会显示。" : "绑定小红书共享工作区前，仅当前 GPT 登录账户可查看资料。"}</p></div><div className="topbar-actions"><a className="web-mode-link" href="/web/" target="_blank" rel="noreferrer">网页展示模式 ↗</a><span className={`status-chip ${phase}`}>{phaseLabel}</span><a className="account-signout" href="/signout-with-chatgpt?return_to=%2Fwechat">退出工作区</a><a className="avatar" href="https://www.xiaohongshu.com/" target="_blank" rel="noreferrer" aria-label="登录当前浏览器的小红书账户">XHS</a></div></header>
       {!isSiteOwner && <section className="new-user-sync-card" aria-label="新账户功能同步状态">
-        <div><small>NEW ACCOUNT · FEATURES SYNCED</small><strong>新账户功能已同步</strong><p>你已拥有与主站一致的创作能力，但项目、引流笔记、排期和小红书会话只属于当前账户。</p></div>
-        <ul><li><span>01</span>实景图识别与多模型文案</li><li><span>02</span>封面、5 个标题与标签生成</li><li><span>03</span>右键收藏引流笔记并解析</li><li><span>04</span>三台电脑共享本账户项目库</li></ul>
+        <div><small>NEW ACCOUNT · FEATURES SYNCED</small><strong>新账户功能已同步</strong><p>绑定前资料只属于当前 GPT 账户；绑定同一小红书主页后，仅共享绑定后创建的新项目和排期，作者历史资料仍保持私有。</p></div>
+        <ul><li><span>01</span>实景图识别与多模型文案</li><li><span>02</span>封面、5 个标题与标签生成</li><li><span>03</span>右键收藏引流笔记并解析</li><li><span>04</span>同一小红书账号共享新项目库</li></ul>
       </section>}
-      <div className={`xhs-session-banner ${bridgeReady ? "connected" : ""}`}><div><strong>{bridgeReady ? "当前电脑已连接共享创作工作区" : "请扫码登录当前电脑的小红书"}</strong><p>同一平台账户最多绑定 3 台电脑，项目库、文案和发布排期实时共享；每台电脑只需在小红书官方页面扫码登录，不传输密码或登录状态。</p><label><span>当前小红书主页链接</span><input value={profileUrl} onChange={(event) => { const value = event.target.value.trim(); setProfileUrl(value); window.localStorage.setItem(`mj-xhs-profile-url:${accountKey}`, value); }} placeholder="扫码登录后复制同一个小红书主页链接"/></label></div><div>{!bridgeReady && <a href={XHS_BRIDGE_EXTENSION_URL} download>下载发布桥</a>}<a href="https://www.xiaohongshu.com/" target="_blank" rel="noreferrer">打开小红书扫码登录 ↗</a></div></div>
+      <div className={`xhs-session-banner ${bridgeReady ? "connected" : ""}`}><div><strong>{xhsWorkspace.linked ? "已进入同一小红书账号共享项目库" : bridgeReady ? "发布桥已连接，可绑定小红书共享项目库" : "请扫码登录当前电脑的小红书"}</strong><p>不同 GPT 账户绑定同一个小红书主页后，共享绑定之后创建的项目资产库、文案和发布排期；网站作者绑定前的历史项目保持私有，不会迁移或显示。</p><label><span>当前小红书主页链接</span><input value={profileUrl} onChange={(event) => { const value = event.target.value.trim(); setProfileUrl(value); window.localStorage.setItem(`mj-xhs-profile-url:${accountKey}`, value); }} placeholder="扫码登录后复制同一个小红书主页链接"/></label>{xhsWorkspaceNotice && <em>{xhsWorkspaceNotice}</em>}</div><div>{!bridgeReady && <a href={XHS_BRIDGE_EXTENSION_URL} download>下载发布桥</a>}<a href="https://www.xiaohongshu.com/" target="_blank" rel="noreferrer">打开小红书扫码登录 ↗</a><button type="button" onClick={() => void bindXhsWorkspace()} disabled={!bridgeReady || !profileUrl}>{xhsWorkspace.linked ? "重新确认共享工作区" : "绑定同一小红书项目库"}</button></div></div>
       <section className="device-workspace-card" aria-label="共享设备管理"><div><small>MULTI-DEVICE WORKSPACE</small><strong>共享电脑 {devices.length} / 3</strong><p>三台电脑共享同一项目资产库与发布日历，小红书扫码会话分别保存在各自浏览器。</p>{deviceNotice && <em>{deviceNotice}</em>}</div><div className="device-list">{devices.map((device) => <article key={device.deviceKey} className={device.deviceKey === deviceKey ? "current" : ""}><span>{device.bridgeConnected ? "●" : "○"}</span><div><strong>{device.deviceName}{device.deviceKey === deviceKey ? "（当前）" : ""}</strong><small>{device.bridgeConnected ? "发布桥已连接" : "等待扫码或连接发布桥"} · {new Date(device.lastSeenAt).toLocaleString("zh-CN")}</small></div>{device.deviceKey !== deviceKey && <button onClick={() => void removeDevice(device.deviceKey)}>移除</button>}</article>)}</div></section>
       {activeTab === "creator" && creatorView}
       {activeTab === "assets" && assetView}
